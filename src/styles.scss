@@ -1,0 +1,44 @@
+/* ------------------------------
+   Ionic Core CSS
+   ------------------------------ */
+@use '@ionic/core/css/core.css';
+@use '@ionic/core/css/normalize.css';
+@use '@ionic/core/css/structure.css';
+@use '@ionic/core/css/typography.css';
+// @use '@ionic/core/css/padding.css';
+// @use '@ionic/core/css/float-elements.css';
+// @use '@ionic/core/css/text-alignment.css';
+// @use '@ionic/core/css/text-transformation.css';
+// @use '@ionic/core/css/flex-utils.css';
+// @use '@ionic/core/css/display.css';
+
+/**
+ * Ionic Dark Palette
+ * -----------------------------------------------------
+ * For more information, please see:
+ * https://ionicframework.com/docs/theming/dark-mode
+ */
+
+/* @import '@ionic/angular/css/palettes/dark.always.css'; */
+@use '@ionic/core/css/palettes/dark.class.css';
+/* @import '@ionic/angular/css/palettes/dark.system.css'; */
+
+/* ------------------------------
+   Theme variables
+   ------------------------------ */
+@use 'theme/variables' as *;
+
+/* ------------------------------
+   Global custom styles
+   ------------------------------ */
+body {
+  font-family: var(--ion-font-family, 'Roboto', sans-serif);
+  margin: 0;
+  background-color: var(--ion-background-color, #fff);
+}
+
+.error-message {
+  color: red;
+  margin: 10px 0;
+  text-align: center;
+}

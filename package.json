@@ -1,0 +1,53 @@
+{
+  "name": "hyperliquid-mobile",
+  "version": "0.0.0",
+  "author": "Sylvain D.",
+  "description": "Mobile application built with Ionic, Capacitor, and Angular, acting as a client for the Hyperliquid API.",
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve --configuration=$npm_config_configuration",
+    "build": "ng build --configuration=$npm_config_configuration",
+    "watch": "ng build --watch --configuration=$npm_config_configuration",
+    "test": "ng test",
+    "android:build": "npm run build -- --configuration=$npm_config_configuration && npx cap sync android",
+    "android:build:apk": "sh scripts/android/build-android.sh apk $npm_config_configuration",
+    "android:build:apk:debug": "sh scripts/android/build-android.sh debug $npm_config_configuration",
+    "android:sync": "npx cap sync android",
+    "android:run": "npx cap run android",
+    "serve:external": "npm run kill-8100 && ng serve --host 0.0.0.0 --port 8100",
+    "android:live": "npm run serve:external -- --configuration=$npm_config_configuration & npx cap sync android && npx cap run android",
+    "kill-8100": "kill-port 8100",
+    "format": "prettier --write \"src/**/*.{ts,html,scss,json,css}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,html,scss,json,css}\"",
+    "postinstall": "npx capacitor-assets generate"
+  },
+  "private": true,
+  "packageManager": "npm@10.8.2",
+  "dependencies": {
+    "@angular/common": "^21.0.6",
+    "@angular/compiler": "^21.0.6",
+    "@angular/core": "^21.0.6",
+    "@angular/forms": "^21.0.6",
+    "@angular/platform-browser": "^21.0.6",
+    "@angular/router": "^21.0.6",
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/preferences": "^8.0.0",
+    "@ionic/angular": "^8.7.16",
+    "capacitor-secure-storage-plugin": "^0.13.0",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^21.0.5",
+    "@angular/cli": "^21.0.5",
+    "@angular/compiler-cli": "^21.0.6",
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.4.4",
+    "jsdom": "^27.1.0",
+    "kill-port": "^2.0.1",
+    "prettier": "^3.7.4",
+    "typescript": "~5.9.2",
+    "vitest": "^4.0.8"
+  }
+}

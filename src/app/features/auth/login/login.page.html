@@ -1,0 +1,49 @@
+<ion-content fullscreen class="ion-padding login-page">
+  <div class="login-container-wrapper">
+    <div class="login-container">
+      @if (showForm()) {
+      <div class="form-header">
+        <ion-button fill="clear" (click)="showForm.set(false)">
+          <ion-icon aria-hidden="true" name="arrow-back" slot="start"></ion-icon>
+          Back
+        </ion-button>
+      </div>
+      <app-wallet-form [loading]="loading()" [error]="error()" (walletAdded)="addWallet($event)" />
+      } @else {
+      <ion-button (click)="showForm.set(true)">
+        <ion-icon aria-hidden="true" name="add" slot="start"></ion-icon>
+        Add
+      </ion-button>
+
+      <ul class="wallet-list">
+        @if ((wallets() || []).length > 0) { @for (wallet of wallets(); track wallet.address) {
+        <li>
+          <app-wallet-item
+            [wallet]="wallet"
+            (clicked)="onWalletClick($event)"
+            (deleted)="onWalletDelete($event)"
+          />
+        </li>
+        } } @else {
+        <li class="empty-message">No wallets saved.</li>
+        }
+      </ul>
+      }
+    </div>
+  </div>
+  <app-bubble-footer class="bubble-footer">
+    <div class="bubble-footer__sub">
+      <div class="footer__img">
+        <img
+          width="18"
+          height="18"
+          alt="github"
+          data-srcset=""
+          loading="lazy"
+          src="https://www.syl-studio.com/_nuxt/github.774864c6.svg"
+        />
+      </div>
+      <a href="https://github.com/Syldel" class="footer__link">@Syldel</a>
+    </div>
+  </app-bubble-footer>
+</ion-content>

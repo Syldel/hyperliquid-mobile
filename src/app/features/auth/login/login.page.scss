@@ -1,0 +1,78 @@
+.login-page {
+  --padding-top: 0;
+  --padding-bottom: 0;
+}
+
+.login-container-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('/assets/hl-splashscreen.jpg') no-repeat center center / cover;
+    opacity: 0.5;
+    z-index: -1;
+  }
+}
+
+.login-container {
+  width: 100%;
+  max-width: 400px;
+  padding: 20px;
+  border-radius: 12px !important;
+  background-color: var(--ion-background-color, #fff);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1) !important;
+}
+
+@media (max-width: 768px) {
+  .login-container {
+    margin: 0 15px;
+    box-shadow: none;
+    border-radius: 0;
+  }
+}
+
+.wallet-list {
+  list-style-type: none;
+  padding-left: 0;
+  margin: 0;
+
+  li {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(var(--ion-color-medium-rgb), 0.5);
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  .empty-message {
+    color: var(--ion-color-medium);
+    font-style: italic;
+    text-align: center;
+    padding: 10px;
+  }
+}
+
+.bubble-footer {
+  z-index: -1;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+
+  &__sub {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.6rem;
+    line-height: 0.6rem;
+  }
+}

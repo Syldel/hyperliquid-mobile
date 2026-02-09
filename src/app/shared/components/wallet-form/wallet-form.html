@@ -1,0 +1,25 @@
+<form [formGroup]="form" (ngSubmit)="onSubmit()" class="wallet-form">
+  <h2 class="form-title">Add a Wallet</h2>
+
+  @if (error()) {
+  <div class="error-message">{{ error() }}</div>
+  }
+
+  <ion-item>
+    <ion-label position="floating">Wallet Name</ion-label>
+    <ion-input formControlName="name" type="text"></ion-input>
+  </ion-item>
+
+  <ion-item>
+    <ion-label position="floating">Public Address</ion-label>
+    <ion-input formControlName="address" type="text"></ion-input>
+  </ion-item>
+
+  <ion-button type="submit" expand="block" [disabled]="form.invalid || loading()">
+    @if (!loading()) {
+    <ion-icon name="add" slot="start"></ion-icon>
+    Add } @else {
+    <ion-spinner name="dots"></ion-spinner>
+    }
+  </ion-button>
+</form>
