@@ -1,0 +1,64 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>URL Configuration</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="dismiss()">Close</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+<ion-content class="ion-padding">
+  <form [formGroup]="configForm">
+    <ion-list>
+      <ion-item>
+        <ion-label position="stacked">User Service URL</ion-label>
+        <ion-input formControlName="userServiceUrl" placeholder="http://..." type="url"></ion-input>
+        @if(configForm.get('userServiceUrl')?.invalid && configForm.get('userServiceUrl')?.touched)
+        {
+        <ion-note color="danger">
+          Please enter a valid URL (e.g., http://... or https://...)
+        </ion-note>
+        }
+      </ion-item>
+      <ion-item>
+        <ion-label position="stacked">Hyperliquid Public API URL</ion-label>
+        <ion-input
+          formControlName="hyperliquidPublicUrl"
+          placeholder="https://..."
+          type="url"
+        ></ion-input>
+        @if(configForm.get('hyperliquidPublicUrl')?.invalid &&
+        configForm.get('hyperliquidPublicUrl')?.touched) {
+        <ion-note color="danger">
+          Please enter a valid URL (e.g., http://... or https://...)
+        </ion-note>
+        }
+      </ion-item>
+      <ion-item>
+        <ion-label position="stacked">Hyperliquid Gateway URL</ion-label>
+        <ion-input
+          formControlName="hyperliquidGatewayUrl"
+          placeholder="http://..."
+          type="url"
+        ></ion-input>
+        @if(configForm.get('hyperliquidGatewayUrl')?.invalid &&
+        configForm.get('hyperliquidGatewayUrl')?.touched) {
+        <ion-note color="danger">
+          Please enter a valid URL (e.g., http://... or https://...)
+        </ion-note>
+        }
+      </ion-item>
+    </ion-list>
+  </form>
+</ion-content>
+<ion-footer>
+  <ion-toolbar>
+    <ion-button
+      expand="block"
+      (click)="saveConfig()"
+      color="primary"
+      [disabled]="!configForm.valid"
+    >
+      Save
+    </ion-button>
+  </ion-toolbar>
+</ion-footer>

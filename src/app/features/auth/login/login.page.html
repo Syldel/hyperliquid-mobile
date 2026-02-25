@@ -32,18 +32,29 @@
     </div>
   </div>
   <app-bubble-footer class="bubble-footer">
-    <div class="bubble-footer__sub">
-      <div class="footer__img">
-        <img
-          width="18"
-          height="18"
-          alt="github"
-          data-srcset=""
-          loading="lazy"
-          src="https://www.syl-studio.com/_nuxt/github.774864c6.svg"
-        />
+    <div class="bubble-footer__line">
+      <div class="bubble-footer__copyright">
+        <div>
+          <img
+            width="18"
+            height="18"
+            alt="github"
+            data-srcset=""
+            loading="lazy"
+            src="https://www.syl-studio.com/_nuxt/github.774864c6.svg"
+          />
+        </div>
+        <a href="https://github.com/Syldel" class="footer__link">@Syldel</a>
       </div>
-      <a href="https://github.com/Syldel" class="footer__link">@Syldel</a>
+      <ion-button
+        fill="clear"
+        expand="block"
+        class="config-button"
+        (click)="openUrlConfig()"
+        aria-label="Configure URLs (Global Settings)"
+      >
+        <ion-icon name="globe-outline" slot="icon-only"></ion-icon>
+      </ion-button>
     </div>
   </app-bubble-footer>
 </ion-content>

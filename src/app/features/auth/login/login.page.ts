@@ -3,12 +3,14 @@ import { Component, computed, signal } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { AuthService } from '@auth/auth.service';
-import { IonButton, IonContent, IonIcon } from '@ionic/angular/standalone';
+import { IonButton, IonContent, IonIcon, ModalController } from '@ionic/angular/standalone';
 import { BasePage } from '@shared/components/base-page/base-page';
 import { BubbleFooterComponent } from '@shared/components/bubble-footer/bubble-footer.component';
 import { WalletFormComponent } from '@shared/components/wallet-form/wallet-form';
 import { addIcons } from 'ionicons';
-import { add, arrowBack } from 'ionicons/icons';
+import { add, arrowBack, globeOutline } from 'ionicons/icons';
+import { ConfigService } from '../../../core/services/config.service';
+import { UrlConfigPage } from '../url-config/url-config.page';
 import { LoginWallet } from './login-wallet.interface';
 import { WalletItemComponent } from './wallet-item/wallet-item.component';
 
@@ -38,10 +40,12 @@ export class LoginPage extends BasePage {
 
   constructor(
     private readonly auth: AuthService,
+    private readonly config: ConfigService,
     private readonly router: Router,
+    private readonly modalCtrl: ModalController,
   ) {
     super();
-    addIcons({ arrowBack, add });
+    addIcons({ arrowBack, add, globeOutline });
   }
 
   async addWallet(wallet: LoginWallet) {
@@ -71,5 +75,22 @@ export class LoginPage extends BasePage {
     // this.wallets.update(current =>
     //   current.filter(w => w.address !== wallet.address)
     // );
+  }
+
+  async openUrlConfig() {
+    const modal = await this.modalCtrl.create({
+      component: UrlConfigPage,
+      componentProps: {
+        initialConfig: () => this.config.getConfig(),
+      },
+    });
+
+    modal.onDidDismiss().then((result) => {
+      if (result.data) {
+        this.config.saveConfig(result.data);
+      }
+    });
+
+    await modal.present();
   }
 }
