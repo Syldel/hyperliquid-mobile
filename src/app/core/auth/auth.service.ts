@@ -6,18 +6,19 @@ import { UserWallet } from '@models/wallet/user-wallet.interfaces';
 import { SecureStorageService } from '@storage/secure.storage.service';
 import { StorageService } from '@storage/storage.service';
 import { BehaviorSubject } from 'rxjs';
+import { ConfigService } from '../services/config.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly _userWallets = signal<UserWallet[] | null>([]);
   private readonly _currentUser = signal<UserWallet | null>(null);
-  private readonly _loading = signal(false);
-  private readonly _error = signal<string | null>(null);
+  // private readonly _loading = signal(false);
+  // private readonly _error = signal<string | null>(null);
 
   readonly userWallets = this._userWallets.asReadonly();
   readonly currentUser = this._currentUser.asReadonly();
-  readonly loading = this._loading.asReadonly();
-  readonly error = this._error.asReadonly();
+  // readonly loading = this._loading.asReadonly();
+  // readonly error = this._error.asReadonly();
 
   readonly ready$ = new BehaviorSubject(false);
 
@@ -29,6 +30,7 @@ export class AuthService {
     private readonly storage: StorageService,
     private readonly secureStorage: SecureStorageService,
     private readonly router: Router,
+    private readonly config: ConfigService,
   ) {
     this.restoreSession();
   }
@@ -50,12 +52,29 @@ export class AuthService {
     }
   }
 
-  // Méthode pour ajouter un wallet (exemple)
-  addUserWallet(wallet: UserWallet): void {
+  // Méthode pour se connecter avec une adresse de wallet et un mot de passe
+  loginWithWallet(walletAddress: string, password: string) {
+    return this.http.post<{ access_token: string }>(`${this.config.userServiceUrl}/auth/login`, {
+      walletAddress,
+      password,
+    });
+  }
+
+  // Méthode pour se connecter avec un nom de wallet et un mot de passe
+  loginWithUsername(username: string, password: string) {
+    return this.http.post<{ access_token: string }>(`${this.config.userServiceUrl}/auth/login`, {
+      username,
+      password,
+    });
+  }
+
+  // Méthode pour ajouter un wallet
+  private addUserWallet(wallet: UserWallet): void {
     this._userWallets.update((current) => [...(current || []), wallet]);
     this.storage.set('userWallets', this._userWallets());
   }
 
+  /*
   async login(payload: { publicAddress: string }) {
     this._loading.set(true);
     this._error.set(null);
@@ -88,6 +107,7 @@ export class AuthService {
     }
     return;
   }
+  */
 
   async logout() {
     this._currentUser.set(null);

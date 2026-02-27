@@ -1,12 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { AuthService } from '@auth/auth.service';
 import { IonButton, IonContent, IonIcon, ModalController } from '@ionic/angular/standalone';
 import { BasePage } from '@shared/components/base-page/base-page';
 import { BubbleFooterComponent } from '@shared/components/bubble-footer/bubble-footer.component';
-import { WalletFormComponent } from '@shared/components/wallet-form/wallet-form';
+import { LoginModalPage } from '@shared/components/login-modal/login-modal.page';
 import { addIcons } from 'ionicons';
 import { add, arrowBack, globeOutline } from 'ionicons/icons';
 import { ConfigService } from '../../../core/services/config.service';
@@ -21,7 +21,6 @@ import { WalletItemComponent } from './wallet-item/wallet-item.component';
   styleUrls: ['./login.page.scss'],
   imports: [
     CommonModule,
-    WalletFormComponent,
     WalletItemComponent,
     IonContent,
     IonButton,
@@ -30,10 +29,6 @@ import { WalletItemComponent } from './wallet-item/wallet-item.component';
   ],
 })
 export class LoginPage extends BasePage {
-  readonly showForm = signal(false);
-  readonly loading = signal(false);
-  readonly error = signal<string | null>(null);
-
   readonly wallets = computed(() => {
     return this.auth.userWallets()?.map((u) => ({ name: u.name, address: u.wallet.publicAddress }));
   });
@@ -48,21 +43,20 @@ export class LoginPage extends BasePage {
     addIcons({ arrowBack, add, globeOutline });
   }
 
-  async addWallet(wallet: LoginWallet) {
-    this.loading.set(true);
-    this.error.set(null);
+  async openLoginModal() {
+    const modal = await this.modalCtrl.create({
+      component: LoginModalPage,
+      cssClass: 'login-modal',
+    });
 
-    try {
-      this.auth.addUserWallet({
-        name: wallet.name,
-        wallet: { publicAddress: wallet.address },
-      });
-      this.showForm.set(false);
-    } catch (err) {
-      this.error.set('An error occurred while adding the wallet. Please try again.');
-    } finally {
-      this.loading.set(false);
-    }
+    // modal.onDidDismiss().then((result) => {
+    //   if (result.data) {
+    //     console.log('Login successful:', result.data);
+    //     // Handle login success here
+    //   }
+    // });
+
+    await modal.present();
   }
 
   onWalletClick(wallet: LoginWallet) {

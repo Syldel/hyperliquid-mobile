@@ -1,0 +1,82 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Login</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="dismiss()">Close</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+    <ion-segment [value]="loginMethod()" (ionChange)="toggleLoginMethod()">
+      <ion-segment-button value="wallet">
+        <ion-label>Wallet</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="username">
+        <ion-label>Username</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+
+    <div>
+      @if (loginMethod() === 'wallet') {
+      <ion-item>
+        <ion-label position="stacked">Ethereum Wallet Address</ion-label>
+        <ion-input formControlName="walletAddress" type="text" placeholder="0x..."></ion-input>
+        @if(loginForm.get('walletAddress')?.invalid && loginForm.get('walletAddress')?.touched) {
+        <ion-note color="danger">
+          Please enter a valid Ethereum wallet address (e.g., 0x...)
+        </ion-note>
+        }
+      </ion-item>
+      } @else if (loginMethod() === 'username') {
+      <ion-item>
+        <ion-label position="stacked">Username</ion-label>
+        <ion-input
+          formControlName="walletName"
+          type="text"
+          placeholder="Your wallet name"
+        ></ion-input>
+        @if(loginForm.get('walletName')?.invalid && loginForm.get('walletName')?.touched) {
+        <ion-note color="danger">Wallet name must be at least 3 characters</ion-note>
+        }
+      </ion-item>
+      }
+
+      <ion-item>
+        <ion-label position="stacked">Password</ion-label>
+        <ion-input
+          formControlName="password"
+          type="password"
+          placeholder="Your password"
+        ></ion-input>
+        @if (loginForm.get('password')?.invalid && loginForm.get('password')?.touched) {
+        <ion-note color="danger">
+          @if (loginForm.get('password')?.errors?.['required']) { Password is required } @else if
+          (loginForm.get('password')?.errors?.['minlength']) { Password must be at least 8
+          characters } @else { Invalid password }
+        </ion-note>
+        }
+      </ion-item>
+    </div>
+  </form>
+</ion-content>
+
+<ion-footer>
+  <ion-toolbar>
+    <ion-button
+      class="login-button"
+      expand="block"
+      type="submit"
+      color="primary"
+      [disabled]="!isFormValid() || isLoading()"
+      (click)="onSubmit()"
+    >
+      @if (isLoading()) {
+      <ion-spinner name="crescent"></ion-spinner>
+      } @else {
+      <span>Login</span>
+      }
+    </ion-button>
+  </ion-toolbar>
+</ion-footer>

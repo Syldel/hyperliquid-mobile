@@ -1,0 +1,12 @@
+ion-footer {
+  ion-toolbar {
+    --padding-start: 16px;
+    --padding-end: 16px;
+    --padding-top: 8px;
+    --padding-bottom: 8px;
+
+    ion-spinner {
+      height: 20px;
+    }
+  }
+}
