@@ -35,6 +35,7 @@
     "@capacitor/preferences": "^8.0.0",
     "@ionic/angular": "^8.7.16",
     "capacitor-secure-storage-plugin": "^0.13.0",
+    "jwt-decode": "^4.0.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },

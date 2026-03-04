@@ -1,117 +1,216 @@
 import { HttpClient } from '@angular/common/http';
-import { computed, Injectable, signal } from '@angular/core';
-
-import { Router } from '@angular/router';
-import { UserWallet } from '@models/wallet/user-wallet.interfaces';
+import { computed, effect, inject, Injectable, signal } from '@angular/core';
+import { AuthResponse, JwtPayload, TokenMap } from '@models/auth.interfaces';
 import { SecureStorageService } from '@storage/secure.storage.service';
 import { StorageService } from '@storage/storage.service';
-import { BehaviorSubject } from 'rxjs';
+import { jwtDecode } from 'jwt-decode';
+import { BehaviorSubject, from, switchMap } from 'rxjs';
 import { ConfigService } from '../services/config.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private readonly _userWallets = signal<UserWallet[] | null>([]);
-  private readonly _currentUser = signal<UserWallet | null>(null);
-  // private readonly _loading = signal(false);
-  // private readonly _error = signal<string | null>(null);
+  private readonly http = inject(HttpClient);
+  private readonly storage = inject(StorageService);
+  private readonly secureStorage = inject(SecureStorageService);
+  private readonly config = inject(ConfigService);
 
+  // --- State ---
+  private readonly _tokens = signal<TokenMap>({});
+  private readonly _userWallets = signal<JwtPayload[]>([]);
+  private readonly _currentAddress = signal<string | null>(null);
+
+  // --- Public readonly ---
+  readonly tokens = this._tokens.asReadonly();
   readonly userWallets = this._userWallets.asReadonly();
-  readonly currentUser = this._currentUser.asReadonly();
-  // readonly loading = this._loading.asReadonly();
-  // readonly error = this._error.asReadonly();
+  readonly currentAddress = this._currentAddress.asReadonly();
+
+  // --- Derived ---
+  readonly currentWallet = computed(() => {
+    const address = this._currentAddress();
+    if (!address) return null;
+    return this._userWallets().find((w) => w.wallet === address) ?? null;
+  });
+
+  readonly currentToken = computed(() => {
+    const address = this._currentAddress();
+    if (!address) return null;
+    return this._tokens()[address] ?? null;
+  });
+
+  readonly isLoggedIn = computed(() => !!this.currentToken());
 
   readonly ready$ = new BehaviorSubject(false);
 
-  // TODO: consider this.isTokenExpired()
-  readonly isLoggedIn = computed(() => !!this._currentUser());
-
-  constructor(
-    private readonly http: HttpClient,
-    private readonly storage: StorageService,
-    private readonly secureStorage: SecureStorageService,
-    private readonly router: Router,
-    private readonly config: ConfigService,
-  ) {
+  constructor() {
+    this.setupAutoLogout();
     this.restoreSession();
   }
 
-  async restoreSession() {
+  // --- Session restore ---
+
+  async restoreSession(): Promise<void> {
     try {
-      const [userWallets, currentUser] = await Promise.all([
-        this.storage.get<UserWallet[]>('userWallets'),
-        this.storage.get<UserWallet>('currentUser'),
+      const [userWallets, tokenMap, currentAddress] = await Promise.all([
+        this.storage.get<JwtPayload[]>('userWallets'),
+        this.secureStorage.get<TokenMap>('tokens'),
+        this.storage.get<string>('currentAddress'),
       ]);
 
-      this._userWallets.set(userWallets);
-      this._currentUser.set(currentUser);
+      if (userWallets) this._userWallets.set(userWallets);
 
-      this.ready$.next(true);
+      if (tokenMap) {
+        // Purger les tokens expirés au démarrage
+        const validTokens = this.purgeExpiredTokens(tokenMap);
+        this._tokens.set(validTokens);
+        await this.secureStorage.set('tokens', validTokens);
+      }
+
+      // Restaurer l'adresse courante si son token est encore valide
+      if (currentAddress && this._tokens()[currentAddress]) {
+        this._currentAddress.set(currentAddress);
+      }
     } catch (err) {
       console.error('Error restoring session', err);
+    } finally {
       this.ready$.next(true);
     }
   }
 
-  // Méthode pour se connecter avec une adresse de wallet et un mot de passe
+  // --- Login ---
+
   loginWithWallet(walletAddress: string, password: string) {
-    return this.http.post<{ access_token: string }>(`${this.config.userServiceUrl}/auth/login`, {
-      walletAddress,
-      password,
-    });
+    return this.http
+      .post<AuthResponse>(`${this.config.userServiceUrl}/auth/login`, { walletAddress, password })
+      .pipe(switchMap((res) => from(this.handleAuthResponse(res))));
   }
 
-  // Méthode pour se connecter avec un nom de wallet et un mot de passe
   loginWithUsername(username: string, password: string) {
-    return this.http.post<{ access_token: string }>(`${this.config.userServiceUrl}/auth/login`, {
-      username,
-      password,
+    return this.http
+      .post<AuthResponse>(`${this.config.userServiceUrl}/auth/login`, { username, password })
+      .pipe(switchMap((res) => from(this.handleAuthResponse(res))));
+  }
+
+  private async handleAuthResponse({ access_token }: AuthResponse): Promise<void> {
+    const payload = jwtDecode<JwtPayload>(access_token);
+
+    if (Date.now() >= payload.exp * 1000) return;
+
+    const address = payload.wallet;
+
+    // Mettre à jour le token map
+    this._tokens.update((tokens) => ({ ...tokens, [address]: access_token }));
+    await this.secureStorage.set('tokens', this._tokens());
+
+    // Mettre à jour ou ajouter le wallet
+    await this.upsertUserWallet(payload);
+
+    // Définir comme wallet courant
+    this._currentAddress.set(address);
+    await this.storage.set('currentAddress', address);
+  }
+
+  // --- Wallet management ---
+
+  async chooseUserWallet(walletAddress: string): Promise<void> {
+    const wallet = this._userWallets().find((w) => w.wallet === walletAddress);
+    if (!wallet) return;
+
+    this._currentAddress.set(walletAddress);
+    await this.storage.set('currentAddress', walletAddress);
+  }
+
+  async removeUserWallet(walletAddress: string): Promise<void> {
+    this._userWallets.update((wallets) => wallets.filter((w) => w.wallet !== walletAddress));
+    this._tokens.update(({ [walletAddress]: _, ...rest }) => rest);
+
+    await Promise.all([
+      this.storage.set('userWallets', this._userWallets()),
+      this.secureStorage.set('tokens', this._tokens()),
+    ]);
+
+    if (this._currentAddress() === walletAddress) {
+      this._currentAddress.set(null);
+      await this.storage.set('currentAddress', null);
+    }
+  }
+
+  // --- Logout ---
+
+  async logout(walletAddress?: string): Promise<void> {
+    const target = walletAddress ?? this._currentAddress();
+    if (!target) return;
+
+    this._tokens.update(({ [target]: _, ...rest }) => rest);
+    await this.secureStorage.set('tokens', this._tokens());
+
+    if (this._currentAddress() === target) {
+      this._currentAddress.set(null);
+      await this.storage.set('currentAddress', null);
+    }
+  }
+
+  async logoutAll(): Promise<void> {
+    this._tokens.set({});
+    this._currentAddress.set(null);
+    await Promise.all([this.secureStorage.remove('tokens'), this.storage.remove('currentAddress')]);
+  }
+
+  // --- Private helpers ---
+
+  private async upsertUserWallet(payload: JwtPayload): Promise<void> {
+    let merged = false;
+
+    const updated = this._userWallets().map((w) => {
+      if (w.wallet === payload.wallet) {
+        merged = true;
+        return { ...w, ...payload };
+      }
+      return w;
     });
+
+    this._userWallets.set(merged ? updated : [...updated, payload]);
+    await this.storage.set('userWallets', this._userWallets());
   }
 
-  // Méthode pour ajouter un wallet
-  private addUserWallet(wallet: UserWallet): void {
-    this._userWallets.update((current) => [...(current || []), wallet]);
-    this.storage.set('userWallets', this._userWallets());
+  private purgeExpiredTokens(tokenMap: TokenMap): TokenMap {
+    return Object.fromEntries(
+      Object.entries(tokenMap).filter(([_, token]) => {
+        try {
+          const { exp } = jwtDecode<JwtPayload>(token);
+          return Date.now() < exp * 1000;
+        } catch {
+          return false;
+        }
+      }),
+    );
   }
 
-  /*
-  async login(payload: { publicAddress: string }) {
-    this._loading.set(true);
-    this._error.set(null);
+  private setupAutoLogout(): void {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const MAX_TIMEOUT = 2_147_483_647;
 
-    try {
-      // const res = await firstValueFrom(
-      //   this.http.post<any>(`${environment.apiBaseUrl}/login`, payload, {
-      //     headers: { 'Content-Type': 'application/json' },
-      //   }),
-      // );
-      const res = {
-        token: 'fake',
-        user: {},
-      };
+    effect((onCleanup) => {
+      const token = this.currentToken();
 
-      this._currentUser.set({
-        name: 'fake',
-        wallet: { publicAddress: payload.publicAddress },
-        user: {},
-        token: 'fake',
+      onCleanup(() => {
+        if (timeoutId) clearTimeout(timeoutId);
       });
 
-      await this.secureStorage.set('currentUser', this.currentUser());
+      if (!token) return;
 
-      return res;
-    } catch {
-      this._error.set('Login failed. Please check your credentials.');
-    } finally {
-      this._loading.set(false);
-    }
-    return;
-  }
-  */
+      try {
+        const { exp } = jwtDecode<JwtPayload>(token);
+        const delay = exp * 1000 - Date.now();
 
-  async logout() {
-    this._currentUser.set(null);
+        if (delay <= 0) {
+          this.logout();
+          return;
+        }
 
-    await this.router.navigate(['/auth/login']);
+        timeoutId = setTimeout(() => this.logout(), Math.min(delay, MAX_TIMEOUT));
+      } catch {
+        this.logout();
+      }
+    });
   }
 }

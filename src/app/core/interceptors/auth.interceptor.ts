@@ -5,7 +5,7 @@ import {
   HttpInterceptor,
   HttpRequest,
 } from '@angular/common/http';
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { catchError, Observable, throwError } from 'rxjs';
 
 import { AuthService } from '@auth/auth.service';
@@ -14,10 +14,11 @@ import { AuthService } from '@auth/auth.service';
 export class AuthInterceptor implements HttpInterceptor {
   private readonly PUBLIC_ROUTES: string[] = ['/login'];
 
-  constructor(private readonly auth: AuthService) {}
+  readonly auth = inject(AuthService);
 
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    const token = this.auth.currentUser()?.token;
+    const token = this.auth.currentToken();
+
     const isPublicRoute = this.PUBLIC_ROUTES.some((route) => {
       const routePattern = route.replace(/\*/g, '.*');
       const regex = new RegExp(`${routePattern}(\\?.*)?$`);

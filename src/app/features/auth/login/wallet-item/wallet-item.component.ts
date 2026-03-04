@@ -1,4 +1,4 @@
-import { Component, input, output } from '@angular/core';
+import { Component, computed, input, output } from '@angular/core';
 import {
   IonIcon,
   IonItem,
@@ -9,6 +9,7 @@ import {
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { trashOutline } from 'ionicons/icons';
+import { formatEthereumAddress } from '../../../../core/utils/ethereum-utils';
 import { LoginWallet } from '../login-wallet.interface';
 
 @Component({
@@ -23,6 +24,14 @@ export class WalletItemComponent {
 
   clicked = output<LoginWallet>();
   deleted = output<LoginWallet>();
+
+  walletName = computed(() => {
+    return this.wallet().name;
+  });
+
+  formattedAddress = computed(() => {
+    return formatEthereumAddress(this.wallet().address, 12, 12);
+  });
 
   constructor() {
     addIcons({ trashOutline });

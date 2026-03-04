@@ -30,7 +30,7 @@ import { WalletItemComponent } from './wallet-item/wallet-item.component';
 })
 export class LoginPage extends BasePage {
   readonly wallets = computed(() => {
-    return this.auth.userWallets()?.map((u) => ({ name: u.name, address: u.wallet.publicAddress }));
+    return this.auth.userWallets()?.map((u) => ({ name: u.username, address: u.wallet }));
   });
 
   constructor(
@@ -59,16 +59,13 @@ export class LoginPage extends BasePage {
     await modal.present();
   }
 
-  onWalletClick(wallet: LoginWallet) {
-    console.log('onWalletClick :', wallet);
+  async onWalletClick(wallet: LoginWallet) {
+    await this.auth.chooseUserWallet(wallet.address);
     this.router.navigate(['/secure']);
   }
 
   onWalletDelete(wallet: LoginWallet) {
-    console.log('onWalletDelete :', wallet);
-    // this.wallets.update(current =>
-    //   current.filter(w => w.address !== wallet.address)
-    // );
+    this.auth.removeUserWallet(wallet.address);
   }
 
   async openUrlConfig() {
