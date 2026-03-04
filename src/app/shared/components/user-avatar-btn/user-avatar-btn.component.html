@@ -1,0 +1,13 @@
+<button
+  type="button"
+  class="avatar-btn"
+  (click)="goToProfile()"
+  [attr.aria-label]="isLoggedIn() ? 'My profile – active session' : 'My profile – not logged in'"
+  title="My profile"
+>
+  <div class="avatar-icon" aria-hidden="true">
+    <ion-icon name="person-circle-outline"></ion-icon>
+  </div>
+
+  <span class="status-dot" [class.active]="isLoggedIn()" aria-hidden="true"></span>
+</button>

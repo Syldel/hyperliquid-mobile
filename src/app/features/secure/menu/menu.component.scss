@@ -1,3 +1,7 @@
 ion-item {
   cursor: pointer;
 }
+
+app-user-avatar-btn {
+  --icon-color: var(--ion-color-contrast);
+}

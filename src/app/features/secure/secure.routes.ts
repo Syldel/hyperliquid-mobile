@@ -21,6 +21,11 @@ export const SECURE_ROUTES: Routes = [
         loadComponent: () => import('./settings/settings.page').then((m) => m.SettingsPage),
         title: 'Settings',
       },
+      {
+        path: 'profile',
+        loadComponent: () => import('./profile/profile.page').then((m) => m.ProfilePage),
+        title: 'Profile',
+      },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
     ],
   },

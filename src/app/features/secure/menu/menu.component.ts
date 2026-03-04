@@ -2,6 +2,7 @@ import { Component, inject, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '@auth/auth.service';
 import {
+  IonButtons,
   IonContent,
   IonFooter,
   IonHeader,
@@ -15,6 +16,7 @@ import {
   IonToolbar,
   MenuController,
 } from '@ionic/angular/standalone';
+import { UserAvatarBtnComponent } from '@shared/components/user-avatar-btn/user-avatar-btn.component';
 import { addIcons } from 'ionicons';
 import {
   homeOutline,
@@ -40,6 +42,8 @@ import {
     IonTitle,
     IonToolbar,
     IonFooter,
+    IonButtons,
+    UserAvatarBtnComponent,
   ],
   templateUrl: './menu.component.html',
   styleUrls: ['./menu.component.scss'],

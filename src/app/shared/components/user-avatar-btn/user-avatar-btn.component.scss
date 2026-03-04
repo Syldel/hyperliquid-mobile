@@ -1,0 +1,61 @@
+:host {
+  /* Override from outside:
+         <app-user-avatar-btn style="--icon-color: var(--ion-color-secondary)" />  */
+  --icon-color: var(--ion-color-primary);
+}
+
+.avatar-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  transition: background 0.2s ease;
+
+  &:active {
+    background: rgba(var(--ion-color-primary-rgb), 0.12);
+  }
+}
+
+.avatar-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  ion-icon {
+    font-size: 28px;
+    color: var(--icon-color);
+  }
+}
+
+.status-dot {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--ion-background-color, #fff);
+  background-color: var(--ion-color-danger, #ef4444);
+  transition: background-color 0.3s ease;
+
+  &.active {
+    background-color: #22c55e;
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
+    animation: pulse-green 2s infinite;
+  }
+}
+
+@keyframes pulse-green {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0);
+  }
+}
