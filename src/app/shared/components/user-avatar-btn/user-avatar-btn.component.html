@@ -1,7 +1,7 @@
 <button
   type="button"
   class="avatar-btn"
-  (click)="goToProfile()"
+  (click)="profileClick.emit()"
   [attr.aria-label]="isLoggedIn() ? 'My profile – active session' : 'My profile – not logged in'"
   title="My profile"
 >

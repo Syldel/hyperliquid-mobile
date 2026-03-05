@@ -46,16 +46,5 @@
   &.active {
     background-color: #22c55e;
     box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
-    animation: pulse-green 2s infinite;
-  }
-}
-
-@keyframes pulse-green {
-  0%,
-  100% {
-    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
-  }
-  50% {
-    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0);
   }
 }

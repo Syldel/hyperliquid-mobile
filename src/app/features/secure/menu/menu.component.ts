@@ -1,4 +1,4 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, computed, inject, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '@auth/auth.service';
 import {
@@ -52,6 +52,8 @@ export class MenuComponent implements OnInit {
   private readonly menuCtrl = inject(MenuController);
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+
+  readonly isLoggedIn = computed(() => this.authService.isLoggedIn());
 
   constructor() {
     addIcons({
