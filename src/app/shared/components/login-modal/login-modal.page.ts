@@ -73,6 +73,9 @@ export class LoginModalPage {
     this.loginForm.statusChanges.pipe(takeUntilDestroyed()).subscribe(() => {
       this.isFormValid.set(this.loginFormValid());
     });
+
+    this.loginForm.get('walletAddress')?.setValue(this.authService.currentWallet()?.wallet);
+    this.loginForm.get('walletName')?.setValue(this.authService.currentWallet()?.username);
   }
 
   private loginFormValid(): boolean {

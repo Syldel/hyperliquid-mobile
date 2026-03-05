@@ -7,5 +7,54 @@
   </ion-toolbar>
 </ion-header>
 <ion-content>
-  <p>Securised content!</p>
+  @if (currentUser(); as user) {
+
+  <ion-list lines="full">
+    <ion-item>
+      <ion-label>
+        <p>Username</p>
+        <h2>{{ user.username }}</h2>
+      </ion-label>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>
+        <p>Wallet</p>
+        <h2>{{ user.wallet }}</h2>
+      </ion-label>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>
+        <p>User ID</p>
+        <h2>{{ user.sub }}</h2>
+      </ion-label>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>
+        <p>Token expires</p>
+        <h2>{{ user.exp * 1000 | date: 'medium' }}</h2>
+      </ion-label>
+      <ion-badge
+        slot="end"
+        [color]="isLoggedIn() ? 'success' : 'danger'"
+        aria-live="polite"
+        [attr.aria-label]="isLoggedIn() ? 'Token valid' : 'Token expired'"
+      >
+        {{ isLoggedIn() ? 'Valid' : 'Expired' }}
+      </ion-badge>
+    </ion-item>
+  </ion-list>
+
+  } @else {
+  <ion-note color="medium">No user data available.</ion-note>
+  } @if (!isLoggedIn()) {
+  <div class="ion-padding">
+    <ion-button expand="block" (click)="openLoginModal()">
+      <ion-icon slot="start" name="log-in-outline" aria-hidden="true" />
+      Sign in again
+    </ion-button>
+  </div>
+  }
 </ion-content>

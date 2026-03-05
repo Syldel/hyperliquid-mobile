@@ -164,7 +164,7 @@ describe('AuthService', () => {
       expect(secureStorageMock.set).toHaveBeenCalledWith('tokens', {});
     });
 
-    it('should not restore currentAddress if its token is expired', async () => {
+    it('should restore currentAddress even if its token is expired', async () => {
       mockJwtDecode.mockReturnValue(EXPIRED_PAYLOAD);
       storageMock.get.mockImplementation((key: string) => {
         if (key === 'currentAddress') return Promise.resolve(MOCK_ADDRESS);
@@ -174,7 +174,8 @@ describe('AuthService', () => {
 
       await service.restoreSession();
 
-      expect(service.currentAddress()).toBeNull();
+      expect(service.currentAddress()).toBe(MOCK_ADDRESS);
+      expect(service.isLoggedIn()).toBe(false);
     });
 
     it('should restore userWallets from storage', async () => {
@@ -188,7 +189,7 @@ describe('AuthService', () => {
       expect(service.userWallets()).toEqual([MOCK_PAYLOAD]);
     });
 
-    it('should leave currentAddress null if stored address has no valid token', async () => {
+    it('should restore currentAddress even if stored address has no valid token', async () => {
       storageMock.get.mockImplementation((key: string) => {
         if (key === 'currentAddress') return Promise.resolve(MOCK_ADDRESS);
         return Promise.resolve(null);
@@ -197,7 +198,8 @@ describe('AuthService', () => {
 
       await service.restoreSession();
 
-      expect(service.currentAddress()).toBeNull();
+      expect(service.currentAddress()).toBe(MOCK_ADDRESS);
+      expect(service.isLoggedIn()).toBe(false);
     });
   });
 
@@ -233,10 +235,9 @@ describe('AuthService', () => {
       expect(service.userWallets()[0].username).toBe('updated-1');
     });
 
-    it('should not set session if token is already expired', async () => {
+    it('should not be logged in if token is already expired', async () => {
       await loginWallet(service, httpMock, MOCK_EXPIRED_TOKEN, MOCK_ADDRESS, EXPIRED_PAYLOAD);
-      expect(service.currentAddress()).toBeNull();
-      expect(service.currentToken()).toBeNull();
+      expect(service.isLoggedIn()).toBe(false);
     });
   });
 
@@ -337,56 +338,32 @@ describe('AuthService', () => {
       await loginWallet(service, httpMock, MOCK_TOKEN_2, MOCK_ADDRESS_2, MOCK_PAYLOAD_2);
     });
 
-    it('should remove token of current address by default', async () => {
+    it('should clear currentAddress by default', async () => {
       await service.logout();
-      expect(service.tokens()[MOCK_ADDRESS_2]).toBeUndefined();
-    });
-
-    it('should remove token of specific address when provided', async () => {
-      await service.logout(MOCK_ADDRESS);
-      expect(service.tokens()[MOCK_ADDRESS]).toBeUndefined();
-      expect(service.tokens()[MOCK_ADDRESS_2]).toBe(MOCK_TOKEN_2);
-    });
-
-    it('should persist updated tokens to secure storage', async () => {
-      await service.logout(MOCK_ADDRESS);
-      expect(secureStorageMock.set).toHaveBeenCalledWith('tokens', {
-        [MOCK_ADDRESS_2]: MOCK_TOKEN_2,
-      });
-    });
-
-    it('should do nothing if no current address and no address provided', async () => {
-      await service.logoutAll();
-      await service.logout();
-      expect(secureStorageMock.set).not.toHaveBeenCalledAfter?.(
-        secureStorageMock.remove as ReturnType<typeof vi.fn>,
-      );
-    });
-  });
-
-  describe('logoutAll', () => {
-    beforeEach(async () => {
-      await loginWallet(service, httpMock, MOCK_TOKEN, MOCK_ADDRESS, MOCK_PAYLOAD);
-    });
-
-    it('should clear all tokens', async () => {
-      await service.logoutAll();
-      expect(service.tokens()).toEqual({});
-    });
-
-    it('should set currentAddress to null', async () => {
-      await service.logoutAll();
       expect(service.currentAddress()).toBeNull();
     });
 
-    it('should remove tokens from secure storage', async () => {
-      await service.logoutAll();
-      expect(secureStorageMock.remove).toHaveBeenCalledWith('tokens');
+    it('should keep tokens intact after logout', async () => {
+      await service.logout();
+      expect(service.tokens()[MOCK_ADDRESS]).toBe(MOCK_TOKEN);
+      expect(service.tokens()[MOCK_ADDRESS_2]).toBe(MOCK_TOKEN_2);
     });
 
-    it('should remove currentAddress from storage', async () => {
-      await service.logoutAll();
-      expect(storageMock.remove).toHaveBeenCalledWith('currentAddress');
+    it('should clear currentAddress when specific address matches', async () => {
+      await service.logout(MOCK_ADDRESS_2);
+      expect(service.currentAddress()).toBeNull();
+    });
+
+    it('should not clear currentAddress when specific address does not match current', async () => {
+      await service.logout(MOCK_ADDRESS);
+      expect(service.currentAddress()).toBe(MOCK_ADDRESS_2);
+    });
+
+    it('should do nothing if no current address and no address provided', async () => {
+      service['_currentAddress'].set(null); // arrange: force null directly
+      secureStorageMock.set.mockClear(); // reset call history
+      await service.logout();
+      expect(secureStorageMock.set).not.toHaveBeenCalled();
     });
   });
 
@@ -399,25 +376,27 @@ describe('AuthService', () => {
       vi.useRealTimers();
     });
 
-    it('should schedule logout when token is set', async () => {
+    it('should remove expired token but keep currentAddress when token expires', async () => {
       const soonPayload = { ...MOCK_PAYLOAD, exp: Math.floor(Date.now() / 1000) + 2 };
       await loginWallet(service, httpMock, MOCK_TOKEN, MOCK_ADDRESS, soonPayload);
 
       TestBed.tick();
-
       await vi.advanceTimersByTimeAsync(2000);
 
+      expect(service.currentAddress()).toBe(MOCK_ADDRESS);
       expect(service.tokens()[MOCK_ADDRESS]).toBeUndefined();
+      expect(service.isLoggedIn()).toBe(false);
     });
 
-    it('should logout immediately if delay is zero or negative', async () => {
+    it('should remove expired token immediately if delay is zero or negative', async () => {
       await loginWallet(service, httpMock, MOCK_EXPIRED_TOKEN, MOCK_ADDRESS, EXPIRED_PAYLOAD);
 
       TestBed.tick();
-
       await vi.advanceTimersByTimeAsync(0);
 
-      expect(service.currentAddress()).toBeNull();
+      expect(service.currentAddress()).toBe(MOCK_ADDRESS);
+      expect(service.tokens()[MOCK_ADDRESS]).toBeUndefined();
+      expect(service.isLoggedIn()).toBe(false);
     });
   });
 });

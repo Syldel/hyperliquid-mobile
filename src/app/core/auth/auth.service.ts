@@ -37,7 +37,15 @@ export class AuthService {
     return this._tokens()[address] ?? null;
   });
 
-  readonly isLoggedIn = computed(() => !!this.currentToken());
+  readonly isLoggedIn = computed(() => {
+    const address = this._currentAddress();
+    if (!address) return false;
+
+    const payload = this._userWallets().find((p) => p.wallet === address);
+    if (!payload) return false;
+
+    return payload.exp > Date.now() / 1000;
+  });
 
   readonly ready$ = new BehaviorSubject(false);
 
@@ -59,16 +67,12 @@ export class AuthService {
       if (userWallets) this._userWallets.set(userWallets);
 
       if (tokenMap) {
-        // Purger les tokens expirés au démarrage
         const validTokens = this.purgeExpiredTokens(tokenMap);
         this._tokens.set(validTokens);
         await this.secureStorage.set('tokens', validTokens);
       }
 
-      // Restaurer l'adresse courante si son token est encore valide
-      if (currentAddress && this._tokens()[currentAddress]) {
-        this._currentAddress.set(currentAddress);
-      }
+      this._currentAddress.set(currentAddress);
     } catch (err) {
       console.error('Error restoring session', err);
     } finally {
@@ -93,8 +97,6 @@ export class AuthService {
   private async handleAuthResponse({ access_token }: AuthResponse): Promise<void> {
     const payload = jwtDecode<JwtPayload>(access_token);
 
-    if (Date.now() >= payload.exp * 1000) return;
-
     const address = payload.wallet;
 
     // Mettre à jour le token map
@@ -112,8 +114,8 @@ export class AuthService {
   // --- Wallet management ---
 
   async chooseUserWallet(walletAddress: string): Promise<void> {
-    const wallet = this._userWallets().find((w) => w.wallet === walletAddress);
-    if (!wallet) return;
+    const delay = this.removeTokenIfExpired(walletAddress);
+    if (!delay) return;
 
     this._currentAddress.set(walletAddress);
     await this.storage.set('currentAddress', walletAddress);
@@ -140,8 +142,8 @@ export class AuthService {
     const target = walletAddress ?? this._currentAddress();
     if (!target) return;
 
-    this._tokens.update(({ [target]: _, ...rest }) => rest);
-    await this.secureStorage.set('tokens', this._tokens());
+    // this._tokens.update(({ [target]: _, ...rest }) => rest);
+    // await this.secureStorage.set('tokens', this._tokens());
 
     if (this._currentAddress() === target) {
       this._currentAddress.set(null);
@@ -149,13 +151,27 @@ export class AuthService {
     }
   }
 
-  async logoutAll(): Promise<void> {
-    this._tokens.set({});
-    this._currentAddress.set(null);
-    await Promise.all([this.secureStorage.remove('tokens'), this.storage.remove('currentAddress')]);
+  removeTokenIfExpired(address: string): number | null {
+    const payload = this._userWallets().find((p) => p.wallet === address);
+    if (!payload) return null;
+
+    const delay = payload.exp * 1000 - Date.now();
+    if (delay <= 0) {
+      this.removeToken(address);
+    }
+
+    return delay;
   }
 
   // --- Private helpers ---
+
+  private removeToken(address: string): void {
+    this._tokens.update((tokens) => {
+      const updated = { ...tokens };
+      delete updated[address];
+      return updated;
+    });
+  }
 
   private async upsertUserWallet(payload: JwtPayload): Promise<void> {
     let merged = false;
@@ -173,14 +189,12 @@ export class AuthService {
   }
 
   private purgeExpiredTokens(tokenMap: TokenMap): TokenMap {
+    const now = Date.now() / 1000;
+
     return Object.fromEntries(
-      Object.entries(tokenMap).filter(([_, token]) => {
-        try {
-          const { exp } = jwtDecode<JwtPayload>(token);
-          return Date.now() < exp * 1000;
-        } catch {
-          return false;
-        }
+      Object.entries(tokenMap).filter(([address]) => {
+        const payload = this._userWallets().find((p) => p.wallet === address);
+        return payload && payload.exp > now;
       }),
     );
   }
@@ -190,27 +204,18 @@ export class AuthService {
     const MAX_TIMEOUT = 2_147_483_647;
 
     effect((onCleanup) => {
-      const token = this.currentToken();
+      const address = this._currentAddress();
 
       onCleanup(() => {
         if (timeoutId) clearTimeout(timeoutId);
       });
 
-      if (!token) return;
+      if (!address) return;
 
-      try {
-        const { exp } = jwtDecode<JwtPayload>(token);
-        const delay = exp * 1000 - Date.now();
+      const delay = this.removeTokenIfExpired(address);
+      if (delay === null || delay <= 0) return;
 
-        if (delay <= 0) {
-          this.logout();
-          return;
-        }
-
-        timeoutId = setTimeout(() => this.logout(), Math.min(delay, MAX_TIMEOUT));
-      } catch {
-        this.logout();
-      }
+      timeoutId = setTimeout(() => this.removeToken(address), Math.min(delay, MAX_TIMEOUT));
     });
   }
 }
