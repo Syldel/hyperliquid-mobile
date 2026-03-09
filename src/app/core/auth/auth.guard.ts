@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { ActivatedRouteSnapshot, CanActivate, Router, UrlTree } from '@angular/router';
 
 import { filter, firstValueFrom } from 'rxjs';
@@ -6,15 +6,13 @@ import { AuthService } from './auth.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthGuard implements CanActivate {
-  constructor(
-    private readonly auth: AuthService,
-    private readonly router: Router,
-  ) {}
+  private readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
 
   async canActivate(route: ActivatedRouteSnapshot): Promise<boolean | UrlTree> {
-    await firstValueFrom(this.auth.ready$.pipe(filter((r) => r === true)));
+    await firstValueFrom(this.authService.ready$.pipe(filter((r) => r === true)));
 
-    const isLoggedIn = this.auth.isLoggedIn();
+    const isLoggedIn = this.authService.isLoggedIn();
     const goingToLogin = route.routeConfig?.path === 'login';
 
     if (goingToLogin && isLoggedIn) {
