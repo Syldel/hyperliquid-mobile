@@ -10,10 +10,8 @@ import {
 import { AuthService } from '@auth/auth.service';
 import {
   IonButton,
-  IonButtons,
   IonContent,
   IonFooter,
-  IonHeader,
   IonInput,
   IonItem,
   IonLabel,
@@ -21,12 +19,12 @@ import {
   IonSegment,
   IonSegmentButton,
   IonSpinner,
-  IonTitle,
   IonToolbar,
   ModalController,
   ToastController,
 } from '@ionic/angular/standalone';
 import { lastValueFrom } from 'rxjs';
+import { PageHeaderComponent } from '../page-header/page-header.component';
 
 @Component({
   selector: 'app-login-modal',
@@ -34,11 +32,8 @@ import { lastValueFrom } from 'rxjs';
   styleUrls: ['./login-modal.page.scss'],
   standalone: true,
   imports: [
-    IonHeader,
     IonToolbar,
-    IonTitle,
     IonButton,
-    IonButtons,
     IonContent,
     IonSegment,
     IonSegmentButton,
@@ -50,6 +45,7 @@ import { lastValueFrom } from 'rxjs';
     IonSpinner,
     FormsModule,
     ReactiveFormsModule,
+    PageHeaderComponent,
   ],
 })
 export class LoginModalPage {

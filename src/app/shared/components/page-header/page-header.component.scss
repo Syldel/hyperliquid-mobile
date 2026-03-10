@@ -1,0 +1,18 @@
+// ::slotted(.buttons-first-slot),
+// .buttons-first-slot {
+//   -webkit-margin-start: 0;
+//   margin-inline-start: 0;
+// }
+
+// ::slotted(.buttons-last-slot),
+// .buttons-last-slot {
+//   -webkit-margin-end: 0;
+//   margin-inline-end: 0;
+// }
+
+ion-buttons[slot='start'] {
+  margin-left: 0;
+}
+ion-buttons[slot='end'] {
+  margin-right: 0;
+}

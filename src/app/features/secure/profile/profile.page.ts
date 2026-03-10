@@ -3,21 +3,17 @@ import { Component, computed, inject } from '@angular/core';
 import {
   IonBadge,
   IonButton,
-  IonButtons,
   IonContent,
-  IonHeader,
   IonIcon,
   IonItem,
   IonLabel,
   IonList,
-  IonMenuButton,
   IonNote,
-  IonTitle,
-  IonToolbar,
   ModalController,
 } from '@ionic/angular/standalone';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { LoginModalPage } from '@shared/components/login-modal/login-modal.page';
+import { PageHeaderComponent } from '@shared/components/page-header/page-header.component';
 import { addIcons } from 'ionicons';
 import { logInOutline } from 'ionicons/icons';
 
@@ -26,12 +22,7 @@ import { logInOutline } from 'ionicons/icons';
   standalone: true,
   imports: [
     IonContent,
-    IonHeader,
-    IonTitle,
-    IonToolbar,
-    IonMenuButton,
     IonButton,
-    IonButtons,
     IonItem,
     IonLabel,
     IonBadge,
@@ -39,6 +30,7 @@ import { logInOutline } from 'ionicons/icons';
     IonList,
     IonNote,
     DatePipe,
+    PageHeaderComponent,
   ],
   templateUrl: './profile.page.html',
 })

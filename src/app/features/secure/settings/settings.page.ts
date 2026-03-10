@@ -1,34 +1,13 @@
 import { Component, computed, inject } from '@angular/core';
-import {
-  IonButtons,
-  IonContent,
-  IonHeader,
-  IonItem,
-  IonList,
-  IonListHeader,
-  IonMenuButton,
-  IonTitle,
-  IonToggle,
-  IonToolbar,
-} from '@ionic/angular/standalone';
+import { IonContent, IonItem, IonList, IonListHeader, IonToggle } from '@ionic/angular/standalone';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
+import { PageHeaderComponent } from '@shared/components/page-header/page-header.component';
 import { ThemeService } from 'app/core/services/theme.service';
 
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [
-    IonContent,
-    IonHeader,
-    IonTitle,
-    IonToolbar,
-    IonMenuButton,
-    IonButtons,
-    IonList,
-    IonListHeader,
-    IonItem,
-    IonToggle,
-  ],
+  imports: [IonContent, IonList, IonListHeader, IonItem, IonToggle, PageHeaderComponent],
   templateUrl: './settings.page.html',
 })
 export class SettingsPage extends MenuBasePage {

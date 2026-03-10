@@ -1,15 +1,12 @@
 <ion-menu side="start" menuId="main-menu" contentId="main-content">
-  <ion-header>
-    <ion-toolbar color="primary">
-      <ion-title>Hyperliquid</ion-title>
-      <ion-buttons slot="end">
-        <app-user-avatar-btn
-          [isLoggedIn]="isLoggedIn()"
-          (profileClick)="onMenuItemClick('/secure/profile')"
-        ></app-user-avatar-btn>
-      </ion-buttons>
-    </ion-toolbar>
-  </ion-header>
+  <app-page-header startButton="none" color="primary" [hasEndButtons]="true" title="Hyperliquid">
+    <ion-button slot="end">
+      <app-user-avatar-btn
+        [isLoggedIn]="isLoggedIn()"
+        (profileClick)="onMenuItemClick('/secure/profile')"
+      ></app-user-avatar-btn>
+    </ion-button>
+  </app-page-header>
   <ion-content>
     <ion-list>
       <ion-item (click)="onMenuItemClick('/secure/dashboard')">

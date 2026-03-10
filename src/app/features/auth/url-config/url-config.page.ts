@@ -9,19 +9,17 @@ import {
 import { ModalController } from '@ionic/angular';
 import {
   IonButton,
-  IonButtons,
   IonContent,
   IonFooter,
-  IonHeader,
   IonInput,
   IonItem,
   IonLabel,
   IonList,
   IonNote,
-  IonTitle,
   IonToolbar,
 } from '@ionic/angular/standalone';
 import { AppConfig } from '@models/app-config.interface';
+import { PageHeaderComponent } from '@shared/components/page-header/page-header.component';
 
 type FormConfig = {
   [K in keyof AppConfig]: FormControl<AppConfig[K]>;
@@ -34,11 +32,8 @@ type FormConfig = {
   standalone: true,
   imports: [
     IonItem,
-    IonHeader,
     IonToolbar,
-    IonTitle,
     IonButton,
-    IonButtons,
     IonContent,
     IonLabel,
     IonInput,
@@ -46,6 +41,7 @@ type FormConfig = {
     IonNote,
     IonFooter,
     ReactiveFormsModule,
+    PageHeaderComponent,
   ],
   providers: [ModalController],
 })

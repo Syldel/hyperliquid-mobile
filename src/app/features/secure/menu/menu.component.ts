@@ -2,20 +2,18 @@ import { Component, computed, inject, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '@auth/auth.service';
 import {
-  IonButtons,
+  IonButton,
   IonContent,
   IonFooter,
-  IonHeader,
   IonIcon,
   IonItem,
   IonLabel,
   IonList,
   IonMenu,
   IonRouterOutlet,
-  IonTitle,
-  IonToolbar,
   MenuController,
 } from '@ionic/angular/standalone';
+import { PageHeaderComponent } from '@shared/components/page-header/page-header.component';
 import { UserAvatarBtnComponent } from '@shared/components/user-avatar-btn/user-avatar-btn.component';
 import { addIcons } from 'ionicons';
 import {
@@ -32,18 +30,16 @@ import {
   standalone: true,
   imports: [
     IonContent,
-    IonHeader,
     IonIcon,
     IonItem,
     IonLabel,
     IonList,
     IonMenu,
     IonRouterOutlet,
-    IonTitle,
-    IonToolbar,
     IonFooter,
-    IonButtons,
+    IonButton,
     UserAvatarBtnComponent,
+    PageHeaderComponent,
   ],
   templateUrl: './menu.component.html',
   styleUrls: ['./menu.component.scss'],
