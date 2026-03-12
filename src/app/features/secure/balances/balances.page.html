@@ -4,7 +4,11 @@
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  @if (data(); as balances) { @if (balances.length === 0) {
+  @if (isLoading()) {
+  <div class="loading-spinner">
+    <ion-spinner name="circular" color="primary"></ion-spinner>
+  </div>
+  } @if (data(); as balances) { @if (balances.length === 0) {
   <div class="ion-text-center ion-padding">
     <ion-icon name="wallet-outline" size="large" color="medium" />
     <p>No balances found</p>

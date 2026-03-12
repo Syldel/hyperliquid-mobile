@@ -1,11 +1,16 @@
 import { inject, Injectable, OnInit, signal } from '@angular/core';
-import { IonRefresher, IonRefresherContent, ToastController } from '@ionic/angular/standalone';
+import {
+  IonRefresher,
+  IonRefresherContent,
+  IonSpinner,
+  ToastController,
+} from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { alertCircleOutline } from 'ionicons/icons';
 import { firstValueFrom, Observable } from 'rxjs';
 import { MenuBasePage } from './menu-base-page';
 
-export const REFRESHABLE_PAGE_IMPORTS = [IonRefresher, IonRefresherContent] as const;
+export const REFRESHABLE_PAGE_IMPORTS = [IonRefresher, IonRefresherContent, IonSpinner] as const;
 
 @Injectable()
 export abstract class RefreshablePage<T> extends MenuBasePage implements OnInit {
@@ -13,28 +18,30 @@ export abstract class RefreshablePage<T> extends MenuBasePage implements OnInit 
 
   data = signal<T | null>(null);
   isLoading = signal(false);
+  isRefreshing = signal(false);
 
   abstract fetch(): Promise<T> | Observable<T>;
 
   async ngOnInit() {
     addIcons({ alertCircleOutline });
-    await this.load();
+    await this.load(false);
   }
 
   async onRefresh(event: CustomEvent) {
-    await this.load();
+    await this.load(true);
     (event.target as HTMLIonRefresherElement).complete();
   }
 
-  private async load() {
-    this.isLoading.set(true);
+  private async load(isRefresh = false) {
+    isRefresh ? this.isRefreshing.set(true) : this.isLoading.set(true);
+
     try {
       const result = await this.toPromise(this.fetch());
       this.data.set(result);
     } catch (e) {
       await this.showErrorToast();
     } finally {
-      this.isLoading.set(false);
+      isRefresh ? this.isRefreshing.set(false) : this.isLoading.set(false);
     }
   }
 
