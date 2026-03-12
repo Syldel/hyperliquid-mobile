@@ -1,11 +1,11 @@
 import { HttpClient } from '@angular/common/http';
 import { computed, effect, inject, Injectable, signal } from '@angular/core';
 import { AuthResponse, JwtPayload, TokenMap } from '@models/auth.interfaces';
+import { ConfigService } from '@services/config.service';
 import { SecureStorageService } from '@storage/secure.storage.service';
 import { StorageService } from '@storage/storage.service';
 import { jwtDecode } from 'jwt-decode';
 import { BehaviorSubject, from, switchMap } from 'rxjs';
-import { ConfigService } from '../services/config.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {

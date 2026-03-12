@@ -4,12 +4,12 @@ import { Router } from '@angular/router';
 
 import { AuthService } from '@auth/auth.service';
 import { IonButton, IonContent, IonIcon, ModalController } from '@ionic/angular/standalone';
+import { ConfigService } from '@services/config.service';
 import { BasePage } from '@shared/components/base-page/base-page';
 import { BubbleFooterComponent } from '@shared/components/bubble-footer/bubble-footer.component';
 import { LoginModalPage } from '@shared/components/login-modal/login-modal.page';
 import { addIcons } from 'ionicons';
 import { add, arrowBack, globeOutline } from 'ionicons/icons';
-import { ConfigService } from '../../../core/services/config.service';
 import { UrlConfigPage } from '../url-config/url-config.page';
 import { LoginWallet } from './login-wallet.interface';
 import { WalletItemComponent } from './wallet-item/wallet-item.component';

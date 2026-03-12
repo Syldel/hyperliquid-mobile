@@ -2,10 +2,10 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { JwtPayload } from '@models/auth.interfaces';
+import { ConfigService } from '@services/config.service';
 import { SecureStorageService } from '@storage/secure.storage.service';
 import { StorageService } from '@storage/storage.service';
 import { jwtDecode } from 'jwt-decode';
-import { ConfigService } from '../services/config.service';
 import { AuthService } from './auth.service';
 
 vi.mock('jwt-decode');

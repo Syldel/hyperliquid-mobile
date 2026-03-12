@@ -1,4 +1,25 @@
 <app-page-header title="Balances" />
 <ion-content>
-  <p>Securised content!</p>
+  <ion-refresher slot="fixed" (ionRefresh)="onRefresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  @if (data(); as balances) { @if (balances.length === 0) {
+  <div class="ion-text-center ion-padding">
+    <ion-icon name="wallet-outline" size="large" color="medium" />
+    <p>No balances found</p>
+  </div>
+  } @else {
+  <ion-list>
+    @for (balance of balances; track balance.token) {
+    <ion-item>
+      <ion-label>
+        <h2>{{ balance.coin }}</h2>
+        <p>{{ balance.total }}</p>
+      </ion-label>
+      <ion-note slot="end" color="medium">Hold: {{ balance.hold }}</ion-note>
+    </ion-item>
+    }
+  </ion-list>
+  } }
 </ion-content>

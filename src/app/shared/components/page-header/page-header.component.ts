@@ -17,20 +17,22 @@ type StartButtonType = 'menu' | 'back' | 'none';
   template: `
     <ion-header [translucent]="translucent()">
       <ion-toolbar [color]="color()">
-        <ion-buttons slot="start">
-          @switch (startButton()) {
-            @case ('menu') {
-              <ion-menu-button></ion-menu-button>
+        @if (hasStartButtons()) {
+          <ion-buttons slot="start">
+            @switch (startButton()) {
+              @case ('menu') {
+                <ion-menu-button></ion-menu-button>
+              }
+              @case ('back') {
+                <ion-back-button
+                  [defaultHref]="defaultHref()"
+                  (click)="backClick.emit()"
+                ></ion-back-button>
+              }
+              @case ('none') {}
             }
-            @case ('back') {
-              <ion-back-button
-                [defaultHref]="defaultHref()"
-                (click)="backClick.emit()"
-              ></ion-back-button>
-            }
-            @case ('none') {}
-          }
-        </ion-buttons>
+          </ion-buttons>
+        }
 
         <ion-title>{{ title() }}</ion-title>
 
@@ -51,6 +53,7 @@ export class PageHeaderComponent {
   color = input<string | undefined>(undefined);
   startButton = input<StartButtonType>('menu');
   defaultHref = input<string>('/');
+  hasStartButtons = input<boolean>(true);
   hasEndButtons = input<boolean>(false);
 
   // Outputs

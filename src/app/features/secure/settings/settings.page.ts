@@ -1,8 +1,8 @@
 import { Component, computed, inject } from '@angular/core';
 import { IonContent, IonItem, IonList, IonListHeader, IonToggle } from '@ionic/angular/standalone';
+import { ThemeService } from '@services/theme.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { PageHeaderComponent } from '@shared/components/page-header/page-header.component';
-import { ThemeService } from 'app/core/services/theme.service';
 
 @Component({
   selector: 'app-settings',

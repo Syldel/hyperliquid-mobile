@@ -1,5 +1,11 @@
 <ion-menu side="start" menuId="main-menu" contentId="main-content">
-  <app-page-header startButton="none" color="primary" [hasEndButtons]="true" title="Hyperliquid">
+  <app-page-header
+    startButton="none"
+    color="primary"
+    [hasStartButtons]="false"
+    [hasEndButtons]="true"
+    title="Hyperliquid"
+  >
     <ion-button slot="end">
       <app-user-avatar-btn
         [isLoggedIn]="isLoggedIn()"
