@@ -1,21 +1,11 @@
-<app-page-header title="Balances" />
-<ion-content>
-  <ion-refresher slot="fixed" (ionRefresh)="onRefresh($event)">
-    <ion-refresher-content></ion-refresher-content>
-  </ion-refresher>
-
-  @if (isLoading()) {
-  <div class="loading-spinner">
-    <ion-spinner name="circular" color="primary"></ion-spinner>
-  </div>
-  } @if (data(); as balances) { @if (balances.length === 0) {
-  <div class="ion-text-center ion-padding">
-    <ion-icon name="wallet-outline" size="large" color="medium" />
-    <p>No balances found</p>
-  </div>
-  } @else {
+<app-refreshable-layout
+  title="Balances"
+  [fetchFn]="fetchFn"
+  emptyMessage="No balances found"
+  (dataLoaded)="balances.set($event)"
+>
   <ion-list>
-    @for (balance of balances; track balance.token) {
+    @for (balance of balances(); track balance.token) {
     <ion-item>
       <ion-label>
         <h2>{{ balance.coin }}</h2>
@@ -25,5 +15,4 @@
     </ion-item>
     }
   </ion-list>
-  } }
-</ion-content>
+</app-refreshable-layout>
