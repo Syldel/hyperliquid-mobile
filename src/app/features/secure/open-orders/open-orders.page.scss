@@ -1,0 +1,20 @@
+.order-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.order-badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+ion-badge {
+  font-weight: 500;
+  font-size: 0.7rem;
+  opacity: 0.75;
+}

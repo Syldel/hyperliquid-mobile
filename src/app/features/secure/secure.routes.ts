@@ -17,6 +17,11 @@ export const SECURE_ROUTES: Routes = [
         title: 'Balances',
       },
       {
+        path: 'open-orders',
+        loadComponent: () => import('./open-orders/open-orders.page').then((m) => m.OpenOrdersPage),
+        title: 'Open Orders',
+      },
+      {
         path: 'settings',
         loadComponent: () => import('./settings/settings.page').then((m) => m.SettingsPage),
         title: 'Settings',

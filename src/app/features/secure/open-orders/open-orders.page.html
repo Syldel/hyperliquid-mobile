@@ -1,0 +1,34 @@
+<app-refreshable-layout
+  title="Open Orders"
+  [fetchFn]="fetchFn"
+  emptyMessage="No open orders found"
+  (dataLoaded)="openOrders.set($event)"
+>
+  <ion-list>
+    @for (openOrder of openOrders(); track openOrder.oid) {
+    <ion-item>
+      <ion-label>
+        <div class="order-header">
+          <strong>{{ openOrder.coin }}</strong>
+          <ion-badge [color]="openOrder.side === 'B' ? 'success' : 'danger'">
+            {{ openOrder.side === 'B' ? 'Buy' : 'Sell' }}
+          </ion-badge>
+          <ion-badge color="medium">{{ openOrder.orderType }}</ion-badge>
+        </div>
+        <p>Limit: {{ openOrder.limitPx }} · Sz: {{ openOrder.sz }}/{{ openOrder.origSz }}</p>
+        <p>{{ openOrder.timestamp | date:'dd/MM/yy HH:mm' }}</p>
+      </ion-label>
+
+      <div slot="end" class="order-badges">
+        @if (openOrder.reduceOnly) {
+        <ion-badge color="warning">Reduce</ion-badge>
+        } @if (openOrder.isTrigger) {
+        <ion-badge color="tertiary">Trigger {{ openOrder.triggerPx }}</ion-badge>
+        } @if (openOrder.isPositionTpsl) {
+        <ion-badge color="primary">TP/SL</ion-badge>
+        }
+      </div>
+    </ion-item>
+    }
+  </ion-list>
+</app-refreshable-layout>
