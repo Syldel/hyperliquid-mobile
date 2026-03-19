@@ -41,7 +41,9 @@
   </ion-list>
 
   } @else {
-  <ion-note color="medium">No user data available.</ion-note>
+  <div class="ion-text-center ion-padding">
+    <ion-note color="medium">No user data available.</ion-note>
+  </div>
   } @if (!isLoggedIn()) {
   <div class="ion-padding">
     <ion-button expand="block" (click)="openLoginModal()">

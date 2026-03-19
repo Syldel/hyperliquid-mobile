@@ -14,12 +14,18 @@ export const SECURE_ROUTES: Routes = [
       {
         path: 'balances',
         loadComponent: () => import('./balances/balances.page').then((m) => m.BalancesPage),
-        title: 'Balances',
+        title: 'Spot Balances',
       },
       {
         path: 'open-orders',
         loadComponent: () => import('./open-orders/open-orders.page').then((m) => m.OpenOrdersPage),
         title: 'Open Orders',
+      },
+      {
+        path: 'perp-summary',
+        loadComponent: () =>
+          import('./perp-summary/perp-summary.page').then((m) => m.PerpSummaryPage),
+        title: 'Perp Summary',
       },
       {
         path: 'settings',

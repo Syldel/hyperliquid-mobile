@@ -4,6 +4,7 @@ import { AuthService } from '@auth/auth.service';
 import type {
   CandleSnapshot,
   CandleSnapshotRequest,
+  HLClearinghouseState,
   HLFrontendOpenOrder,
   HLOpenOrder,
   HLOrderStatusData,
@@ -25,6 +26,13 @@ export class HyperliquidInfoService {
 
   private post<T>(body: object): Observable<T> {
     return this.http.post<T>(`${this.config.hyperliquidPublicUrl}/info`, body);
+  }
+
+  getClearinghouseState(): Observable<HLClearinghouseState> {
+    return this.post<HLClearinghouseState>({
+      type: 'clearinghouseState',
+      user: this.auth.currentAddress(),
+    });
   }
 
   getTokenBalances(): Observable<HLSpotBalance[]> {

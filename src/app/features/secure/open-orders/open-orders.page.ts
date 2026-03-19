@@ -5,6 +5,11 @@ import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import { HLFrontendOpenOrder } from '@syldel/hl-shared-types';
+import { Observable } from 'rxjs';
+
+interface HLFrontendOpenOrderExtended extends HLFrontendOpenOrder {
+  tif: string;
+}
 
 @Component({
   selector: 'app-open-orders',
@@ -16,6 +21,6 @@ import { HLFrontendOpenOrder } from '@syldel/hl-shared-types';
 export class OpenOrdersPage extends MenuBasePage {
   private readonly hlInfo = inject(HyperliquidInfoService);
 
-  openOrders = signal<HLFrontendOpenOrder[]>([]);
-  fetchFn = () => this.hlInfo.getFrontendOpenOrders();
+  openOrders = signal<HLFrontendOpenOrderExtended[]>([]);
+  fetchFn = () => this.hlInfo.getFrontendOpenOrders() as Observable<HLFrontendOpenOrderExtended[]>;
 }

@@ -1,0 +1,50 @@
+<app-refreshable-layout
+  title="Perp Summary"
+  [fetchFn]="fetchFn"
+  emptyMessage="No Perp Summary found"
+  (dataLoaded)="clearinghouseState.set($event)"
+>
+  <ion-segment [value]="activeSegment()" (ionChange)="activeSegment.set($any($event.detail.value))">
+    <ion-segment-button value="positions">
+      <ion-label>Positions</ion-label>
+    </ion-segment-button>
+    <ion-segment-button value="account">
+      <ion-label>Account</ion-label>
+    </ion-segment-button>
+  </ion-segment>
+
+  @if (activeSegment() === 'positions') {
+  <ion-list>
+    @for (position of positions(); track position.coin) {
+    <app-position-item [position]="position" />
+    } @empty {
+    <ion-item class="ion-text-center">
+      <ion-label color="medium">No open position</ion-label>
+    </ion-item>
+    }
+  </ion-list>
+  } @if (activeSegment() === 'account') { @if (clearinghouseState(); as info) {
+  <ion-list>
+    <ion-item>
+      <ion-label>
+        <p>Withdrawable</p>
+        <h3>{{ info.withdrawable | smartDecimal }}</h3>
+      </ion-label>
+    </ion-item>
+    <ion-item>
+      <ion-label>
+        <p>Cross maintenance margin used</p>
+        <h3>{{ info.crossMaintenanceMarginUsed | smartDecimal }}</h3>
+      </ion-label>
+    </ion-item>
+    <!-- <ion-item>
+      <ion-label>
+        <p>Snapshot time</p>
+        <h3>{{ info.time | date: 'medium' }}</h3>
+      </ion-label>
+    </ion-item> -->
+  </ion-list>
+  <app-margin-summary title="Global margin" [summary]="info.marginSummary" />
+  <app-margin-summary title="Cross margin" [summary]="info.crossMarginSummary" />
+  } }
+</app-refreshable-layout>

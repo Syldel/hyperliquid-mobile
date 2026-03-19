@@ -1,7 +1,7 @@
 <app-refreshable-layout
   title="Open Orders"
   [fetchFn]="fetchFn"
-  emptyMessage="No open orders found"
+  emptyMessage="No open order found"
   (dataLoaded)="openOrders.set($event)"
 >
   <ion-list>
@@ -14,6 +14,7 @@
             {{ openOrder.side === 'B' ? 'Buy' : 'Sell' }}
           </ion-badge>
           <ion-badge color="medium">{{ openOrder.orderType }}</ion-badge>
+          <ion-badge color="medium">{{ openOrder.tif }}</ion-badge>
         </div>
         <p>Limit: {{ openOrder.limitPx }} · Sz: {{ openOrder.sz }}/{{ openOrder.origSz }}</p>
         <p>{{ openOrder.timestamp | date:'dd/MM/yy HH:mm' }}</p>

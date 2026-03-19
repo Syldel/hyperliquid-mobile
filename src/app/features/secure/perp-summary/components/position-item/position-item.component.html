@@ -1,0 +1,31 @@
+<ion-item (click)="toggle()" button detail="false">
+  <ion-label>
+    <h2>
+      {{ position().coin }}
+      <ion-badge [color]="isLong() ? 'success' : 'danger'">
+        {{ isLong() ? 'LONG' : 'SHORT' }}
+      </ion-badge>
+    </h2>
+
+    <p>
+      {{ position().leverage.value }}x · PnL:
+      <ion-text [color]="pnlColor()">{{ position().unrealizedPnl | smartDecimal }}</ion-text>
+      · Size: {{ position().szi | smartDecimal }}
+    </p>
+
+    @if (expanded()) {
+      <p>
+        Entry: {{ position().entryPx | smartDecimal }} · Value:
+        {{ position().positionValue | smartDecimal }}
+      </p>
+      <p>
+        Margin: {{ position().marginUsed | smartDecimal }} · ROE:
+        <ion-text [color]="pnlColor()">{{ position().returnOnEquity | smartDecimal }}</ion-text>
+      </p>
+      <p>
+        Liq.: {{ position().liquidationPx | smartDecimal }} · Lev.: {{ position().leverage.type }}
+      </p>
+      <!-- <p>Funding: {{ position().cumFunding.sinceOpen | smartDecimal }}</p> -->
+    }
+  </ion-label>
+</ion-item>

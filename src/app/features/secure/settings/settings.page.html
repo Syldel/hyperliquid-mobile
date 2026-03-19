@@ -1,6 +1,6 @@
 <app-page-header title="Settings" />
 <ion-content>
-  <ion-list-header>Appearance</ion-list-header>
+  <ion-list-header><h6>Appearance</h6></ion-list-header>
   <ion-list [inset]="true">
     <ion-item>
       <ion-toggle
@@ -10,6 +10,26 @@
       >
         Dark Mode
       </ion-toggle>
+    </ion-item>
+  </ion-list>
+
+  <ion-list-header><h6>Language</h6></ion-list-header>
+  <ion-list [inset]="true">
+    <ion-item>
+      <ion-label>Locale</ion-label>
+      <ion-select [value]="locale()" (ionChange)="localeChange($event)" interface="popover">
+        <ion-select-option value="en-US">en-US</ion-select-option>
+        <ion-select-option value="fr-FR">fr-FR</ion-select-option>
+      </ion-select>
+    </ion-item>
+    <ion-item>
+      <ion-label color="medium">
+        <p>Preview</p>
+        <p>
+          {{ previewValues[0] | smartDecimal }} · {{ previewValues[1] | smartDecimal }} · {{
+          previewValues[2] | smartDecimal }}
+        </p>
+      </ion-label>
     </ion-item>
   </ion-list>
 </ion-content>
