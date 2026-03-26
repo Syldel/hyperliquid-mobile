@@ -117,9 +117,15 @@ export class LoginModalPage {
               : { walletName: credentials.walletName, password: credentials.password },
         });
       } catch (err) {
+        let message = 'Login failed. Please try again.';
+
+        if ((err as any)?.status === 0) {
+          message = 'Network error or CORS policy problem.';
+        }
+
         const toast = await this.toastCtrl.create({
-          message: 'Login failed. Please try again.',
-          duration: 3000,
+          message: message + ' (status: ' + (err as any)?.status + ')',
+          duration: 4000,
           color: 'danger',
           position: 'top',
         });

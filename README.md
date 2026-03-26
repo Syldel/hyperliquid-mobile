@@ -16,7 +16,9 @@ This project was generated using [Angular CLI](https://github.com/angular/angula
 
 https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api
 
-## Development server
+## Android Development Guide
+
+### Development Server
 
 To start a local development server, run:
 
@@ -26,14 +28,59 @@ ng serve
 
 Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
 
-## Android Live Reload – Development Workflow
+---
 
-This project supports **Android live reload** using Angular dev server and Capacitor.
-Multiple build configurations can be used (`dev`, `prod`) via npm arguments.
+### First-Time Android Setup
 
-### Available Commands
+Run this once to initialize the Android project:
 
-#### ▶️ Android Live Reload (External Dev Server)
+```bash
+npx cap add android
+```
+
+---
+
+### Available Scripts
+
+| Script                    | Description                        |
+| ------------------------- | ---------------------------------- |
+| `android:build`           | Build Angular + sync Capacitor     |
+| `android:build:apk`       | Generate a release APK             |
+| `android:build:apk:debug` | Generate a debug APK               |
+| `android:sync`            | Sync Capacitor only                |
+| `android:run`             | Launch app on a device or emulator |
+| `android:live`            | Live reload on a physical device   |
+
+---
+
+### Standard Build & Run
+
+#### 1. Build + sync
+
+```bash
+npm run android:build --configuration=production
+```
+
+This command runs the Angular build and `cap sync android` in sequence.
+
+#### 2. Open in Android Studio
+
+```bash
+npx cap open android
+```
+
+#### 3. Run on a device or emulator
+
+```bash
+npx cap run android
+```
+
+---
+
+### Android Live Reload – Development Workflow
+
+This project supports **Android live reload** using the Angular dev server and Capacitor.
+Multiple build configurations are available (`dev`, `prod`) via npm arguments.
 
 The following command starts:
 
@@ -46,26 +93,34 @@ npm run android:live --configuration=dev
 npm run android:live --configuration=prod
 ```
 
-### Chrome DevTools
+> The device must be on the same Wi-Fi network as the development machine.
 
-Open:
+---
+
+### Debugging
+
+Open Chrome DevTools for remote debugging:
 
 ```
 chrome://inspect/#devices
 ```
 
-### App assets (icon & splash)
+---
+
+### App Assets (Icon & Splash Screen)
 
 Source files:
 
-- resources/icon.png (1024x1024)
-- resources/splash.png (2732x2732)
+- `resources/icon.png` (1024×1024)
+- `resources/splash.png` (2732×2732)
 
 To regenerate assets:
 
 ```bash
 npx capacitor-assets generate
 ```
+
+> This is also automatically run on `npm install` via the `postinstall` script.
 
 ## Code scaffolding
 

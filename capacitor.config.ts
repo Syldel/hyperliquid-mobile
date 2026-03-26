@@ -1,17 +1,11 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-interface MyCapacitorConfig extends CapacitorConfig {
-  bundledWebRuntime?: boolean;
-}
-
-const config: MyCapacitorConfig = {
-  appId: 'com.syl-studio.hyperliquid',
+const config: CapacitorConfig = {
+  appId: 'com.sylstudio.hyperliquid',
   appName: 'HyperliquidMobile',
   webDir: 'dist/hyperliquid-mobile/browser',
-  bundledWebRuntime: false,
-  server: {
-    url: 'http://10.10.77.25:8100',
-    cleartext: true,
+  android: {
+    allowMixedContent: true, // autorise HTTP depuis HTTPS,
   },
 };
 

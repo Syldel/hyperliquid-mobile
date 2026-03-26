@@ -14,9 +14,8 @@
     "android:build:apk:debug": "sh scripts/android/build-android.sh debug $npm_config_configuration",
     "android:sync": "npx cap sync android",
     "android:run": "npx cap run android",
-    "serve:external": "npm run kill-8100 && ng serve --host 0.0.0.0 --port 8100",
-    "android:live": "npm run serve:external -- --configuration=$npm_config_configuration & npx cap sync android && npx cap run android",
-    "kill-8100": "kill-port 8100",
+    "android:live": "sh scripts/android/live-reload.sh",
+    "android:device": "sh scripts/android/build-android.sh debug development cleartext && adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
     "format": "prettier --write \"src/**/*.{ts,html,scss,json,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,html,scss,json,css}\"",
     "postinstall": "npx capacitor-assets generate"
@@ -47,7 +46,6 @@
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.2.0",
     "jsdom": "^28.1.0",
-    "kill-port": "^2.0.1",
     "prettier": "^3.8.1",
     "typescript": "~5.9.3",
     "vitest": "^4.0.18"
