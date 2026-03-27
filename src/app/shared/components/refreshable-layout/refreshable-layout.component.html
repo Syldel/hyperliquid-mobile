@@ -1,23 +1,45 @@
 <app-page-header [title]="title()" />
 <ion-content>
-  <ion-refresher slot="fixed" (ionRefresh)="onRefresh($event)">
-    <ion-refresher-content></ion-refresher-content>
-  </ion-refresher>
-
-  @if (isLoading()) {
-    <div class="loading-spinner">
-      <ion-spinner name="circular" color="primary"></ion-spinner>
+  @if (requiresAuth() && !isLoggedIn()) {
+    <div class="auth-required">
+      <ion-icon
+        class="lock-icon"
+        name="lock-closed-outline"
+        size="large"
+        color="medium"
+        aria-hidden="true"
+      />
+      <ion-note color="medium">You need to be signed in to view this content</ion-note>
+      <ion-button
+        class="sign-in-button"
+        expand="block"
+        (click)="openLoginModal()"
+        aria-label="Sign in to your account"
+      >
+        <ion-icon slot="start" name="log-in-outline" aria-hidden="true" />
+        Sign in
+      </ion-button>
     </div>
-  }
+  } @else {
+    <ion-refresher slot="fixed" (ionRefresh)="onRefresh($event)">
+      <ion-refresher-content></ion-refresher-content>
+    </ion-refresher>
 
-  @if (!isLoading() && isEmpty()) {
-    <div class="ion-text-center ion-padding">
-      <ion-icon [name]="emptyIcon()" size="large" color="medium" />
-      <p>{{ emptyMessage() }}</p>
-    </div>
-  }
+    @if (isLoading()) {
+      <div class="loading-spinner">
+        <ion-spinner name="circular" color="primary"></ion-spinner>
+      </div>
+    }
 
-  @if (!isLoading() && !isEmpty()) {
-    <ng-content />
+    @if (!isLoading() && isEmpty()) {
+      <div class="ion-text-center ion-padding">
+        <ion-icon [name]="emptyIcon()" size="large" color="medium" />
+        <p>{{ emptyMessage() }}</p>
+      </div>
+    }
+
+    @if (!isLoading() && !isEmpty()) {
+      <ng-content />
+    }
   }
 </ion-content>

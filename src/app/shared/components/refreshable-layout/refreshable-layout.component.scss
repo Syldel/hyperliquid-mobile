@@ -4,6 +4,23 @@
   height: 100%;
 }
 
+.auth-required {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px 16px;
+  text-align: center;
+
+  .lock-icon {
+    font-size: 48px;
+  }
+
+  .sign-in-button {
+    width: 100%;
+  }
+}
+
 // ========================================
 // LOADING SPINNER
 // ========================================

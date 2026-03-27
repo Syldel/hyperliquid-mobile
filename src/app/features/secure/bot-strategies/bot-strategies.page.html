@@ -1,0 +1,39 @@
+<app-refreshable-layout
+  title="Bot Strategies"
+  [fetchFn]="fetchFn"
+  [requiresAuth]="true"
+  emptyMessage="No bot strategy found"
+  (dataLoaded)="user.set($event)"
+>
+  <ion-list>
+    @for (entry of botEntries(); track entry.key) {
+    <ion-item-group>
+      <ion-item-divider>
+        <ion-label>{{ entry.value.name | titlecase }}</ion-label>
+        <ion-toggle
+          slot="end"
+          [checked]="entry.value.enabled"
+          (ionChange)="onExchangeToggle(entry.key, $event.detail.checked)"
+        />
+      </ion-item-divider>
+
+      @for (pair of entry.value.pairs; track pair.name) {
+      <ion-item>
+        <ion-label>
+          <div class="pair-header">
+            <strong>{{ pair.name }}</strong>
+            <ion-badge color="primary">{{ pair.strategy.name }}</ion-badge>
+          </div>
+          <p>Ratio: {{ pair.ratio }}% · Interval: {{ pair.interval }}m</p>
+        </ion-label>
+        <ion-toggle
+          slot="end"
+          [checked]="pair.enabled"
+          (ionChange)="onPairToggle(entry.key, pair.name, $event.detail.checked)"
+        />
+      </ion-item>
+      }
+    </ion-item-group>
+    }
+  </ion-list>
+</app-refreshable-layout>

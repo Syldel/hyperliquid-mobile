@@ -28,6 +28,11 @@ export const SECURE_ROUTES: Routes = [
         title: 'Perp Summary',
       },
       {
+        path: 'bot-strategies',
+        loadComponent: () =>
+          import('./bot-strategies/bot-strategies.page').then((m) => m.BotStrategiesPage),
+      },
+      {
         path: 'settings',
         loadComponent: () => import('./settings/settings.page').then((m) => m.SettingsPage),
         title: 'Settings',
@@ -37,7 +42,7 @@ export const SECURE_ROUTES: Routes = [
         loadComponent: () => import('./profile/profile.page').then((m) => m.ProfilePage),
         title: 'Profile',
       },
-      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+      { path: '', redirectTo: 'balances', pathMatch: 'full' },
     ],
   },
 ];

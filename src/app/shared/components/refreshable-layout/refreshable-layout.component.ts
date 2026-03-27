@@ -1,15 +1,25 @@
-import { Component, inject, input, output, signal } from '@angular/core';
+import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { AuthService } from '@auth/auth.service';
 import {
+  IonButton,
   IonContent,
   IonIcon,
+  IonNote,
   IonRefresher,
   IonRefresherContent,
   IonSpinner,
+  ModalController,
   ToastController,
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { alertCircleOutline, fileTrayOutline } from 'ionicons/icons';
+import {
+  alertCircleOutline,
+  fileTrayOutline,
+  lockClosedOutline,
+  logInOutline,
+} from 'ionicons/icons';
 import { firstValueFrom, Observable } from 'rxjs';
+import { LoginModalPage } from '../login-modal/login-modal.page';
 import { PageHeaderComponent } from '../page-header/page-header.component';
 
 @Component({
@@ -22,17 +32,22 @@ import { PageHeaderComponent } from '../page-header/page-header.component';
     IonRefresherContent,
     IonSpinner,
     IonIcon,
+    IonButton,
+    IonNote,
   ],
   templateUrl: './refreshable-layout.component.html',
   styleUrls: ['./refreshable-layout.component.scss'],
 })
 export class RefreshableLayoutComponent<T> {
   private readonly toastController = inject(ToastController);
+  private readonly modalCtrl = inject(ModalController);
+  private readonly authService = inject(AuthService);
 
   title = input.required<string>();
   fetchFn = input.required<() => Promise<T> | Observable<T>>();
   emptyIcon = input<string>('file-tray-outline');
   emptyMessage = input<string>('No data found');
+  requiresAuth = input<boolean>(false);
 
   dataLoaded = output<T>();
 
@@ -40,8 +55,11 @@ export class RefreshableLayoutComponent<T> {
   isLoading = signal(false);
   isRefreshing = signal(false);
 
+  readonly isLoggedIn = computed(() => this.authService.isLoggedIn());
+
   async ngOnInit() {
-    addIcons({ fileTrayOutline, alertCircleOutline });
+    addIcons({ fileTrayOutline, alertCircleOutline, lockClosedOutline, logInOutline });
+    if (this.requiresAuth() && !this.authService.isLoggedIn()) return;
     await this.load(false);
   }
 
@@ -85,5 +103,20 @@ export class RefreshableLayoutComponent<T> {
       icon: 'alert-circle-outline',
     });
     await toast.present();
+  }
+
+  async openLoginModal() {
+    const modal = await this.modalCtrl.create({
+      component: LoginModalPage,
+      cssClass: 'login-modal',
+    });
+
+    await modal.present();
+
+    modal.onDidDismiss().then((result) => {
+      if (result.data) {
+        this.load(false);
+      }
+    });
   }
 }

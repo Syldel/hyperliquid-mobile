@@ -17,6 +17,7 @@ import { PageHeaderComponent } from '@shared/components/page-header/page-header.
 import { UserAvatarBtnComponent } from '@shared/components/user-avatar-btn/user-avatar-btn.component';
 import { addIcons } from 'ionicons';
 import {
+  hardwareChipOutline,
   homeOutline,
   logOutOutline,
   pieChartOutline,
@@ -59,6 +60,7 @@ export class MenuComponent implements OnInit {
       receiptOutline,
       pieChartOutline,
       settingsOutline,
+      hardwareChipOutline,
     });
   }
 

@@ -38,7 +38,8 @@ export class AuthInterceptor implements HttpInterceptor {
       catchError((error: HttpErrorResponse) => {
         if (error.status === 401 && !isPublicRoute) {
           console.warn('Unauthorized (401) - Logout...');
-          this.auth.logout();
+          // this.auth.logout();
+          // this.auth.removeTokenIfExpired(this.auth.currentAddress() || '');
         } else if (error.status === 403) {
           console.warn('Forbidden (403) - Redirecting to access denied page...');
         }
