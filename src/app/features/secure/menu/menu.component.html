@@ -31,6 +31,10 @@
         <ion-icon aria-hidden="true" name="receipt-outline" slot="start"></ion-icon>
         <ion-label>Open Orders</ion-label>
       </ion-item>
+      <ion-item (click)="onMenuItemClick('/secure/user-fills')">
+        <ion-icon aria-hidden="true" name="analytics-outline" slot="start"></ion-icon>
+        <ion-label>Trade History</ion-label>
+      </ion-item>
       <ion-item (click)="onMenuItemClick('/secure/bot-strategies')">
         <ion-icon aria-hidden="true" name="hardware-chip-outline" slot="start"></ion-icon>
         <ion-label>Bot Strategies</ion-label>

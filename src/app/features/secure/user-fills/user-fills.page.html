@@ -1,0 +1,104 @@
+<app-refreshable-layout
+  title="Trade History"
+  [fetchFn]="fetchFn()"
+  emptyMessage="No fills found for this period"
+  (dataLoaded)="fills.set($event)"
+>
+  <div filters class="date-filters">
+    <div class="date-filters__inputs">
+      <ion-item lines="none">
+        <ion-label position="stacked">Start date</ion-label>
+        <ion-datetime-button datetime="startDatetime"></ion-datetime-button>
+        <ion-modal [keepContentsMounted]="true">
+          <ng-template>
+            <ion-datetime
+              id="startDatetime"
+              presentation="date-time"
+              [max]="maxDate()"
+              [value]="startDateStr()"
+              (ionChange)="onStartChange($event)"
+            ></ion-datetime>
+          </ng-template>
+        </ion-modal>
+      </ion-item>
+
+      <ion-item lines="none">
+        <ion-label position="stacked">End date</ion-label>
+        <ion-datetime-button datetime="endDatetime"></ion-datetime-button>
+        <ion-modal [keepContentsMounted]="true">
+          <ng-template>
+            <ion-datetime
+              id="endDatetime"
+              presentation="date-time"
+              [min]="startDateStr()"
+              [max]="maxDate()"
+              [value]="endDateStr()"
+              (ionChange)="onEndChange($event)"
+            ></ion-datetime>
+          </ng-template>
+        </ion-modal>
+      </ion-item>
+    </div>
+
+    <div class="date-filters__shortcuts">
+      <ion-button
+        [fill]="activeShortcut() === '24h' ? 'solid' : 'outline'"
+        size="small"
+        (click)="setLast24h()"
+      >
+        24h
+      </ion-button>
+
+      <ion-button
+        [fill]="activeShortcut() === '7d' ? 'solid' : 'outline'"
+        size="small"
+        (click)="setLastWeek()"
+      >
+        7d
+      </ion-button>
+    </div>
+
+    <ion-item class="date-filters__coin" lines="none">
+      <ion-label position="stacked">Coin</ion-label>
+      <ion-select
+        placeholder="All"
+        [value]="coinFilter()"
+        (ionChange)="coinFilter.set($event.detail.value)"
+        interface="popover"
+      >
+        <ion-select-option value="">All ({{ fills().length }})</ion-select-option>
+        @for (coin of availableCoins(); track coin) {
+        <ion-select-option [value]="coin">
+          {{ coin }} ({{ coinCounts().get(coin) }})
+        </ion-select-option>
+        }
+      </ion-select>
+    </ion-item>
+  </div>
+
+  <ion-list>
+    @for (fill of filteredFills(); track fill.tid) {
+    <ion-item>
+      <ion-label>
+        <div class="fill-header">
+          <span class="fill-coin">{{ fill.coin }}</span>
+          <ion-badge [color]="fill.side === 'B' ? 'success' : 'danger'">
+            {{ fill.side === 'B' ? 'BUY' : 'SELL' }}
+          </ion-badge>
+        </div>
+        <p class="fill-dir">{{ fill.dir }}</p>
+        <div class="fill-row">
+          <span>{{ fill.px }} · {{ fill.sz }}</span>
+          <span [class]="fill.closedPnl >= '0' ? 'pnl-positive' : 'pnl-negative'">
+            {{ fill.closedPnl | number:'1.2-2' }}
+          </span>
+        </div>
+        <div class="fill-row">
+          <span class="fill-fee">Fee: {{ fill.fee }} {{ fill.feeToken }}</span>
+          <span class="fill-date">{{ fill.time | date:'dd/MM/yy HH:mm' }}</span>
+        </div>
+      </ion-label>
+    </ion-item>
+    }
+  </ion-list>
+</app-refreshable-layout>

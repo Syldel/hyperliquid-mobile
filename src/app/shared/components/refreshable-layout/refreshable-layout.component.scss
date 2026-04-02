@@ -4,7 +4,16 @@
   height: 100%;
 }
 
-.auth-required {
+.sticky-filters {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--ion-background-color);
+  border-bottom: 1px solid var(--ion-background-color-step-200, transparent);
+  padding-bottom: 6px;
+}
+
+.icon-note {
   display: flex;
   flex-direction: column;
   align-items: center;

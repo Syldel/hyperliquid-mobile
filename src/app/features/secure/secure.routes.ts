@@ -28,6 +28,11 @@ export const SECURE_ROUTES: Routes = [
         title: 'Perp Summary',
       },
       {
+        path: 'user-fills',
+        loadComponent: () => import('./user-fills/user-fills.page').then((m) => m.UserFillsPage),
+        title: 'Trade History',
+      },
+      {
         path: 'bot-strategies',
         loadComponent: () =>
           import('./bot-strategies/bot-strategies.page').then((m) => m.BotStrategiesPage),

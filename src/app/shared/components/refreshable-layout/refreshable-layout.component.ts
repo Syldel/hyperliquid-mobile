@@ -1,4 +1,13 @@
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  untracked,
+} from '@angular/core';
 import { AuthService } from '@auth/auth.service';
 import {
   IonButton,
@@ -57,10 +66,16 @@ export class RefreshableLayoutComponent<T> {
 
   readonly isLoggedIn = computed(() => this.authService.isLoggedIn());
 
+  constructor() {
+    effect(() => {
+      this.fetchFn();
+      if (this.requiresAuth() && !this.authService.isLoggedIn()) return;
+      untracked(() => this.load(false));
+    });
+  }
+
   async ngOnInit() {
     addIcons({ fileTrayOutline, alertCircleOutline, lockClosedOutline, logInOutline });
-    if (this.requiresAuth() && !this.authService.isLoggedIn()) return;
-    await this.load(false);
   }
 
   async onRefresh(event: CustomEvent) {

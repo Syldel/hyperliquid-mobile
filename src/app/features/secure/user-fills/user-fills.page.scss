@@ -1,0 +1,87 @@
+.date-filters {
+  position: relative;
+
+  &__inputs {
+    ion-item {
+      ion-label {
+        margin-bottom: 6px;
+      }
+    }
+  }
+
+  &__shortcuts {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+    display: flex;
+    gap: 10px;
+    padding: 0 12px 3px 0;
+
+    ion-button {
+      --border-radius: 20px;
+      --padding-start: 12px;
+      --padding-end: 12px;
+      font-size: 0.75rem;
+      margin: 0;
+    }
+  }
+
+  &__coin {
+    position: absolute;
+    right: 0;
+    top: 0;
+    z-index: 1;
+  }
+}
+
+ion-item {
+  --padding-start: 12px;
+  --inner-padding-end: 12px;
+
+  .fill-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2px;
+  }
+
+  .fill-coin {
+    font-weight: 600;
+    font-size: 1rem;
+  }
+
+  .fill-dir {
+    font-size: 0.75rem;
+    color: var(--ion-color-medium);
+    margin: 0 0 4px;
+  }
+
+  .fill-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    color: var(--ion-color-medium);
+    margin-top: 2px;
+  }
+
+  .pnl-positive {
+    color: var(--ion-color-success);
+    font-weight: 500;
+  }
+
+  .pnl-negative {
+    color: var(--ion-color-danger);
+    font-weight: 500;
+  }
+
+  .fill-date {
+    font-size: 0.72rem;
+    color: var(--ion-color-medium-shade);
+  }
+
+  .fill-fee {
+    font-size: 0.72rem;
+  }
+}
