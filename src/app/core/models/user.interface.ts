@@ -7,14 +7,18 @@ export interface User {
   createdAt: string;
 }
 
+export interface TradingStrategy {
+  name: string;
+  shortname?: string;
+  source?: string;
+}
+
 export interface TradingPair {
   name: string;
   ratio: number;
   interval: string;
   enabled: boolean;
-  strategy: {
-    name: string;
-  };
+  strategy: TradingStrategy;
 }
 
 export interface BotSettings {

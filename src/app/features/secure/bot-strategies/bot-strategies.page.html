@@ -18,22 +18,40 @@
       </ion-item-divider>
 
       @for (pair of entry.value.pairs; track pair.name) {
-      <ion-item>
-        <ion-label>
-          <div class="pair-header">
-            <strong>{{ pair.name }}</strong>
-            <ion-badge color="primary">{{ pair.strategy.name }}</ion-badge>
-          </div>
-          <p>Ratio: {{ pair.ratio }}% · Interval: {{ pair.interval }}m</p>
-        </ion-label>
-        <ion-toggle
-          slot="end"
-          [checked]="pair.enabled"
-          (ionChange)="onPairToggle(entry.key, pair.name, $event.detail.checked)"
-        />
-      </ion-item>
+      <ion-item-sliding>
+        <ion-item>
+          <ion-label>
+            <div class="pair-header">
+              <strong>{{ pair.name }}</strong>
+              <ion-badge color="primary">{{ pair.strategy.name }}</ion-badge>
+            </div>
+            <p>Ratio: {{ pair.ratio }}% · Interval: {{ pair.interval }}</p>
+          </ion-label>
+          <ion-toggle
+            slot="end"
+            [checked]="pair.enabled"
+            (ionChange)="onPairToggle(entry.key, pair.name, $event.detail.checked)"
+          />
+        </ion-item>
+
+        <ion-item-options side="end">
+          <ion-item-option color="primary" (click)="openEditModal(entry.key, pair)">
+            <ion-icon slot="icon-only" name="pencil-outline" />
+          </ion-item-option>
+          <ion-item-option color="danger" (click)="deletePair(entry.key, pair.name)">
+            <ion-icon slot="icon-only" name="trash-outline" />
+          </ion-item-option>
+        </ion-item-options>
+      </ion-item-sliding>
       }
     </ion-item-group>
     }
   </ion-list>
+
+  <!-- FAB -->
+  <ion-fab slot="fixed" vertical="bottom" horizontal="end">
+    <ion-fab-button (click)="openAddModal()">
+      <ion-icon name="add-outline" />
+    </ion-fab-button>
+  </ion-fab>
 </app-refreshable-layout>

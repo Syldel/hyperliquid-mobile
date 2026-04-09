@@ -1,0 +1,184 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>{{ isEditMode() ? 'Edit Pair' : 'Add Pair' }}</ion-title>
+    <ion-buttons slot="start">
+      <ion-button (click)="dismiss()">
+        <ion-icon slot="icon-only" name="close-outline" />
+      </ion-button>
+    </ion-buttons>
+    <ion-buttons slot="end">
+      <ion-button (click)="submit()" [disabled]="!isValid()">
+        <ion-icon slot="icon-only" name="checkmark-outline" />
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <form [formGroup]="form">
+    <!-- Exchange -->
+    <ion-list inset class="exchange__inset-list">
+      <ion-item>
+        <ion-select
+          formControlName="exchangeKey"
+          label="Exchange"
+          labelPlacement="stacked"
+          interface="action-sheet"
+          placeholder="Select an exchange"
+        >
+          @for (entry of exchanges(); track entry.key) {
+            <ion-select-option [value]="entry.key">
+              {{ entry.value.name | titlecase }}
+            </ion-select-option>
+          }
+        </ion-select>
+      </ion-item>
+    </ion-list>
+
+    <!-- Pair name — tabs Perp / Spot -->
+    <ion-segment [value]="marketType()" (ionChange)="onMarketTypeChange($event)">
+      <ion-segment-button value="perp">
+        <ion-label>Perp</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="spot">
+        <ion-label>Spot</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+
+    <!-- Selected pair chip -->
+    @if (form.get('pairName')?.value) {
+      <div class="selected-chip-row">
+        <ion-chip color="primary" (click)="selectPairName('')">
+          <ion-label>{{ form.get('pairName')?.value }}</ion-label>
+          <ion-icon name="close-circle" />
+        </ion-chip>
+      </div>
+    }
+
+    @if (form.get('pairName')?.hasError('pairNameExists')) {
+      <ion-note color="danger">This pair already exists for this exchange</ion-note>
+    }
+
+    <ion-list inset class="market__inset-list">
+      <!-- Searchbar -->
+      <ion-item>
+        <ion-searchbar
+          [placeholder]="'Search ' + marketType() + ' pair'"
+          [debounce]="200"
+          (ionInput)="searchQuery.set($event.detail.value ?? '')"
+          [value]="searchQuery()"
+        />
+      </ion-item>
+
+      <!-- Loading -->
+      @if (isLoadingMarkets()) {
+        <ion-item>
+          <ion-spinner slot="start" name="crescent" />
+          <ion-label>Loading markets…</ion-label>
+        </ion-item>
+      }
+
+      <!-- Pair list -->
+      @if (!isLoadingMarkets()) {
+        <div class="pair-list">
+          @for (name of filteredMarkets(); track name) {
+            <ion-item button [detail]="false" (click)="selectPairName(name)">
+              <ion-label>{{ name }}</ion-label>
+              @if (form.get('pairName')?.value === name) {
+                <ion-icon slot="end" name="checkmark-circle" color="primary" />
+              }
+            </ion-item>
+          } @empty {
+            <ion-item>
+              <ion-label color="medium">No results</ion-label>
+            </ion-item>
+          }
+        </div>
+      }
+    </ion-list>
+
+    <!-- Strategy -->
+    <ion-list inset>
+      <ion-item>
+        <ion-select
+          formControlName="strategy"
+          label="Strategy"
+          labelPlacement="stacked"
+          interface="action-sheet"
+          placeholder="Select a strategy"
+        >
+          @for (s of strategies; track s.name) {
+            <ion-select-option [value]="s">{{ s.name }}</ion-select-option>
+          }
+        </ion-select>
+      </ion-item>
+    </ion-list>
+
+    <!-- Ratio -->
+    <ion-list inset>
+      <ion-label class="ratio__label">
+        <span>Ratio :</span>
+        <div class="ratio__row">
+          <ion-button
+            fill="clear"
+            size="medium"
+            (click)="adjustRatio(-1)"
+            [disabled]="form.get('ratio')!.value <= 0"
+          >
+            <ion-icon slot="icon-only" name="remove-outline" />
+          </ion-button>
+
+          <span class="ratio-value">{{ form.get('ratio')?.value }}%</span>
+
+          <ion-button
+            fill="clear"
+            size="medium"
+            (click)="adjustRatio(1)"
+            [disabled]="form.get('ratio')!.value >= 100"
+          >
+            <ion-icon slot="icon-only" name="add-outline" />
+          </ion-button>
+        </div>
+      </ion-label>
+      <ion-item>
+        <ion-range
+          formControlName="ratio"
+          [min]="0"
+          [max]="100"
+          [step]="1"
+          [pin]="true"
+          [pinFormatter]="pinFormatter"
+          color="primary"
+        >
+          <ion-label slot="start">0%</ion-label>
+          <ion-label slot="end">100%</ion-label>
+        </ion-range>
+      </ion-item>
+    </ion-list>
+
+    <!-- Interval -->
+    <ion-list inset>
+      <ion-item>
+        <ion-select
+          formControlName="interval"
+          label="Interval"
+          labelPlacement="stacked"
+          interface="action-sheet"
+          placeholder="Select an interval"
+        >
+          @for (interval of candleIntervals; track interval) {
+            <ion-select-option [value]="interval">{{ interval }}</ion-select-option>
+          }
+        </ion-select>
+      </ion-item>
+    </ion-list>
+
+    <!-- Enabled -->
+    <ion-list inset>
+      <ion-item>
+        <ion-label>Enabled</ion-label>
+        <ion-toggle slot="end" formControlName="enabled" />
+      </ion-item>
+    </ion-list>
+  </form>
+</ion-content>
