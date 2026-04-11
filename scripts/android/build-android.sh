@@ -134,6 +134,7 @@ if [ "$TYPE" = "apk" ]; then
         rm "$APK_PATH"
     fi
 
+    # Nécessite une signature
     ./gradlew assembleRelease
     echo "📦 APK generated"
 
@@ -158,6 +159,7 @@ elif [ "$TYPE" = "aab" ]; then
         rm "$AAB_PATH"
     fi
 
+    # Pas installable avec adb
     ./gradlew bundleRelease
     echo "📦 AAB generated"
 

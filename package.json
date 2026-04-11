@@ -15,7 +15,7 @@
     "android:sync": "npx cap sync android",
     "android:run": "npx cap run android",
     "android:live": "sh scripts/android/live-reload.sh",
-    "android:device": "sh scripts/android/build-android.sh debug development cleartext && adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
+    "android:device": "sh scripts/android/build-android.sh debug development && adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
     "format": "prettier --write \"src/**/*.{ts,html,scss,json,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,html,scss,json,css}\"",
     "postinstall": "npx capacitor-assets generate --android"
@@ -30,6 +30,7 @@
     "@angular/platform-browser": "^21.2.6",
     "@angular/router": "^21.2.6",
     "@capacitor/android": "^8.3.0",
+    "@capacitor/app": "^8.1.0",
     "@capacitor/core": "^8.3.0",
     "@capacitor/preferences": "^8.0.1",
     "@ionic/angular": "^8.8.2",

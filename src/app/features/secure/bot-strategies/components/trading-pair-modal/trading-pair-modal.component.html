@@ -106,8 +106,9 @@
           labelPlacement="stacked"
           interface="action-sheet"
           placeholder="Select a strategy"
+          [compareWith]="compareStrategies"
         >
-          @for (s of strategies; track s.name) {
+          @for (s of strategies; track s.shortname) {
             <ion-select-option [value]="s">{{ s.name }}</ion-select-option>
           }
         </ion-select>

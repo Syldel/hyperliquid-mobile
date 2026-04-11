@@ -1,0 +1,19 @@
+<ion-item>
+  <ion-label>
+    <p>Token expires</p>
+    <h2>{{ exp() * 1000 | date: 'medium' }}</h2>
+    @if (remainingLabel(); as label) {
+      <p>
+        <ion-text [color]="color()">{{ label }} remaining</ion-text>
+      </p>
+    }
+  </ion-label>
+  <ion-badge
+    slot="end"
+    [color]="color()"
+    aria-live="polite"
+    [attr.aria-label]="remainingLabel() ? 'Token valid' : 'Token expired'"
+  >
+    {{ remainingLabel() ? 'Valid' : 'Expired' }}
+  </ion-badge>
+</ion-item>

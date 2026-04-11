@@ -9,8 +9,8 @@ export interface User {
 
 export interface TradingStrategy {
   name: string;
-  shortname?: string;
-  source?: string;
+  shortname: string;
+  // source?: string;
 }
 
 export interface TradingPair {

@@ -1,7 +1,5 @@
-import { DatePipe } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
 import {
-  IonBadge,
   IonButton,
   IonContent,
   IonIcon,
@@ -11,11 +9,13 @@ import {
   IonNote,
   ModalController,
 } from '@ionic/angular/standalone';
+import { AppLifecycleService } from '@services/app-lifecycle.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { LoginModalPage } from '@shared/components/login-modal/login-modal.page';
 import { PageHeaderComponent } from '@shared/components/page-header/page-header.component';
 import { addIcons } from 'ionicons';
 import { logInOutline } from 'ionicons/icons';
+import { TokenExpiryComponent } from './components/token-expiry.component';
 
 @Component({
   selector: 'app-profile',
@@ -25,20 +25,26 @@ import { logInOutline } from 'ionicons/icons';
     IonButton,
     IonItem,
     IonLabel,
-    IonBadge,
     IonIcon,
     IonList,
     IonNote,
-    DatePipe,
     PageHeaderComponent,
+    TokenExpiryComponent,
   ],
   templateUrl: './profile.page.html',
 })
 export class ProfilePage extends MenuBasePage {
   private readonly modalCtrl = inject(ModalController);
+  private readonly lifecycle = inject(AppLifecycleService);
 
-  readonly isLoggedIn = computed(() => this.authService.isLoggedIn());
-  readonly currentUser = computed(() => this.authService.currentWallet());
+  readonly isLoggedIn = computed(() => {
+    this.lifecycle.foregroundCount();
+    return this.authService.isLoggedIn();
+  });
+  readonly currentUser = computed(() => {
+    this.lifecycle.foregroundCount();
+    return this.authService.currentWallet();
+  });
 
   ngOnInit(): void {
     addIcons({

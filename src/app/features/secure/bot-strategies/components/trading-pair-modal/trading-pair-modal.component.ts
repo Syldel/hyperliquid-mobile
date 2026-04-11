@@ -33,7 +33,6 @@ import {
   IonToolbar,
   ModalController,
 } from '@ionic/angular/standalone';
-import { RangeValue } from '@ionic/core';
 import { BotSettings, TradingPair, TradingStrategy } from '@models/user.interface';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { addIcons } from 'ionicons';
@@ -281,23 +280,11 @@ export class TradingPairModalComponent implements OnInit {
     this.form.patchValue({ pairName: name });
   }
 
-  onStrategyChange(name: string): void {
-    const strategy = this.strategies.find((s) => s.name === name);
-    if (!strategy) return;
-    this.form.patchValue({ strategy });
-  }
+  compareStrategies = (s1: TradingStrategy, s2: TradingStrategy): boolean => {
+    return s1 && s2 ? s1.shortname === s2.shortname : s1 === s2;
+  };
 
   readonly pinFormatter = (value: number) => `${value}%`;
-
-  onRatioChange(event: CustomEvent) {
-    const value = event.detail.value as RangeValue;
-
-    if (typeof value === 'number') {
-      this.form.patchValue({ ratio: value });
-    } else {
-      this.form.patchValue({ ratio: value.upper });
-    }
-  }
 
   adjustRatio(delta: number): void {
     const current = this.form.getRawValue().ratio;

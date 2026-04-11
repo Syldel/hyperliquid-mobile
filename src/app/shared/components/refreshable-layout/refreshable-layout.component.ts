@@ -20,6 +20,7 @@ import {
   ModalController,
   ToastController,
 } from '@ionic/angular/standalone';
+import { AppLifecycleService } from '@services/app-lifecycle.service';
 import { addIcons } from 'ionicons';
 import {
   alertCircleOutline,
@@ -51,6 +52,7 @@ export class RefreshableLayoutComponent<T> {
   private readonly toastController = inject(ToastController);
   private readonly modalCtrl = inject(ModalController);
   private readonly authService = inject(AuthService);
+  private readonly lifecycle = inject(AppLifecycleService);
 
   title = input.required<string>();
   fetchFn = input.required<() => Promise<T> | Observable<T>>();
@@ -69,6 +71,7 @@ export class RefreshableLayoutComponent<T> {
   constructor() {
     effect(() => {
       this.fetchFn();
+      this.lifecycle.foregroundCount();
       if (this.requiresAuth() && !this.authService.isLoggedIn()) return;
       untracked(() => this.load(false));
     });

@@ -14,6 +14,9 @@ export class AuthService {
   private readonly secureStorage = inject(SecureStorageService);
   private readonly config = inject(ConfigService);
 
+  private timeoutId: ReturnType<typeof setTimeout> | null = null;
+  private readonly MAX_TIMEOUT = 2_147_483_647;
+
   // --- State ---
   private readonly _tokens = signal<TokenMap>({});
   private readonly _userWallets = signal<JwtPayload[]>([]);
@@ -38,6 +41,8 @@ export class AuthService {
   });
 
   readonly isLoggedIn = computed(() => {
+    this._tokens(); // dépendance silencieuse
+
     const address = this._currentAddress();
     if (!address) return false;
 
@@ -200,22 +205,26 @@ export class AuthService {
   }
 
   private setupAutoLogout(): void {
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const MAX_TIMEOUT = 2_147_483_647;
-
     effect((onCleanup) => {
       const address = this._currentAddress();
 
       onCleanup(() => {
-        if (timeoutId) clearTimeout(timeoutId);
+        if (this.timeoutId) clearTimeout(this.timeoutId);
       });
 
       if (!address) return;
 
-      const delay = this.removeTokenIfExpired(address);
-      if (delay === null || delay <= 0) return;
-
-      timeoutId = setTimeout(() => this.removeToken(address), Math.min(delay, MAX_TIMEOUT));
+      this.scheduleAutoLogout(address);
     });
+  }
+
+  public scheduleAutoLogout(address = this._currentAddress()): void {
+    if (this.timeoutId) clearTimeout(this.timeoutId);
+    if (!address) return;
+
+    const delay = this.removeTokenIfExpired(address);
+    if (delay === null || delay <= 0) return;
+
+    this.timeoutId = setTimeout(() => this.removeToken(address), Math.min(delay, this.MAX_TIMEOUT));
   }
 }

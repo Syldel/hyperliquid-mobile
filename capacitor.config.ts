@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'HyperliquidMobile',
   webDir: 'dist/hyperliquid-mobile/browser',
   android: {
-    allowMixedContent: true, // autorise HTTP depuis HTTPS,
+    allowMixedContent: false, // autorise HTTP depuis HTTPS,
   },
 };
 

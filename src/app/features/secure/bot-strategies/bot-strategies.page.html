@@ -9,7 +9,7 @@
     @for (entry of botEntries(); track entry.key) {
     <ion-item-group>
       <ion-item-divider>
-        <ion-label>{{ entry.value.name | titlecase }}</ion-label>
+        <ion-label color="dark">{{ entry.value.name | titlecase }}</ion-label>
         <ion-toggle
           slot="end"
           [checked]="entry.value.enabled"

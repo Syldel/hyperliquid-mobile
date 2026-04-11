@@ -24,20 +24,7 @@
       </ion-label>
     </ion-item>
 
-    <ion-item>
-      <ion-label>
-        <p>Token expires</p>
-        <h2>{{ user.exp * 1000 | date: 'medium' }}</h2>
-      </ion-label>
-      <ion-badge
-        slot="end"
-        [color]="isLoggedIn() ? 'success' : 'danger'"
-        aria-live="polite"
-        [attr.aria-label]="isLoggedIn() ? 'Token valid' : 'Token expired'"
-      >
-        {{ isLoggedIn() ? 'Valid' : 'Expired' }}
-      </ion-badge>
-    </ion-item>
+    <app-token-expiry [exp]="user.exp" />
   </ion-list>
 
   } @else {
