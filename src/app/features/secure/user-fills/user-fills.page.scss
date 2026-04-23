@@ -46,6 +46,25 @@ ion-item {
     margin-bottom: 2px;
   }
 
+  .fill-body {
+    display: flex;
+  }
+
+  .fill-half {
+    width: 50%;
+
+    &--left {
+      padding-right: 8px;
+      border-right: 1px solid var(--ion-color-light-shade);
+    }
+
+    &--right {
+      margin-left: 50%;
+      padding-left: 8px;
+      border-left: 1px solid var(--ion-color-light-shade);
+    }
+  }
+
   .fill-coin {
     font-weight: 600;
     font-size: 1rem;

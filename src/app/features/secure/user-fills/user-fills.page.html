@@ -80,22 +80,26 @@
     @for (fill of filteredFills(); track fill.tid) {
     <ion-item>
       <ion-label>
-        <div class="fill-header">
-          <span class="fill-coin">{{ fill.coin }}</span>
-          <ion-badge [color]="fill.side === 'B' ? 'success' : 'danger'">
-            {{ fill.side === 'B' ? 'BUY' : 'SELL' }}
-          </ion-badge>
-        </div>
-        <p class="fill-dir">{{ fill.dir }}</p>
-        <div class="fill-row">
-          <span>{{ fill.px }} · {{ fill.sz }}</span>
-          <span [class]="fill.closedPnl >= '0' ? 'pnl-positive' : 'pnl-negative'">
-            {{ fill.closedPnl | number:'1.2-2' }}
-          </span>
-        </div>
-        <div class="fill-row">
-          <span class="fill-fee">Fee: {{ fill.fee }} {{ fill.feeToken }}</span>
-          <span class="fill-date">{{ fill.time | date:'dd/MM/yy HH:mm' }}</span>
+        <div class="fill-half" [class]="isOpen(fill) ? 'fill-half--left' : 'fill-half--right'">
+          <div class="fill-header">
+            <span class="fill-coin">{{ fill.coin }}</span>
+            <ion-badge [color]="fill.side === 'B' ? 'success' : 'danger'">
+              {{ fill.side === 'B' ? 'BUY' : 'SELL' }}
+            </ion-badge>
+          </div>
+          <p class="fill-dir">{{ fill.dir }}</p>
+          <div class="fill-row">
+            <span>{{ fill.px }} · {{ fill.sz }}</span>
+            @if (!isOpen(fill)) {
+            <span [class]="fill.closedPnl >= '0' ? 'pnl-positive' : 'pnl-negative'">
+              {{ fill.closedPnl | number:'1.2-2' }}
+            </span>
+            }
+          </div>
+          <div class="fill-row">
+            <span class="fill-fee">Fee: {{ fill.fee }} {{ fill.feeToken }}</span>
+            <span class="fill-date">{{ fill.time | date:'dd/MM/yy HH:mm' }}</span>
+          </div>
         </div>
       </ion-label>
     </ion-item>

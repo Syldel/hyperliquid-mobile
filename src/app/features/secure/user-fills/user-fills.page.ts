@@ -1,5 +1,5 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   IonBadge,
@@ -13,6 +13,7 @@ import {
   IonSelect,
   IonSelectOption,
 } from '@ionic/angular/standalone';
+import { AppLifecycleService } from '@services/app-lifecycle.service';
 import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
@@ -42,6 +43,7 @@ import { interval, Observable } from 'rxjs';
 })
 export class UserFillsPage extends MenuBasePage {
   private readonly hlInfo = inject(HyperliquidInfoService);
+  private readonly lifecycle = inject(AppLifecycleService);
 
   fills = signal<HLUserFill[]>([]);
   coinFilter = signal<string>('');
@@ -77,6 +79,19 @@ export class UserFillsPage extends MenuBasePage {
     interval(60_000)
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.maxDate.set(this.getCurrentMaxDate()));
+
+    effect(() => {
+      this.lifecycle.foregroundCount();
+      untracked(() => {
+        if (this.activeShortcut() === '24h') {
+          this.startDateStr.set(this.toLocalISO(this.daysAgo(1)));
+        } else if (this.activeShortcut() === '7d') {
+          this.startDateStr.set(this.toLocalISO(this.daysAgo(7)));
+        }
+        this.endDateStr.set(this.toLocalISO(new Date()));
+        this.fetchFn.set(this.buildFetchFn());
+      });
+    });
   }
 
   private getCurrentMaxDate(): string {
@@ -97,6 +112,10 @@ export class UserFillsPage extends MenuBasePage {
 
   private daysAgo(days: number): Date {
     return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  }
+
+  isOpen(fill: HLUserFill): boolean {
+    return fill.dir.toLowerCase().includes('open');
   }
 
   onStartChange(event: CustomEvent): void {
