@@ -35,6 +35,7 @@ import {
 } from '@ionic/angular/standalone';
 import { BotSettings, TradingPair, TradingStrategy } from '@models/user.interface';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
+import { HLPerpDex } from '@syldel/hl-shared-types';
 import { addIcons } from 'ionicons';
 import {
   addOutline,
@@ -45,7 +46,7 @@ import {
   removeOutline,
 } from 'ionicons/icons';
 
-type MarketType = 'perp' | 'spot';
+type MarketType = 'perp' | 'spot' | 'hip3';
 
 interface TradingPairForm {
   exchangeKey: FormControl<string>;
@@ -129,20 +130,33 @@ export class TradingPairModalComponent implements OnInit {
   marketType = signal<MarketType>('perp');
   searchQuery = signal('');
   isLoadingMarkets = signal(false);
+  selectedDex = signal<string>('');
 
   private perpNames = signal<string[]>([]);
   private spotNames = signal<string[]>([]);
+  private perpDexs = signal<HLPerpDex[]>([]);
+
+  readonly dexNames = computed(() => this.perpDexs().map((d) => d.name));
 
   readonly filteredMarkets = computed(() => {
-    const list = this.marketType() === 'perp' ? this.perpNames() : this.spotNames();
+    let list: string[];
+    if (this.marketType() === 'perp') {
+      list = this.perpNames();
+    } else if (this.marketType() === 'spot') {
+      list = this.spotNames();
+    } else {
+      // hip3 : assets du DEX sélectionné
+      const dex = this.perpDexs().find((d) => d.name === this.selectedDex());
+      list = dex ? dex.assetToStreamingOiCap.map(([asset]) => asset) : [];
+    }
     const q = this.searchQuery().toLowerCase().trim();
     return q ? list.filter((n) => n.toLowerCase().includes(q)) : list;
   });
 
-  // Mémoire parallèle par marketType
-  private readonly pairMemory = {
+  private readonly pairMemory: Record<MarketType, ReturnType<typeof signal<string>>> = {
     perp: signal<string>(''),
     spot: signal<string>(''),
+    hip3: signal<string>(''),
   };
 
   // ------------------------------------------------------------------
@@ -219,14 +233,31 @@ export class TradingPairModalComponent implements OnInit {
         enabled: pair.enabled,
       });
 
-      const type: MarketType = pair.name.includes('/') ? 'spot' : 'perp';
+      this.form.get('exchangeKey')?.disable();
 
-      if (pair) {
-        this.form.get('exchangeKey')?.disable();
+      // Détection du type de marché
+      // Les assets HIP-3 ont le format "dex:ASSET" (contiennent ":")
+      // Les spots ont le format "BASE/QUOTE" (contiennent "/")
+      let type: MarketType = 'perp';
 
-        this.pairMemory[type].set(pair.name);
+      if (pair.name.includes('/')) {
+        type = 'spot';
+      } else if (pair.name.includes(':')) {
+        type = 'hip3';
+        // Retrouver le DEX propriétaire de cet asset
+        const ownerDex = this.perpDexs().find((d) =>
+          d.assetToStreamingOiCap.some(([asset]) => asset === pair.name),
+        );
+        if (ownerDex) {
+          this.selectedDex.set(ownerDex.name);
+        } else {
+          // DEX pas encore chargé — on extrait le préfixe "dex:" du nom
+          const prefix = pair.name.split(':')[0];
+          this.selectedDex.set(prefix);
+        }
       }
 
+      this.pairMemory[type].set(pair.name);
       this.marketType.set(type);
     });
   }
@@ -239,8 +270,11 @@ export class TradingPairModalComponent implements OnInit {
   //  Market loading
   // ------------------------------------------------------------------
 
+  private loadCount = 0;
+
   private loadMarkets(): void {
     this.isLoadingMarkets.set(true);
+    this.loadCount = 0;
 
     this.marketService.getPerpNames().subscribe({
       next: (names) => this.perpNames.set(names),
@@ -251,13 +285,24 @@ export class TradingPairModalComponent implements OnInit {
       next: (names) => this.spotNames.set(names),
       complete: () => this.checkLoadingDone(),
     });
-  }
 
-  private loadCount = 0;
+    this.marketService.getPerpDexs().subscribe({
+      next: (dexs) => {
+        // Filtrer les DEX sans assets
+        const activeDexs = dexs.filter((d) => d.assetToStreamingOiCap.length > 0);
+        this.perpDexs.set(activeDexs);
+
+        if (activeDexs.length > 0 && !this.selectedDex()) {
+          this.selectedDex.set(activeDexs[0].name);
+        }
+      },
+      complete: () => this.checkLoadingDone(),
+    });
+  }
 
   private checkLoadingDone(): void {
     this.loadCount++;
-    if (this.loadCount >= 2) this.isLoadingMarkets.set(false);
+    if (this.loadCount >= 3) this.isLoadingMarkets.set(false);
   }
 
   // ------------------------------------------------------------------
@@ -266,14 +311,30 @@ export class TradingPairModalComponent implements OnInit {
 
   onMarketTypeChange(event: CustomEvent): void {
     const type = event.detail.value as MarketType;
-    if (!['spot', 'perp'].includes(type)) return;
+    if (!['perp', 'spot', 'hip3'].includes(type)) return;
 
-    this.pairMemory[this.marketType()].set(this.form.get('pairName')?.value || '');
+    // Sauvegarder la paire courante dans la mémoire de l'onglet actuel
+    this.pairMemory[this.marketType()].set(this.form.get('pairName')?.value ?? '');
 
     this.marketType.set(type);
     this.searchQuery.set('');
 
-    this.form.patchValue({ pairName: this.pairMemory[type as MarketType]() });
+    // Restaurer la paire mémorisée pour le nouvel onglet
+    this.form.patchValue({ pairName: this.pairMemory[type]() });
+  }
+
+  onDexChange(event: CustomEvent): void {
+    const dexName = event.detail.value as string;
+    if (!dexName || dexName === this.selectedDex()) return;
+
+    // Sauvegarder la paire courante avant de changer de DEX
+    this.pairMemory.hip3.set(this.form.get('pairName')?.value ?? '');
+
+    this.selectedDex.set(dexName);
+    this.searchQuery.set('');
+
+    // Réinitialiser la paire — elle n'est pas valide sur un autre DEX
+    this.form.patchValue({ pairName: '' });
   }
 
   selectPairName(name: string): void {

@@ -105,7 +105,7 @@ export class BotStrategiesPage extends MenuBasePage {
     await modal.present();
 
     const { data, role } = await modal.onDidDismiss<TradingPairModalResult>();
-    if (role === 'confirm' && data) this.applyEdit(data);
+    if (role === 'confirm' && data) this.applyEdit(data, pair.name);
   }
 
   // ------------------------------------------------------------------ //
@@ -121,11 +121,11 @@ export class BotStrategiesPage extends MenuBasePage {
     this.triggerSave();
   }
 
-  private applyEdit({ exchangeKey, pair }: TradingPairModalResult): void {
+  private applyEdit({ exchangeKey, pair }: TradingPairModalResult, nameRef: string): void {
     this.user.update((user) => {
       if (!user?.tradingSettings?.[exchangeKey]) return user;
       const pairs = user.tradingSettings[exchangeKey].pairs.map((p) =>
-        p.name === pair.name ? pair : p,
+        p.name === nameRef ? pair : p,
       );
       return this.patchExchange(user, exchangeKey, { pairs });
     });

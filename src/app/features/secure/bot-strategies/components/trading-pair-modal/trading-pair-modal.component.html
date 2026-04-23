@@ -43,7 +43,31 @@
       <ion-segment-button value="spot">
         <ion-label>Spot</ion-label>
       </ion-segment-button>
+      <ion-segment-button value="hip3">
+        <ion-label>HIP-3</ion-label>
+      </ion-segment-button>
     </ion-segment>
+
+    @if (marketType() === 'hip3') {
+      @if (isLoadingMarkets()) {
+        <!-- Le spinner global couvre déjà ce cas -->
+      } @else if (dexNames().length === 0) {
+        <ion-note color="medium" class="hip3__no-dex">No DEX available</ion-note>
+      } @else {
+        <ion-segment
+          [value]="selectedDex()"
+          (ionChange)="onDexChange($event)"
+          scrollable="true"
+          class="hip3__dex-segment"
+        >
+          @for (dexName of dexNames(); track dexName) {
+            <ion-segment-button [value]="dexName">
+              <ion-label>{{ dexName }}</ion-label>
+            </ion-segment-button>
+          }
+        </ion-segment>
+      }
+    }
 
     <!-- Selected pair chip -->
     @if (form.get('pairName')?.value) {

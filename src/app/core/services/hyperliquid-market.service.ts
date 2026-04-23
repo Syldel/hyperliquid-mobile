@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { ConfigService } from '@services/config.service';
-import { HLPerpMeta, HLSpotMeta } from '@syldel/hl-shared-types';
+import { HLPerpDex, HLPerpDexsResponse, HLPerpMeta, HLSpotMeta } from '@syldel/hl-shared-types';
 import { map, Observable, of, tap } from 'rxjs';
 
 const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24h
@@ -11,13 +11,24 @@ interface CacheEntry<T> {
   expiresAt: number;
 }
 
+interface CacheMap {
+  perp: HLPerpMeta;
+  spot: HLSpotMeta;
+  hip3: HLPerpDex[];
+}
+
+type CacheStore = { [K in keyof CacheMap]: CacheEntry<CacheMap[K]> | null };
+
 @Injectable({ providedIn: 'root' })
 export class HyperliquidMarketService {
   private readonly config = inject(ConfigService);
   private readonly http = inject(HttpClient);
 
-  private perpCache: CacheEntry<HLPerpMeta> | null = null;
-  private spotCache: CacheEntry<HLSpotMeta> | null = null;
+  private cache: CacheStore = {
+    perp: null,
+    spot: null,
+    hip3: null,
+  };
 
   private post<T>(body: object): Observable<T> {
     return this.http.post<T>(`${this.config.hyperliquidPublicUrl}/info`, body);
@@ -28,9 +39,8 @@ export class HyperliquidMarketService {
   // ------------------------------------------------------------------ //
 
   getPerpMeta(): Observable<HLPerpMeta> {
-    if (this.perpCache && Date.now() < this.perpCache.expiresAt) {
-      return of(this.perpCache.data);
-    }
+    const cached = this.getCache('perp');
+    if (cached) return of(cached);
     return this.post<HLPerpMeta>({ type: 'meta' }).pipe(tap((data) => this.setCache('perp', data)));
   }
 
@@ -46,9 +56,8 @@ export class HyperliquidMarketService {
   // ------------------------------------------------------------------ //
 
   getSpotMeta(): Observable<HLSpotMeta> {
-    if (this.spotCache && Date.now() < this.spotCache.expiresAt) {
-      return of(this.spotCache.data);
-    }
+    const cached = this.getCache('spot');
+    if (cached) return of(cached);
     return this.post<HLSpotMeta>({ type: 'spotMeta' }).pipe(
       tap((data) => this.setCache('spot', data)),
     );
@@ -76,20 +85,44 @@ export class HyperliquidMarketService {
   }
 
   // ------------------------------------------------------------------ //
+  //  HIP-3 / PerpDexs
+  // ------------------------------------------------------------------ //
+
+  getPerpDexs(): Observable<HLPerpDex[]> {
+    const cached = this.getCache('hip3');
+    if (cached) return of(cached);
+    return this.post<HLPerpDexsResponse>({ type: 'perpDexs' }).pipe(
+      map((res) => res.filter((d): d is HLPerpDex => d !== null)),
+      tap((data) => this.setCache('hip3', data)),
+    );
+  }
+
+  /** Returns the list of PerpDex short names, e.g. ["test", "myDex", …] */
+  getPerpDexNames(): Observable<string[]> {
+    return this.getPerpDexs().pipe(map((dexs) => dexs.map((d) => d.name)));
+  }
+
+  // ------------------------------------------------------------------ //
   //  Cache helpers
   // ------------------------------------------------------------------ //
 
-  private setCache(type: 'perp', data: HLPerpMeta): void;
-  private setCache(type: 'spot', data: HLSpotMeta): void;
-  private setCache(type: 'perp' | 'spot', data: HLPerpMeta | HLSpotMeta): void {
-    const entry = { data, expiresAt: Date.now() + CACHE_DURATION_MS };
-    if (type === 'perp') this.perpCache = entry as CacheEntry<HLPerpMeta>;
-    else this.spotCache = entry as CacheEntry<HLSpotMeta>;
+  private setCache<K extends keyof CacheMap>(type: K, data: CacheMap[K]): void {
+    (this.cache as Record<K, CacheEntry<CacheMap[K]> | null>)[type] = {
+      data,
+      expiresAt: Date.now() + CACHE_DURATION_MS,
+    };
   }
 
-  /** Manually invalidate one or both caches (e.g. on pull-to-refresh). */
-  clearCache(target: 'perp' | 'spot' | 'all' = 'all'): void {
-    if (target === 'perp' || target === 'all') this.perpCache = null;
-    if (target === 'spot' || target === 'all') this.spotCache = null;
+  private getCache<K extends keyof CacheMap>(type: K): CacheMap[K] | null {
+    const entry = (this.cache as Record<K, CacheEntry<CacheMap[K]> | null>)[type];
+    return entry && Date.now() < entry.expiresAt ? entry.data : null;
+  }
+
+  clearCache(target: keyof CacheMap | 'all' = 'all'): void {
+    if (target === 'all') {
+      (Object.keys(this.cache) as (keyof CacheMap)[]).forEach((k) => (this.cache[k] = null));
+    } else {
+      this.cache[target] = null;
+    }
   }
 }
