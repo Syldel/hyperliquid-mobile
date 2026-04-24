@@ -66,6 +66,10 @@ export class UserFillsPage extends MenuBasePage {
     return counts;
   });
 
+  totalPnl = computed(() =>
+    this.filteredFills().reduce((sum, f) => sum + parseFloat(f.closedPnl), 0),
+  );
+
   readonly maxDate = signal(this.getCurrentMaxDate());
   readonly startDateStr = signal(this.toLocalISO(this.daysAgo(7)));
   readonly endDateStr = signal(this.toLocalISO(new Date()));

@@ -76,6 +76,15 @@
     </ion-item>
   </div>
 
+  <div
+    filters
+    class="pnl-banner"
+    [class]="totalPnl() >= 0 ? 'pnl-banner--positive' : 'pnl-banner--negative'"
+  >
+    <span class="pnl-banner__label">PnL {{ coinFilter() ? coinFilter() : 'All' }}</span>
+    <span class="pnl-banner__value">{{ totalPnl() | number:'1.2-2' }}</span>
+  </div>
+
   <ion-list>
     @for (fill of filteredFills(); track fill.tid) {
     <ion-item>

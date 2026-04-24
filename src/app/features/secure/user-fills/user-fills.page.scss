@@ -35,6 +35,34 @@
   }
 }
 
+.pnl-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 16px;
+  font-size: 0.85rem;
+  border-top: 1px solid var(--ion-color-light-shade);
+  margin: 6px 0 -6px 0;
+
+  &--positive {
+    background: rgba(var(--ion-color-success-rgb), 0.1);
+    color: var(--ion-color-success);
+  }
+
+  &--negative {
+    background: rgba(var(--ion-color-danger-rgb), 0.1);
+    color: var(--ion-color-danger);
+  }
+
+  &__label {
+    font-weight: 500;
+  }
+
+  &__value {
+    font-weight: 600;
+  }
+}
+
 ion-item {
   --padding-start: 12px;
   --inner-padding-end: 12px;
