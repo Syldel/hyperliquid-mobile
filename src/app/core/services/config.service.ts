@@ -11,6 +11,7 @@ export class ConfigService {
     userServiceUrl: '',
     hyperliquidPublicUrl: environment.hyperliquidPublicUrl,
     hyperliquidGatewayUrl: '',
+    botServiceUrl: '',
   });
 
   constructor(private readonly storage: StorageService) {}
@@ -54,5 +55,9 @@ export class ConfigService {
 
   get hyperliquidGatewayUrl(): string {
     return this.getConfig().hyperliquidGatewayUrl;
+  }
+
+  get botServiceUrl(): string {
+    return this.getConfig().botServiceUrl;
   }
 }

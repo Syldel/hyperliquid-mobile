@@ -47,6 +47,15 @@
         </ion-note>
         }
       </ion-item>
+      <ion-item>
+        <ion-label position="stacked">Bot Service URL</ion-label>
+        <ion-input formControlName="botServiceUrl" placeholder="http://..." type="url"></ion-input>
+        @if(configForm.get('botServiceUrl')?.invalid && configForm.get('botServiceUrl')?.touched) {
+        <ion-note color="danger">
+          Please enter a valid URL (e.g., http://... or https://...)
+        </ion-note>
+        }
+      </ion-item>
     </ion-list>
   </form>
 </ion-content>

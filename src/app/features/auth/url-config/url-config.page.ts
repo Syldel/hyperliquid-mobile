@@ -50,6 +50,7 @@ export class UrlConfigPage implements OnInit {
     userServiceUrl: '',
     hyperliquidPublicUrl: 'https://api.hyperliquid.xyz',
     hyperliquidGatewayUrl: '',
+    botServiceUrl: '',
   });
 
   configSaved = output<AppConfig>();
@@ -70,6 +71,10 @@ export class UrlConfigPage implements OnInit {
         Validators.pattern(/^https?:\/\/.+/),
       ]),
       hyperliquidGatewayUrl: this.fb.nonNullable.control('', [
+        Validators.required,
+        Validators.pattern(/^https?:\/\/.+/),
+      ]),
+      botServiceUrl: this.fb.nonNullable.control('', [
         Validators.required,
         Validators.pattern(/^https?:\/\/.+/),
       ]),

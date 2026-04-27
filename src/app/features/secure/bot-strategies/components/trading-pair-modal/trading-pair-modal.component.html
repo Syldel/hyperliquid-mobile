@@ -19,6 +19,14 @@
     <!-- Exchange -->
     <ion-list inset class="exchange__inset-list">
       <ion-item>
+        @if (isLoadingMetadata()) {
+          <ion-spinner name="crescent" slot="end" />
+        } @else if (metadataError()) {
+          <ion-note color="danger" slot="end">
+            <ion-icon name="alert-circle-outline" />
+            Failed to load
+          </ion-note>
+        }
         <ion-select
           formControlName="exchangeKey"
           label="Exchange"
@@ -26,10 +34,8 @@
           interface="action-sheet"
           placeholder="Select an exchange"
         >
-          @for (entry of exchanges(); track entry.key) {
-            <ion-select-option [value]="entry.key">
-              {{ entry.value.name | titlecase }}
-            </ion-select-option>
+          @for (exchange of selectableExchanges(); track exchange) {
+            <ion-select-option [value]="exchange">{{ exchange | titlecase }}</ion-select-option>
           }
         </ion-select>
       </ion-item>
@@ -124,6 +130,14 @@
     <!-- Strategy -->
     <ion-list inset>
       <ion-item>
+        @if (isLoadingMetadata()) {
+          <ion-spinner name="crescent" slot="end" />
+        } @else if (metadataError()) {
+          <ion-note color="danger" slot="end">
+            <ion-icon name="alert-circle-outline" />
+            Failed to load
+          </ion-note>
+        }
         <ion-select
           formControlName="strategy"
           label="Strategy"
@@ -132,7 +146,7 @@
           placeholder="Select a strategy"
           [compareWith]="compareStrategies"
         >
-          @for (s of strategies; track s.shortname) {
+          @for (s of filteredStrategies(); track s.shortname) {
             <ion-select-option [value]="s">{{ s.name }}</ion-select-option>
           }
         </ion-select>
@@ -184,6 +198,14 @@
     <!-- Interval -->
     <ion-list inset>
       <ion-item>
+        @if (isLoadingMetadata()) {
+          <ion-spinner name="crescent" slot="end" />
+        } @else if (metadataError()) {
+          <ion-note color="danger" slot="end">
+            <ion-icon name="alert-circle-outline" />
+            Failed to load
+          </ion-note>
+        }
         <ion-select
           formControlName="interval"
           label="Interval"
@@ -191,7 +213,7 @@
           interface="action-sheet"
           placeholder="Select an interval"
         >
-          @for (interval of candleIntervals; track interval) {
+          @for (interval of candleIntervals(); track interval) {
             <ion-select-option [value]="interval">{{ interval }}</ion-select-option>
           }
         </ion-select>

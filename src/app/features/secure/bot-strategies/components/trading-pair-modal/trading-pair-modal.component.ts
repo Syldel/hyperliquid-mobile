@@ -1,6 +1,15 @@
 import { TitleCasePipe } from '@angular/common';
-import { Component, computed, effect, inject, input, OnInit, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import {
+  Component,
+  computed,
+  DestroyRef,
+  effect,
+  inject,
+  input,
+  OnInit,
+  signal,
+} from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import {
   AbstractControl,
   FormBuilder,
@@ -33,7 +42,9 @@ import {
   IonToolbar,
   ModalController,
 } from '@ionic/angular/standalone';
+import { ChartInterval, ExchangeStrategy } from '@models/bot.interfaces';
 import { BotSettings, TradingPair, TradingStrategy } from '@models/user.interface';
+import { BotService } from '@services/bot.service';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { HLPerpDex } from '@syldel/hl-shared-types';
 import { addIcons } from 'ionicons';
@@ -53,7 +64,7 @@ interface TradingPairForm {
   pairName: FormControl<string>;
   strategy: FormControl<TradingStrategy>;
   ratio: FormControl<number>;
-  interval: FormControl<string>; // CandleInterval
+  interval: FormControl<ChartInterval>;
   enabled: FormControl<boolean>;
 }
 
@@ -95,7 +106,9 @@ export interface TradingPairModalResult {
 export class TradingPairModalComponent implements OnInit {
   private readonly modalCtrl = inject(ModalController);
   private readonly marketService = inject(HyperliquidMarketService);
+  private readonly botService = inject(BotService);
   private readonly fb = inject(FormBuilder);
+  private readonly destroyRef = inject(DestroyRef);
 
   // ------------------------------------------------------------------
   //  Inputs — provided by the caller via ModalController componentProps
@@ -111,15 +124,61 @@ export class TradingPairModalComponent implements OnInit {
   readonly editExchangeKey = input<string | undefined>();
 
   // ------------------------------------------------------------------
-  //  Constants
+  //  State
   // ------------------------------------------------------------------
 
-  readonly candleIntervals: string[] = ['15', '60', '240', '1D'];
+  isLoadingMetadata = signal(false);
+  candleIntervals = signal<ChartInterval[]>([]);
+  strategies = signal<ExchangeStrategy[]>([]);
+  availableExchanges = signal<string[]>([]);
+  strategiesByExchange = signal<Record<string, ExchangeStrategy[]>>({});
+  metadataError = signal(false);
 
-  readonly strategies: TradingStrategy[] = [
-    { name: 'Tol Langit ATR v7 Pro', shortname: 'tol-langit-atr-v7-pro' },
-    { name: 'Tol Langit ATR v7 AI Enhanced', shortname: 'tol-langit-atr-v7-ai-enhanced' },
-  ];
+  // ------------------------------------------------------------------
+  //  Computed
+  // ------------------------------------------------------------------
+
+  readonly filteredStrategies = computed(() => {
+    const exchangeKey = this.formValue().exchangeKey;
+    if (!exchangeKey) return this.strategies();
+    return this.strategiesByExchange()[exchangeKey] ?? this.strategies();
+  });
+
+  readonly selectableExchanges = computed(() => {
+    const fromApi = this.availableExchanges();
+    const fromInput = this.exchanges().map((e) => e.key);
+    return [...new Set([...fromApi, ...fromInput])];
+  });
+
+  // ------------------------------------------------------------------
+  //  Metadata loading
+  // ------------------------------------------------------------------
+
+  private loadMetadata(): void {
+    this.isLoadingMetadata.set(true);
+    this.metadataError.set(false);
+    this.form.controls.strategy.disable();
+    this.form.controls.interval.disable();
+
+    this.botService.getExchangeFormMetadata().subscribe({
+      next: (meta) => {
+        this.candleIntervals.set(meta.intervals);
+        this.availableExchanges.set(meta.exchanges);
+        this.strategiesByExchange.set(meta.strategies);
+
+        const all = Object.values(meta.strategies).flat();
+        this.strategies.set(all);
+
+        this.form.controls.strategy.enable();
+        this.form.controls.interval.enable();
+      },
+      error: () => {
+        this.metadataError.set(true);
+        this.isLoadingMetadata.set(false);
+      },
+      complete: () => this.isLoadingMetadata.set(false),
+    });
+  }
 
   // ------------------------------------------------------------------
   //  State
@@ -190,7 +249,7 @@ export class TradingPairModalComponent implements OnInit {
       Validators.min(0),
       Validators.max(100),
     ]),
-    interval: this.fb.nonNullable.control<string>(null as any, Validators.required),
+    interval: this.fb.nonNullable.control<ChartInterval>(null as any, Validators.required),
     enabled: this.fb.nonNullable.control(true),
   });
 
@@ -233,8 +292,6 @@ export class TradingPairModalComponent implements OnInit {
         enabled: pair.enabled,
       });
 
-      this.form.get('exchangeKey')?.disable();
-
       // Détection du type de marché
       // Les assets HIP-3 ont le format "dex:ASSET" (contiennent ":")
       // Les spots ont le format "BASE/QUOTE" (contiennent "/")
@@ -263,6 +320,13 @@ export class TradingPairModalComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.form.controls.exchangeKey.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        this.form.controls.pairName.updateValueAndValidity({ emitEvent: false });
+      });
+
+    this.loadMetadata();
     this.loadMarkets();
   }
 
