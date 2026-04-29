@@ -26,6 +26,17 @@
               <ion-badge color="primary">{{ pair.strategy.name }}</ion-badge>
             </div>
             <p>Ratio: {{ pair.ratio }}% · Interval: {{ pair.interval }}</p>
+            <div class="prot-summary">
+              @if (pair.strategy.protective?.entries?.length) { @for (e of
+              sortedEntries(pair.strategy.protective!.entries); track $index) {
+              <ion-badge [color]="e.tpsl === 'tp' ? 'success' : 'danger'" class="prot-badge">
+                <ion-icon
+                  [name]="e.tpsl === 'tp' ? 'trending-up-outline' : 'trending-down-outline'"
+                />
+                {{ e.tpsl | uppercase }} {{ e.sizePercent }}% · {{ e.atrMultiplier }}×ATR
+              </ion-badge>
+              } }
+            </div>
           </ion-label>
           <ion-toggle
             slot="end"
@@ -37,6 +48,9 @@
         <ion-item-options side="end">
           <ion-item-option color="primary" (click)="openEditModal(entry.key, pair)">
             <ion-icon slot="icon-only" name="pencil-outline" />
+          </ion-item-option>
+          <ion-item-option color="tertiary" (click)="openProtectiveStrategyModal(entry.key, pair)">
+            <ion-icon slot="icon-only" name="shield-checkmark-outline" />
           </ion-item-option>
           <ion-item-option color="danger" (click)="deletePair(entry.key, pair.name)">
             <ion-icon slot="icon-only" name="trash-outline" />

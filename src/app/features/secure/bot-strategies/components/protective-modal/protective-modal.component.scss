@@ -1,0 +1,366 @@
+// ─── Header ──────────────────────────────────────────────────────────────────
+
+.modal-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+
+  .title-icon {
+    font-size: 1rem;
+    color: var(--ion-color-primary);
+  }
+}
+
+.save-btn {
+  --border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.84rem;
+}
+
+// ─── Context row ─────────────────────────────────────────────────────────────
+
+.context-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 14px 4px;
+}
+
+.strategy-chip {
+  font-size: 0.72rem;
+  height: auto;
+  margin: 0;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 4px 10px;
+
+  .chip-short {
+    opacity: 0.55;
+    font-size: 0.64rem;
+    margin-top: 1px;
+  }
+}
+
+.interval-chip {
+  font-size: 0.72rem;
+  height: 24px;
+  margin: 0;
+}
+
+// ─── Summary bars ────────────────────────────────────────────────────────────
+
+.summary-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 10px 14px 0;
+  padding: 14px;
+  background: var(--ion-color-step-50, var(--ion-background-color-step-50));
+  border-radius: 14px;
+  border: 1px solid var(--ion-border-color, var(--ion-color-step-100));
+}
+
+.alloc-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.alloc-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.alloc-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.73rem;
+  font-weight: 700;
+  ion-icon {
+    font-size: 0.88rem;
+  }
+
+  &.tp-label {
+    color: var(--ion-color-success);
+  }
+  &.sl-label {
+    color: var(--ion-color-danger);
+  }
+}
+
+.alloc-value {
+  font-size: 0.73rem;
+  font-weight: 700;
+  color: var(--ion-text-color);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+
+  &.over {
+    color: var(--ion-color-danger);
+    animation: blink 1.3s ease-in-out infinite;
+  }
+}
+
+.alloc-remaining {
+  font-size: 0.65rem;
+  color: var(--ion-color-medium);
+  font-weight: 400;
+}
+
+.alloc-warn {
+  font-size: 0.65rem;
+  color: var(--ion-color-danger);
+}
+
+.alloc-bar {
+  --border-radius: 4px;
+  height: 4px;
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+// ─── Global errors ───────────────────────────────────────────────────────────
+
+.global-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 14px 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  ion-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  &.tp-global-error,
+  &.sl-global-error {
+    background: rgba(var(--ion-color-danger-rgb), 0.1);
+    color: var(--ion-color-danger);
+    border: 1px solid rgba(var(--ion-color-danger-rgb), 0.3);
+  }
+}
+
+// ─── Entry cards ─────────────────────────────────────────────────────────────
+
+.entries-container {
+  padding: 10px 14px 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.entry-card {
+  --background: var(--ion-color-step-50, var(--ion-background-color-step-50));
+  border: 1px solid var(--ion-border-color, var(--ion-color-step-100));
+  border-left: 3px solid transparent;
+  margin: 0 0 10px;
+  box-shadow: none;
+  border-radius: 14px;
+
+  &.tp-card {
+    border-left-color: var(--ion-color-success);
+  }
+  &.sl-card {
+    border-left-color: var(--ion-color-danger);
+  }
+}
+
+.entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 10px 0 14px;
+  flex-direction: row;
+}
+
+.entry-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.type-chip {
+  font-size: 0.7rem;
+  font-weight: 700;
+  height: 24px;
+  margin: 0;
+  ion-icon {
+    font-size: 0.78rem;
+    margin: 0 5px 0 0;
+  }
+}
+
+.entry-index {
+  font-size: 0.63rem;
+  color: var(--ion-color-medium);
+}
+
+.remove-btn {
+  --padding-start: 6px;
+  --padding-end: 6px;
+  height: 32px;
+}
+
+.entry-body {
+  padding: 8px 10px 14px 14px;
+}
+
+.field-group {
+  margin-bottom: 10px;
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+// ─── Field label ─────────────────────────────────────────────────────────────
+
+.field-label {
+  display: block;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ion-color-medium);
+  margin-bottom: 5px;
+
+  .optional {
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.64rem;
+  }
+
+  .info-icon {
+    vertical-align: middle;
+    margin-left: 4px;
+    font-size: 0.8rem;
+    cursor: help;
+  }
+}
+
+.field-error {
+  font-size: 0.68rem;
+  color: var(--ion-color-danger);
+  margin: 3px 0 0 2px;
+}
+
+// ─── Entry items ─────────────────────────────────────────────────────────────
+
+.entry-item {
+  --border-radius: 10px;
+  --padding-start: 12px;
+  --inner-padding-end: 10px;
+  min-height: 42px;
+
+  ion-input,
+  ion-select {
+    font-size: 0.9rem;
+  }
+}
+
+.unit-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--ion-color-medium);
+  padding-right: 4px;
+  white-space: nowrap;
+}
+
+// ─── ATR preview ─────────────────────────────────────────────────────────────
+
+.atr-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0 2px;
+  font-size: 0.68rem;
+  color: var(--ion-color-medium);
+}
+
+.atr-formula {
+  color: var(--ion-color-primary);
+  font-weight: 600;
+}
+
+.atr-dir {
+  font-size: 0.64rem;
+  opacity: 0.6;
+}
+
+// ─── Empty state ─────────────────────────────────────────────────────────────
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 28px 16px;
+}
+
+.empty-icon {
+  font-size: 2.8rem;
+  color: var(--ion-color-medium);
+  opacity: 0.4;
+  margin-bottom: 14px;
+}
+
+.empty-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ion-text-color);
+  margin: 0 0 6px;
+}
+
+.empty-sub {
+  font-size: 0.76rem;
+  line-height: 1.55;
+  margin: 0;
+  color: var(--ion-color-medium);
+}
+
+// ─── Add row ─────────────────────────────────────────────────────────────────
+
+.add-row {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px 4px;
+}
+
+.add-btn {
+  flex: 1;
+  --border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.82rem;
+  height: 42px;
+}
+
+// ─── Danger zone ─────────────────────────────────────────────────────────────
+
+.danger-zone {
+  display: flex;
+  justify-content: center;
+  padding: 6px 14px 28px;
+  margin-top: 10px;
+  border-top: 1px solid var(--ion-border-color, var(--ion-color-step-100));
+}
+
+.clear-btn {
+  font-size: 0.74rem;
+}

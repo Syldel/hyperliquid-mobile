@@ -1,4 +1,4 @@
-import { TitleCasePipe } from '@angular/common';
+import { TitleCasePipe, UpperCasePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import {
   IonBadge,
@@ -16,13 +16,25 @@ import {
   IonToggle,
   ModalController,
 } from '@ionic/angular/standalone';
-import { BotSettings, TradingPair, User } from '@models/user.interface';
+import { BotSettings, ProtectiveOrderEntry, TradingPair, User } from '@models/user.interface';
 import { UserService } from '@services/user.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import { addIcons } from 'ionicons';
-import { addOutline, pencilOutline, trashOutline } from 'ionicons/icons';
+import {
+  addOutline,
+  pencilOutline,
+  shieldCheckmarkOutline,
+  trashOutline,
+  trendingDownOutline,
+  trendingUpOutline,
+} from 'ionicons/icons';
 import { debounceTime, Subject, switchMap } from 'rxjs';
+
+import {
+  ProtectiveModalComponent,
+  ProtectiveModalResult,
+} from './components/protective-modal/protective-modal.component';
 import {
   TradingPairModalComponent,
   TradingPairModalResult,
@@ -47,6 +59,7 @@ import {
     IonFabButton,
     IonIcon,
     TitleCasePipe,
+    UpperCasePipe,
   ],
   templateUrl: './bot-strategies.page.html',
   styleUrls: ['./bot-strategies.page.scss'],
@@ -66,7 +79,14 @@ export class BotStrategiesPage extends MenuBasePage {
 
   constructor() {
     super();
-    addIcons({ addOutline, pencilOutline, trashOutline });
+    addIcons({
+      addOutline,
+      pencilOutline,
+      trashOutline,
+      shieldCheckmarkOutline,
+      trendingUpOutline,
+      trendingDownOutline,
+    });
 
     this.save$
       .pipe(
@@ -158,6 +178,48 @@ export class BotStrategiesPage extends MenuBasePage {
       return this.patchExchange(user, exchangeKey, { pairs });
     });
     this.triggerSave();
+  }
+
+  // ------------------------------------------------------------------ //
+  //  Protective
+  // ------------------------------------------------------------------ //
+
+  async openProtectiveStrategyModal(exchangeKey: string, pair: TradingPair): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: ProtectiveModalComponent,
+      componentProps: {
+        pair: () => pair,
+      },
+      breakpoints: [0, 1],
+      initialBreakpoint: 1,
+      cssClass: 'protective-modal',
+    });
+
+    await modal.present();
+
+    const { data, role } = await modal.onDidDismiss<ProtectiveModalResult>();
+    if (role === 'confirm' && data) {
+      this.applyProtectiveStrategy(data.pair, exchangeKey, pair.name);
+    }
+  }
+
+  private applyProtectiveStrategy(
+    updatedPair: TradingPair,
+    exchangeKey: string,
+    originalName: string,
+  ): void {
+    this.user.update((user) => {
+      if (!user?.tradingSettings?.[exchangeKey]) return user;
+      const pairs = user.tradingSettings[exchangeKey].pairs.map((p) =>
+        p.name === originalName ? updatedPair : p,
+      );
+      return this.patchExchange(user, exchangeKey, { pairs });
+    });
+    this.triggerSave();
+  }
+
+  sortedEntries(entries: ProtectiveOrderEntry[]): ProtectiveOrderEntry[] {
+    return [...entries].sort((a, b) => (a.tpsl === b.tpsl ? 0 : a.tpsl === 'tp' ? -1 : 1));
   }
 
   // ------------------------------------------------------------------ //

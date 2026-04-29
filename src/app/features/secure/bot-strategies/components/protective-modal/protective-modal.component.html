@@ -1,0 +1,270 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="dismiss()" fill="clear" class="close-btn">
+        <ion-icon name="close-outline" slot="icon-only" />
+      </ion-button>
+    </ion-buttons>
+
+    <ion-title>
+      <span class="modal-title">
+        <ion-icon name="shield-checkmark-outline" class="title-icon" />
+        Protection · {{ pair().name }}
+      </span>
+    </ion-title>
+
+    <ion-buttons slot="end">
+      <ion-button
+        (click)="save()"
+        [disabled]="form.invalid"
+        fill="solid"
+        color="primary"
+        class="save-btn"
+      >
+        <ion-icon name="checkmark-outline" slot="start" />
+        Save
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="modal-content" [formGroup]="form">
+  <!-- ── Context chip ───────────────────────────────────────────── -->
+  <div class="context-row">
+    <ion-chip color="medium" class="strategy-chip">
+      {{ pair().strategy.name }}
+      @if (pair().strategy.shortname) {
+        <span class="chip-short">{{ pair().strategy.shortname }}</span>
+      }
+    </ion-chip>
+    <ion-chip color="medium" class="interval-chip">
+      {{ pair().interval }}
+    </ion-chip>
+  </div>
+
+  <!-- ── Allocation summary bars ───────────────────────────────── -->
+  @if (entries.length > 0) {
+    <section class="summary-section">
+      <div class="alloc-row">
+        <div class="alloc-meta">
+          <span class="alloc-label tp-label">
+            <ion-icon name="trending-up-outline" />
+            Take Profit
+          </span>
+          <span class="alloc-value" [class.over]="tpOver()">
+            {{ tpSum() | number: '1.0-1' }}%
+            @if (!tpOver() && tpRemaining() > 0) {
+              <span class="alloc-remaining">· {{ tpRemaining() | number: '1.0-0' }}% free</span>
+            }
+            @if (tpOver()) {
+              <span class="alloc-warn">⚠ exceeds 100%</span>
+            }
+          </span>
+        </div>
+        <ion-progress-bar
+          [value]="tpProgress()"
+          [color]="tpOver() ? 'danger' : 'success'"
+          class="alloc-bar"
+        />
+      </div>
+
+      <div class="alloc-row">
+        <div class="alloc-meta">
+          <span class="alloc-label sl-label">
+            <ion-icon name="trending-down-outline" />
+            Stop Loss
+          </span>
+          <span class="alloc-value" [class.over]="slOver()">
+            {{ slSum() | number: '1.0-1' }}%
+            @if (!slOver() && slRemaining() > 0) {
+              <span class="alloc-remaining">· {{ slRemaining() | number: '1.0-0' }}% free</span>
+            }
+            @if (slOver()) {
+              <span class="alloc-warn">⚠ exceeds 100%</span>
+            }
+          </span>
+        </div>
+        <ion-progress-bar
+          [value]="slProgress()"
+          [color]="slOver() ? 'danger' : 'warning'"
+          class="alloc-bar"
+        />
+      </div>
+    </section>
+  }
+
+  <!-- ── Global validation errors ──────────────────────────────── -->
+  @if (entries.errors?.['tpSumExceeds100']) {
+    <div class="global-error tp-global-error">
+      <ion-icon name="warning-outline" />
+      TP total {{ entries.errors?.['tpSumExceeds100']?.sum }}% — reduce entries to stay ≤ 100%
+    </div>
+  }
+  @if (entries.errors?.['slSumExceeds100']) {
+    <div class="global-error sl-global-error">
+      <ion-icon name="warning-outline" />
+      SL total {{ entries.errors?.['slSumExceeds100']?.sum }}% — reduce entries to stay ≤ 100%
+    </div>
+  }
+
+  <!-- ── Entry cards ────────────────────────────────────────────── -->
+  <div class="entries-container" formArrayName="entries">
+    @for (ctrl of entries.controls; track ctrl; let i = $index) {
+      <ion-card
+        [formGroupName]="i"
+        class="entry-card"
+        [class.tp-card]="isTp(i)"
+        [class.sl-card]="!isTp(i)"
+      >
+        <ion-card-header class="entry-header">
+          <div class="entry-header-left">
+            <ion-chip [color]="isTp(i) ? 'success' : 'danger'" class="type-chip">
+              <ion-icon [name]="isTp(i) ? 'trending-up-outline' : 'trending-down-outline'" />
+              {{ isTp(i) ? 'Take Profit' : 'Stop Loss' }}
+            </ion-chip>
+            <span class="entry-index">#{{ i + 1 }}</span>
+          </div>
+          <ion-button
+            fill="clear"
+            color="medium"
+            size="small"
+            (click)="removeEntry(i)"
+            class="remove-btn"
+          >
+            <ion-icon name="trash-outline" slot="icon-only" />
+          </ion-button>
+        </ion-card-header>
+
+        <ion-card-content class="entry-body">
+          <!-- Type -->
+          <div class="field-group">
+            <label class="field-label">Type</label>
+            <ion-item lines="none" class="entry-item">
+              <ion-select
+                formControlName="tpsl"
+                interface="popover"
+                (ionChange)="onEntriesChanged()"
+              >
+                <ion-select-option value="tp">Take Profit (TP)</ion-select-option>
+                <ion-select-option value="sl">Stop Loss (SL)</ion-select-option>
+              </ion-select>
+            </ion-item>
+          </div>
+
+          <!-- ATR Multiplier -->
+          <div class="field-group">
+            <label class="field-label">
+              ATR Multiplier
+              <span
+                class="info-icon"
+                title="triggerPx = entryPx ± (ATR × multiplier) — computed server-side at each entry"
+              ></span>
+            </label>
+            <ion-item lines="none" class="entry-item">
+              <ion-input
+                formControlName="atrMultiplier"
+                type="number"
+                inputmode="decimal"
+                min="0.1"
+                max="20"
+                step="0.1"
+                placeholder="1.5"
+                (ionInput)="onEntriesChanged()"
+              />
+              <ion-note slot="end" class="unit-tag">× ATR</ion-note>
+            </ion-item>
+            @if (
+              entryGroup(i).get('atrMultiplier')?.invalid &&
+              entryGroup(i).get('atrMultiplier')?.touched
+            ) {
+              <p class="field-error">Value between 0.1 and 20</p>
+            } @else if (atrValue(i) !== null) {
+              <p class="atr-preview">
+                <span class="atr-formula">
+                  entryPx {{ isTp(i) ? '+' : '−' }} {{ atrValue(i) }} × ATR
+                </span>
+                <span class="atr-dir">{{ isTp(i) ? '↑ above entry' : '↓ below entry' }}</span>
+              </p>
+            }
+          </div>
+
+          <!-- Size % -->
+          <div class="field-group">
+            <label class="field-label">Position size</label>
+            <ion-item lines="none" class="entry-item">
+              <ion-input
+                formControlName="sizePercent"
+                type="number"
+                inputmode="decimal"
+                min="1"
+                max="100"
+                step="1"
+                placeholder="50"
+                (ionInput)="onEntriesChanged()"
+              />
+              <ion-note slot="end" class="unit-tag">% de la position</ion-note>
+            </ion-item>
+            @if (
+              entryGroup(i).get('sizePercent')?.invalid && entryGroup(i).get('sizePercent')?.touched
+            ) {
+              <p class="field-error">1 – 100 %</p>
+            }
+          </div>
+        </ion-card-content>
+      </ion-card>
+    }
+  </div>
+
+  <!-- ── Empty state ────────────────────────────────────────────── -->
+  @if (entries.length === 0) {
+    <div class="empty-state">
+      <ion-icon name="shield-checkmark-outline" class="empty-icon" />
+      <p class="empty-title">No protective orders</p>
+      <p class="empty-sub">
+        Add Take Profit and/or Stop Loss levels.
+        <br />
+        The bot will place them automatically at each entry.
+      </p>
+    </div>
+  }
+
+  <!-- ── Add buttons ────────────────────────────────────────────── -->
+  <div class="add-row">
+    <ion-button
+      fill="outline"
+      color="success"
+      (click)="addEntry('tp')"
+      class="add-btn"
+      [disabled]="tpSum() >= 100"
+    >
+      <ion-icon name="add-outline" slot="start" />
+      Add TP
+    </ion-button>
+    <ion-button
+      fill="outline"
+      color="danger"
+      (click)="addEntry('sl')"
+      class="add-btn"
+      [disabled]="slSum() >= 100"
+    >
+      <ion-icon name="add-outline" slot="start" />
+      Add SL
+    </ion-button>
+  </div>
+
+  <!-- ── Danger zone ────────────────────────────────────────────── -->
+  @if (hasExistingStrategy()) {
+    <div class="danger-zone">
+      <ion-button
+        fill="clear"
+        color="medium"
+        size="small"
+        (click)="clearStrategy()"
+        class="clear-btn"
+      >
+        <ion-icon name="trash-outline" slot="start" />
+        Remove all protective configurations
+      </ion-button>
+    </div>
+  }
+</ion-content>

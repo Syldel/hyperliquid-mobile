@@ -5,3 +5,21 @@
   flex-wrap: wrap;
   margin-bottom: 4px;
 }
+
+.prot-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.prot-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  ion-icon {
+    font-size: 0.75rem;
+  }
+}

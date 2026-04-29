@@ -11,6 +11,7 @@ export interface TradingStrategy {
   name: string;
   shortname: string;
   // source?: string;
+  protective?: ProtectiveOrderStrategy;
 }
 
 export interface TradingPair {
@@ -25,4 +26,18 @@ export interface BotSettings {
   name: string;
   enabled: boolean;
   pairs: TradingPair[];
+}
+
+// ─── Protective order types ───────────────────────────────────────────────────
+
+export type TpslType = 'tp' | 'sl';
+
+export interface ProtectiveOrderEntry {
+  tpsl: TpslType;
+  atrMultiplier: number;
+  sizePercent: number;
+}
+
+export interface ProtectiveOrderStrategy {
+  entries: ProtectiveOrderEntry[];
 }
