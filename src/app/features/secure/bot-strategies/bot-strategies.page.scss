@@ -13,6 +13,12 @@
   margin-top: 4px;
 }
 
+.prot-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
 .prot-badge {
   display: inline-flex;
   align-items: center;

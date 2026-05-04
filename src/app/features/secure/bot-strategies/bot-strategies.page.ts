@@ -218,8 +218,11 @@ export class BotStrategiesPage extends MenuBasePage {
     this.triggerSave();
   }
 
-  sortedEntries(entries: ProtectiveOrderEntry[]): ProtectiveOrderEntry[] {
-    return [...entries].sort((a, b) => (a.tpsl === b.tpsl ? 0 : a.tpsl === 'tp' ? -1 : 1));
+  protGroups(entries: ProtectiveOrderEntry[]) {
+    const tp = entries.filter((e) => e.tpsl === 'tp');
+    const sl = entries.filter((e) => e.tpsl === 'sl');
+    const singleLine = tp.length === 1 && sl.length === 1;
+    return singleLine ? [tp.concat(sl)] : [tp, sl].filter((g) => g.length);
   }
 
   // ------------------------------------------------------------------ //

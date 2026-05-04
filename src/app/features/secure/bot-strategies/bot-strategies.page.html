@@ -27,14 +27,18 @@
             </div>
             <p>Ratio: {{ pair.ratio }}% · Interval: {{ pair.interval }}</p>
             <div class="prot-summary">
-              @if (pair.strategy.protective?.entries?.length) { @for (e of
-              sortedEntries(pair.strategy.protective!.entries); track $index) {
-              <ion-badge [color]="e.tpsl === 'tp' ? 'success' : 'danger'" class="prot-badge">
-                <ion-icon
-                  [name]="e.tpsl === 'tp' ? 'trending-up-outline' : 'trending-down-outline'"
-                />
-                {{ e.tpsl | uppercase }} {{ e.sizePercent }}% · {{ e.atrMultiplier }}×ATR
-              </ion-badge>
+              @if (pair.strategy.protective?.entries?.length) { @for (group of
+              protGroups(pair.strategy.protective!.entries); track $index) {
+              <div class="prot-row">
+                @for (e of group; track $index) {
+                <ion-badge [color]="e.tpsl === 'tp' ? 'success' : 'danger'" class="prot-badge">
+                  <ion-icon
+                    [name]="e.tpsl === 'tp' ? 'trending-up-outline' : 'trending-down-outline'"
+                  />
+                  {{ e.tpsl | uppercase }} {{ e.sizePercent }}% · {{ e.atrMultiplier }}×ATR
+                </ion-badge>
+                }
+              </div>
               } }
             </div>
           </ion-label>
