@@ -22,7 +22,6 @@ import {
 import {
   IonButton,
   IonButtons,
-  IonChip,
   IonContent,
   IonHeader,
   IonIcon,
@@ -31,12 +30,10 @@ import {
   IonList,
   IonNote,
   IonRange,
-  IonSearchbar,
-  IonSegment,
-  IonSegmentButton,
   IonSelect,
   IonSelectOption,
   IonSpinner,
+  IonText,
   IonTitle,
   IonToggle,
   IonToolbar,
@@ -45,19 +42,16 @@ import {
 import { ChartInterval, ExchangeStrategy } from '@models/bot.interfaces';
 import { BotSettings, TradingPair, TradingStrategy } from '@models/user.interface';
 import { BotService } from '@services/bot.service';
-import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
-import { HLPerpDex } from '@syldel/hl-shared-types';
+import { MarketPickerModalComponent } from '@shared/components/market-picker-modal/market-picker-modal.component';
 import { addIcons } from 'ionicons';
 import {
   addOutline,
-  checkmarkCircle,
   checkmarkOutline,
+  chevronForwardOutline,
   closeCircle,
   closeOutline,
   removeOutline,
 } from 'ionicons/icons';
-
-type MarketType = 'perp' | 'spot' | 'hip3';
 
 interface TradingPairForm {
   exchangeKey: FormControl<string>;
@@ -91,21 +85,17 @@ export interface TradingPairModalResult {
     IonLabel,
     IonSelect,
     IonSelectOption,
-    IonSegment,
-    IonSegmentButton,
-    IonSearchbar,
     IonSpinner,
     IonRange,
     IonToggle,
-    IonChip,
     IonNote,
+    IonText,
   ],
   templateUrl: './trading-pair-modal.component.html',
   styleUrls: ['./trading-pair-modal.component.scss'],
 })
 export class TradingPairModalComponent implements OnInit {
   private readonly modalCtrl = inject(ModalController);
-  private readonly marketService = inject(HyperliquidMarketService);
   private readonly botService = inject(BotService);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
@@ -186,38 +176,6 @@ export class TradingPairModalComponent implements OnInit {
 
   readonly isEditMode = computed(() => !!this.editPair());
 
-  marketType = signal<MarketType>('perp');
-  searchQuery = signal('');
-  isLoadingMarkets = signal(false);
-  selectedDex = signal<string>('');
-
-  private perpNames = signal<string[]>([]);
-  private spotNames = signal<string[]>([]);
-  private perpDexs = signal<HLPerpDex[]>([]);
-
-  readonly dexNames = computed(() => this.perpDexs().map((d) => d.name));
-
-  readonly filteredMarkets = computed(() => {
-    let list: string[];
-    if (this.marketType() === 'perp') {
-      list = this.perpNames();
-    } else if (this.marketType() === 'spot') {
-      list = this.spotNames();
-    } else {
-      // hip3 : assets du DEX sélectionné
-      const dex = this.perpDexs().find((d) => d.name === this.selectedDex());
-      list = dex ? dex.assetToStreamingOiCap.map(([asset]) => asset) : [];
-    }
-    const q = this.searchQuery().toLowerCase().trim();
-    return q ? list.filter((n) => n.toLowerCase().includes(q)) : list;
-  });
-
-  private readonly pairMemory: Record<MarketType, ReturnType<typeof signal<string>>> = {
-    perp: signal<string>(''),
-    spot: signal<string>(''),
-    hip3: signal<string>(''),
-  };
-
   // ------------------------------------------------------------------
   //  Form
   // ------------------------------------------------------------------
@@ -271,10 +229,10 @@ export class TradingPairModalComponent implements OnInit {
     addIcons({
       closeOutline,
       checkmarkOutline,
-      checkmarkCircle,
       closeCircle,
       removeOutline,
       addOutline,
+      chevronForwardOutline,
     });
 
     effect(() => {
@@ -291,31 +249,6 @@ export class TradingPairModalComponent implements OnInit {
         interval: pair.interval,
         enabled: pair.enabled,
       });
-
-      // Détection du type de marché
-      // Les assets HIP-3 ont le format "dex:ASSET" (contiennent ":")
-      // Les spots ont le format "BASE/QUOTE" (contiennent "/")
-      let type: MarketType = 'perp';
-
-      if (pair.name.includes('/')) {
-        type = 'spot';
-      } else if (pair.name.includes(':')) {
-        type = 'hip3';
-        // Retrouver le DEX propriétaire de cet asset
-        const ownerDex = this.perpDexs().find((d) =>
-          d.assetToStreamingOiCap.some(([asset]) => asset === pair.name),
-        );
-        if (ownerDex) {
-          this.selectedDex.set(ownerDex.name);
-        } else {
-          // DEX pas encore chargé — on extrait le préfixe "dex:" du nom
-          const prefix = pair.name.split(':')[0];
-          this.selectedDex.set(prefix);
-        }
-      }
-
-      this.pairMemory[type].set(pair.name);
-      this.marketType.set(type);
     });
   }
 
@@ -327,82 +260,28 @@ export class TradingPairModalComponent implements OnInit {
       });
 
     this.loadMetadata();
-    this.loadMarkets();
-  }
-
-  // ------------------------------------------------------------------
-  //  Market loading
-  // ------------------------------------------------------------------
-
-  private loadCount = 0;
-
-  private loadMarkets(): void {
-    this.isLoadingMarkets.set(true);
-    this.loadCount = 0;
-
-    this.marketService.getPerpNames().subscribe({
-      next: (names) => this.perpNames.set(names),
-      complete: () => this.checkLoadingDone(),
-    });
-
-    this.marketService.getSpotNames().subscribe({
-      next: (names) => this.spotNames.set(names),
-      complete: () => this.checkLoadingDone(),
-    });
-
-    this.marketService.getPerpDexs().subscribe({
-      next: (dexs) => {
-        // Filtrer les DEX sans assets
-        const activeDexs = dexs.filter((d) => d.assetToStreamingOiCap.length > 0);
-        this.perpDexs.set(activeDexs);
-
-        if (activeDexs.length > 0 && !this.selectedDex()) {
-          this.selectedDex.set(activeDexs[0].name);
-        }
-      },
-      complete: () => this.checkLoadingDone(),
-    });
-  }
-
-  private checkLoadingDone(): void {
-    this.loadCount++;
-    if (this.loadCount >= 3) this.isLoadingMarkets.set(false);
   }
 
   // ------------------------------------------------------------------
   //  UI handlers
   // ------------------------------------------------------------------
 
-  onMarketTypeChange(event: CustomEvent): void {
-    const type = event.detail.value as MarketType;
-    if (!['perp', 'spot', 'hip3'].includes(type)) return;
+  async openMarketPicker(): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: MarketPickerModalComponent,
+      componentProps: {
+        exchange: () => this.form.controls.exchangeKey.value,
+        initialValue: () => this.form.controls.pairName.value,
+      },
+      breakpoints: [0, 1],
+      initialBreakpoint: 1,
+    });
+    await modal.present();
 
-    // Sauvegarder la paire courante dans la mémoire de l'onglet actuel
-    this.pairMemory[this.marketType()].set(this.form.get('pairName')?.value ?? '');
-
-    this.marketType.set(type);
-    this.searchQuery.set('');
-
-    // Restaurer la paire mémorisée pour le nouvel onglet
-    this.form.patchValue({ pairName: this.pairMemory[type]() });
-  }
-
-  onDexChange(event: CustomEvent): void {
-    const dexName = event.detail.value as string;
-    if (!dexName || dexName === this.selectedDex()) return;
-
-    // Sauvegarder la paire courante avant de changer de DEX
-    this.pairMemory.hip3.set(this.form.get('pairName')?.value ?? '');
-
-    this.selectedDex.set(dexName);
-    this.searchQuery.set('');
-
-    // Réinitialiser la paire — elle n'est pas valide sur un autre DEX
-    this.form.patchValue({ pairName: '' });
-  }
-
-  selectPairName(name: string): void {
-    this.form.patchValue({ pairName: name });
+    const { data, role } = await modal.onDidDismiss<string>();
+    if (role === 'confirm' && data) {
+      this.form.patchValue({ pairName: data });
+    }
   }
 
   compareStrategies = (s1: TradingStrategy, s2: TradingStrategy): boolean => {

@@ -20,6 +20,7 @@ import {
   analyticsOutline,
   hardwareChipOutline,
   homeOutline,
+  lockClosedOutline,
   logOutOutline,
   pieChartOutline,
   receiptOutline,
@@ -63,6 +64,7 @@ export class MenuComponent implements OnInit {
       settingsOutline,
       hardwareChipOutline,
       analyticsOutline,
+      lockClosedOutline,
     });
   }
 

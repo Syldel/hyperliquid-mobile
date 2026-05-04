@@ -1,0 +1,88 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Select a pair</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="dismiss()">
+        <ion-icon name="close-outline" slot="icon-only" />
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+
+  <!-- Segment Perp / Spot / HIP-3 -->
+  <ion-toolbar>
+    <ion-segment [value]="marketType()" (ionChange)="onMarketTypeChange($event)">
+      <ion-segment-button value="perp">
+        <ion-label>Perp</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="spot">
+        <ion-label>Spot</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="hip3">
+        <ion-label>HIP-3</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+  </ion-toolbar>
+
+  <!-- DEX segment — visible uniquement en mode HIP-3 -->
+  @if (marketType() === 'hip3') {
+    <ion-toolbar>
+      @if (isLoadingMarkets()) {
+        <!-- Le spinner global couvre déjà ce cas -->
+      } @else if (dexNames().length === 0) {
+        <ion-note color="medium" class="hip3__no-dex">No DEX available</ion-note>
+      } @else {
+        <ion-segment
+          [value]="selectedDex()"
+          (ionChange)="onDexChange($event)"
+          scrollable="true"
+          class="hip3__dex-segment"
+        >
+          @for (dexName of dexNames(); track dexName) {
+            <ion-segment-button [value]="dexName">
+              <ion-label>{{ dexName }}</ion-label>
+            </ion-segment-button>
+          }
+        </ion-segment>
+      }
+    </ion-toolbar>
+  }
+
+  <!-- Searchbar -->
+  <ion-toolbar>
+    <ion-searchbar
+      [value]="searchQuery()"
+      (ionInput)="searchQuery.set($event.detail.value ?? '')"
+      placeholder="Search..."
+      animated
+    />
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  @if (isLoadingMarkets()) {
+    <div class="loading">
+      <ion-spinner name="crescent" />
+    </div>
+  } @else if (filteredMarkets().length === 0) {
+    <div class="empty">
+      <ion-icon name="search-outline" />
+      <ion-text color="medium">No results for "{{ searchQuery() }}"</ion-text>
+    </div>
+  } @else {
+    <ion-list>
+      @for (name of filteredMarkets(); track name) {
+        <ion-item
+          button
+          [detail]="false"
+          (click)="select(name)"
+          [class.selected]="name === initialValue()"
+        >
+          <ion-label>{{ name }}</ion-label>
+          @if (name === initialValue()) {
+            <ion-icon name="checkmark-outline" slot="end" color="primary" />
+          }
+        </ion-item>
+      }
+    </ion-list>
+  }
+</ion-content>

@@ -41,89 +41,22 @@
       </ion-item>
     </ion-list>
 
-    <!-- Pair name — tabs Perp / Spot -->
-    <ion-segment [value]="marketType()" (ionChange)="onMarketTypeChange($event)">
-      <ion-segment-button value="perp">
-        <ion-label>Perp</ion-label>
-      </ion-segment-button>
-      <ion-segment-button value="spot">
-        <ion-label>Spot</ion-label>
-      </ion-segment-button>
-      <ion-segment-button value="hip3">
-        <ion-label>HIP-3</ion-label>
-      </ion-segment-button>
-    </ion-segment>
-
-    @if (marketType() === 'hip3') {
-      @if (isLoadingMarkets()) {
-        <!-- Le spinner global couvre déjà ce cas -->
-      } @else if (dexNames().length === 0) {
-        <ion-note color="medium" class="hip3__no-dex">No DEX available</ion-note>
-      } @else {
-        <ion-segment
-          [value]="selectedDex()"
-          (ionChange)="onDexChange($event)"
-          scrollable="true"
-          class="hip3__dex-segment"
-        >
-          @for (dexName of dexNames(); track dexName) {
-            <ion-segment-button [value]="dexName">
-              <ion-label>{{ dexName }}</ion-label>
-            </ion-segment-button>
-          }
-        </ion-segment>
-      }
-    }
-
-    <!-- Selected pair chip -->
-    @if (form.get('pairName')?.value) {
-      <div class="selected-chip-row">
-        <ion-chip color="primary" (click)="selectPairName('')">
-          <ion-label>{{ form.get('pairName')?.value }}</ion-label>
-          <ion-icon name="close-circle" />
-        </ion-chip>
-      </div>
-    }
-
-    @if (form.get('pairName')?.hasError('pairNameExists')) {
-      <ion-note color="danger">This pair already exists for this exchange</ion-note>
-    }
-
-    <ion-list inset class="market__inset-list">
-      <!-- Searchbar -->
-      <ion-item>
-        <ion-searchbar
-          [placeholder]="'Search ' + marketType() + ' pair'"
-          [debounce]="200"
-          (ionInput)="searchQuery.set($event.detail.value ?? '')"
-          [value]="searchQuery()"
-        />
+    <!-- Pair name -->
+    <ion-list inset>
+      <ion-item
+        button
+        class="pair-picker"
+        (click)="openMarketPicker()"
+        [class.ion-invalid]="form.get('pairName')?.hasError('pairNameExists')"
+      >
+        <ion-label position="stacked">Pair</ion-label>
+        <ion-text>
+          {{ formValue().pairName || 'Select a pair' }}
+        </ion-text>
+        <ion-icon name="chevron-forward-outline" slot="end" />
       </ion-item>
-
-      <!-- Loading -->
-      @if (isLoadingMarkets()) {
-        <ion-item>
-          <ion-spinner slot="start" name="crescent" />
-          <ion-label>Loading markets…</ion-label>
-        </ion-item>
-      }
-
-      <!-- Pair list -->
-      @if (!isLoadingMarkets()) {
-        <div class="pair-list">
-          @for (name of filteredMarkets(); track name) {
-            <ion-item button [detail]="false" (click)="selectPairName(name)">
-              <ion-label>{{ name }}</ion-label>
-              @if (form.get('pairName')?.value === name) {
-                <ion-icon slot="end" name="checkmark-circle" color="primary" />
-              }
-            </ion-item>
-          } @empty {
-            <ion-item>
-              <ion-label color="medium">No results</ion-label>
-            </ion-item>
-          }
-        </div>
+      @if (form.get('pairName')?.hasError('pairNameExists')) {
+        <ion-note color="danger">This pair already exists for this exchange</ion-note>
       }
     </ion-list>
 
@@ -181,6 +114,7 @@
       </ion-label>
       <ion-item>
         <ion-range
+          class="ratio__range"
           formControlName="ratio"
           [min]="0"
           [max]="100"
