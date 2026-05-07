@@ -1,0 +1,22 @@
+<app-refreshable-layout
+  title="Watchlist"
+  [fetchFn]="fetchFn()"
+  emptyMessage="No pairs in watchlist. Tap + to add one."
+  (dataLoaded)="onDataLoaded($event)"
+>
+  <div class="watchlist-grid">
+    @for (item of items(); track item.coin) {
+    <app-watchlist-card
+      [item]="item"
+      (removeRequested)="onRemove($event)"
+      (itemUpdated)="onItemUpdated($event)"
+    />
+    }
+  </div>
+</app-refreshable-layout>
+
+<ion-fab slot="fixed" vertical="bottom" horizontal="end">
+  <ion-fab-button (click)="openAddModal()">
+    <ion-icon name="add-outline" />
+  </ion-fab-button>
+</ion-fab>

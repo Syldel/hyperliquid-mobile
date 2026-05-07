@@ -20,7 +20,7 @@
       </p>
       <p>
         Margin: {{ position().marginUsed | smartDecimal }} · ROE:
-        <ion-text [color]="pnlColor()">{{ position().returnOnEquity | smartDecimal }}</ion-text>
+        <ion-text [color]="pnlColor()">{{ position().returnOnEquity | percent: '1.0-2' }}</ion-text>
       </p>
       <p>
         Liq.: {{ position().liquidationPx | smartDecimal }} · Lev.: {{ position().leverage.type }}
@@ -28,4 +28,14 @@
       <!-- <p>Funding: {{ position().cumFunding.sinceOpen | smartDecimal }}</p> -->
     }
   </ion-label>
+
+  <ion-button
+    slot="end"
+    fill="clear"
+    size="small"
+    (click)="openWatchlist($event)"
+    aria-label="View on watchlist"
+  >
+    <ion-icon slot="icon-only" name="pulse-outline" />
+  </ion-button>
 </ion-item>

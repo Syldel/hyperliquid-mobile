@@ -1,0 +1,47 @@
+<button class="remove-btn" (click)="confirmRemove($event)" aria-label="Remove">
+  <ion-icon name="close-outline" />
+</button>
+
+<ion-card button class="wl-card" (click)="navigateToDetail()">
+  <ion-card-content class="wl-card__content">
+    <div class="wl-card__header">
+      <span class="wl-card__coin">{{ item().coin }}</span>
+      <span class="wl-card__interval">{{ item().interval }}</span>
+    </div>
+
+    @if (loading()) {
+      <ion-skeleton-text animated class="wl-card__price-skeleton" />
+    } @else {
+      <div class="wl-card__price">{{ currentPrice() | smartDecimal }}</div>
+    }
+
+    <div class="wl-card__chart-wrap">
+      <div
+        #chartEl
+        class="wl-card__chart"
+        [class.wl-card__chart--hidden]="loading() || hasError()"
+      ></div>
+
+      @if (loading()) {
+        <ion-skeleton-text animated class="wl-card__chart-skeleton" />
+      } @else if (hasError()) {
+        <div class="wl-card__error">No data</div>
+      }
+    </div>
+
+    @if (!loading() && !hasError()) {
+      <div
+        class="wl-card__badge"
+        [class.wl-card__badge--up]="priceChange() >= 0"
+        [class.wl-card__badge--down]="priceChange() < 0"
+      >
+        <ion-icon [name]="priceChange() >= 0 ? 'trending-up-outline' : 'trending-down-outline'" />
+        {{ changeSign() }}{{ priceChange().toFixed(2) }}%
+      </div>
+    }
+
+    <button class="edit-btn" (click)="openEditModal($event)" aria-label="Edit">
+      <ion-icon name="ellipsis-horizontal-outline" />
+    </button>
+  </ion-card-content>
+</ion-card>

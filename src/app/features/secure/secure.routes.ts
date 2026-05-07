@@ -12,6 +12,23 @@ export const SECURE_ROUTES: Routes = [
         title: 'Dashboard',
       },
       {
+        path: 'watchlist',
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./watchlist/pages/watchlist/watchlist.page').then((m) => m.WatchlistPage),
+          },
+          {
+            path: 'detail/:coin',
+            loadComponent: () =>
+              import('./watchlist/pages/watchlist-detail/watchlist-detail.page').then(
+                (m) => m.WatchlistDetailPage,
+              ),
+          },
+        ],
+      },
+      {
         path: 'balances',
         loadComponent: () => import('./balances/balances.page').then((m) => m.BalancesPage),
         title: 'Spot Balances',

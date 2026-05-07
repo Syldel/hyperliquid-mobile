@@ -9,8 +9,8 @@
   top: 0;
   z-index: 10;
   background: var(--ion-background-color);
-  border-bottom: 1px solid var(--ion-background-color-step-200, transparent);
-  padding-bottom: 6px;
+  border-bottom: 1px solid
+    var(--ion-color-step-200, var(--ion-background-color-step-200, transparent));
 }
 
 .icon-note {

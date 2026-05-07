@@ -1,0 +1,144 @@
+.detail-content {
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: 0;
+}
+
+/* ── Stats header ─────────────────────────────────── */
+.stats-header {
+  padding: 16px 20px 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+
+  &__price {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--ion-text-color);
+    letter-spacing: -0.5px;
+  }
+
+  &__change {
+    font-size: 14px;
+    font-weight: 600;
+
+    &--up {
+      color: #2dd36f;
+    }
+    &--down {
+      color: #eb445a;
+    }
+  }
+
+  &__abs {
+    font-weight: 400;
+    opacity: 0.7;
+    font-size: 12px;
+  }
+
+  &__price-skel {
+    height: 32px;
+    width: 140px;
+    border-radius: 6px;
+  }
+
+  &__change-skel {
+    height: 18px;
+    width: 80px;
+    border-radius: 4px;
+  }
+}
+
+/* ── Preset strip ─────────────────────────────────── */
+.preset-strip {
+  display: flex;
+  gap: 6px;
+  padding: 4px 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  ion-chip {
+    --padding-start: 10px;
+    --padding-end: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    height: 28px;
+    cursor: pointer;
+  }
+}
+
+/* ── Interval selector ────────────────────────────── */
+.interval-scroll {
+  display: flex;
+  gap: 0;
+  padding: 6px 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.iv-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--ion-color-medium);
+  transition:
+    background 0.15s,
+    color 0.15s;
+
+  &--active {
+    background: var(--ion-color-primary);
+    color: white;
+    font-weight: 700;
+  }
+}
+
+/* ── Chart ────────────────────────────────────────── */
+.chart-wrapper {
+  position: relative;
+  height: calc(100vh - 260px);
+  min-height: 300px;
+  padding: 8px 0 0;
+}
+
+.chart-el {
+  width: 100%;
+  height: 100%;
+}
+
+.chart-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ion-background-color);
+  opacity: 0.7;
+
+  &__skel {
+    position: absolute;
+    inset: 0;
+    height: 100%;
+    border-radius: 0;
+  }
+}
+
+.chart-error {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--ion-color-medium);
+  gap: 8px;
+}

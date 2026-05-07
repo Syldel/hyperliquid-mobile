@@ -1,0 +1,67 @@
+<app-refreshable-layout
+  [title]="item()?.coin ?? '—'"
+  [fetchFn]="fetchFn()"
+  [pageHeaderParams]="{ startButton: 'back', defaultHref: backHref() }"
+>
+  <ng-template #endButtons>
+    <ion-button (click)="loadData()">
+      <ion-icon slot="icon-only" name="refresh-outline" />
+    </ion-button>
+  </ng-template>
+
+  <div class="stats-header">
+    @if (loading()) {
+    <ion-skeleton-text animated class="stats-header__price-skel" />
+    <ion-skeleton-text animated class="stats-header__change-skel" />
+    } @else {
+    <div class="stats-header__price">{{ currentPrice() }}</div>
+    <div
+      class="stats-header__change"
+      [class.stats-header__change--up]="priceChange() >= 0"
+      [class.stats-header__change--down]="priceChange() < 0"
+    >
+      {{ changeSign }}{{ priceChange().toFixed(2) }}%
+      <span class="stats-header__abs">({{ priceChangeAbs() }})</span>
+    </div>
+    }
+  </div>
+
+  <div class="preset-strip">
+    @for (preset of presets; track preset.label) {
+    <ion-chip
+      [color]="selectedPreset().label === preset.label ? 'primary' : 'medium'"
+      [outline]="selectedPreset().label !== preset.label"
+      (click)="onPresetChange(preset)"
+    >
+      {{ preset.label }}
+    </ion-chip>
+    }
+  </div>
+
+  <div class="interval-scroll">
+    @for (iv of intervals; track iv) {
+    <button
+      class="iv-btn"
+      [class.iv-btn--active]="selectedInterval() === iv"
+      (click)="onIntervalChange(iv)"
+    >
+      {{ intervalLabels[iv] }}
+    </button>
+    }
+  </div>
+
+  <div class="chart-wrapper">
+    <div #chartEl class="chart-el"></div>
+
+    @if (loading()) {
+    <div class="chart-loading">
+      <ion-skeleton-text animated class="chart-loading__skel" />
+    </div>
+    } @if (hasError()) {
+    <div class="chart-error">
+      <p>Failed to load candles.</p>
+      <ion-button fill="clear" (click)="loadData()">Retry</ion-button>
+    </div>
+    }
+  </div>
+</app-refreshable-layout>

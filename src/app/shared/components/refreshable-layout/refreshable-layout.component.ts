@@ -1,11 +1,14 @@
+import { NgTemplateOutlet } from '@angular/common';
 import {
   Component,
   computed,
+  contentChild,
   effect,
   inject,
   input,
   output,
   signal,
+  TemplateRef,
   untracked,
 } from '@angular/core';
 import { AuthService } from '@auth/auth.service';
@@ -30,7 +33,12 @@ import {
 } from 'ionicons/icons';
 import { firstValueFrom, Observable } from 'rxjs';
 import { LoginModalPage } from '../login-modal/login-modal.page';
-import { PageHeaderComponent } from '../page-header/page-header.component';
+import { PageHeaderComponent, StartButtonType } from '../page-header/page-header.component';
+
+export interface PageHeaderParams {
+  startButton?: StartButtonType;
+  defaultHref?: string;
+}
 
 @Component({
   selector: 'app-refreshable-layout',
@@ -44,6 +52,7 @@ import { PageHeaderComponent } from '../page-header/page-header.component';
     IonIcon,
     IonButton,
     IonNote,
+    NgTemplateOutlet,
   ],
   templateUrl: './refreshable-layout.component.html',
   styleUrls: ['./refreshable-layout.component.scss'],
@@ -59,6 +68,7 @@ export class RefreshableLayoutComponent<T> {
   emptyIcon = input<string>('file-tray-outline');
   emptyMessage = input<string>('No data found');
   requiresAuth = input<boolean>(false);
+  pageHeaderParams = input<PageHeaderParams>({});
 
   dataLoaded = output<T>();
 
@@ -67,6 +77,8 @@ export class RefreshableLayoutComponent<T> {
   isRefreshing = signal(false);
 
   readonly isLoggedIn = computed(() => this.authService.isLoggedIn());
+
+  readonly endButtonsTpl = contentChild<TemplateRef<any>>('endButtons');
 
   constructor() {
     effect(() => {

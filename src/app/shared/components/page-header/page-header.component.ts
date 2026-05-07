@@ -8,7 +8,7 @@ import {
   IonToolbar,
 } from '@ionic/angular/standalone';
 
-type StartButtonType = 'menu' | 'back' | 'none';
+export type StartButtonType = 'menu' | 'back' | 'none';
 
 @Component({
   selector: 'app-page-header',

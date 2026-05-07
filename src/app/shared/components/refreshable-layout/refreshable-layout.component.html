@@ -1,4 +1,11 @@
-<app-page-header [title]="title()" />
+<app-page-header
+  [title]="title()"
+  [startButton]="pageHeaderParams().startButton ?? 'menu'"
+  [defaultHref]="pageHeaderParams().defaultHref ?? '/'"
+  [hasEndButtons]="!!endButtonsTpl()"
+>
+  <ng-container slot="end" *ngTemplateOutlet="endButtonsTpl() ?? null" />
+</app-page-header>
 
 @if (requiresAuth() && !isLoggedIn()) {
   <ion-content>

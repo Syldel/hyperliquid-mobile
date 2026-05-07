@@ -1,0 +1,162 @@
+:host {
+  display: block;
+  position: relative;
+}
+
+.wl-card {
+  margin: 0;
+  border-radius: 16px;
+  position: relative;
+  overflow: visible;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+
+  &:active {
+    transform: scale(0.97);
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  ion-card-content {
+    padding: 12px 12px 10px;
+  }
+}
+
+.remove-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  z-index: 10;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ion-color-medium);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  color: white;
+  font-size: 14px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  transition: background 0.15s;
+
+  &:active {
+    background: var(--ion-color-danger);
+  }
+
+  ion-icon {
+    font-size: 18px;
+    pointer-events: none;
+  }
+}
+
+.wl-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wl-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wl-card__coin {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--ion-text-color);
+}
+
+.wl-card__interval {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ion-color-medium);
+  background: var(--ion-color-light);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.wl-card__price {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ion-text-color);
+  line-height: 1.2;
+}
+
+.wl-card__price-skeleton {
+  height: 18px;
+  width: 80px;
+  border-radius: 4px;
+}
+
+.wl-card__chart-wrap {
+  height: 64px;
+  margin: 4px -4px 0;
+  position: relative;
+}
+
+.wl-card__chart {
+  width: 100%;
+  height: 100%;
+}
+
+.wl-card__chart-skeleton {
+  height: 64px;
+  border-radius: 8px;
+  position: absolute;
+  top: 0;
+}
+
+.wl-card__error {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--ion-color-medium);
+}
+
+.wl-card__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 6px;
+  align-self: flex-start;
+
+  ion-icon {
+    font-size: 12px;
+  }
+
+  &--up {
+    background: rgba(45, 211, 111, 0.15);
+    color: #2dd36f;
+  }
+
+  &--down {
+    background: rgba(235, 68, 90, 0.15);
+    color: #eb445a;
+  }
+}
+
+.edit-btn {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}

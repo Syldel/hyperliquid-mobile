@@ -1,0 +1,16 @@
+ion-item {
+  --inner-padding-start: 0;
+  --inner-padding-end: 0;
+  --padding-start: 0;
+}
+
+.pair-picker {
+  --inner-padding-top: 0;
+  --inner-padding-bottom: 3px;
+  --inner-border-width: 0;
+
+  ion-icon[slot='end'] {
+    align-self: end;
+    margin: 0;
+  }
+}
