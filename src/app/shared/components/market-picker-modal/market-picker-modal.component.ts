@@ -20,6 +20,8 @@ import {
 } from '@ionic/angular/standalone';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { HLPerpDex } from '@syldel/hl-shared-types';
+import { addIcons } from 'ionicons';
+import { closeOutline } from 'ionicons/icons';
 
 export type MarketType = 'perp' | 'spot' | 'hip3';
 
@@ -90,9 +92,10 @@ export class MarketPickerModalComponent implements OnInit {
   //  Lifecycle
   // ------------------------------------------------------------------
   ngOnInit(): void {
+    addIcons({ closeOutline });
+
     this.loadMarkets();
 
-    // Pré-sélection du type de marché si valeur initiale
     const initial = this.initialValue();
     if (initial) {
       if (initial.includes('/')) {

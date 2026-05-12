@@ -6,6 +6,7 @@ import {
   signal,
   untracked,
 } from '@angular/core';
+import { Router } from '@angular/router';
 import {
   IonFab,
   IonFabButton,
@@ -35,6 +36,7 @@ export class WatchlistPage {
   private readonly modalCtrl = inject(ModalController);
   private readonly toastCtrl = inject(ToastController);
   private readonly lifecycle = inject(AppLifecycleService);
+  private readonly router = inject(Router);
 
   items = signal<WatchlistItem[]>([]);
 
@@ -97,5 +99,9 @@ export class WatchlistPage {
       color: 'success',
     });
     await toast.present();
+  }
+
+  navigateToDetail(coin: string): void {
+    this.router.navigate(['/secure/watchlist/detail', coin]);
   }
 }

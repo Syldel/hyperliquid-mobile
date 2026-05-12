@@ -1,6 +1,5 @@
 import { PercentPipe } from '@angular/common';
-import { Component, computed, inject, input, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, computed, input, output, signal } from '@angular/core';
 import {
   IonBadge,
   IonButton,
@@ -31,9 +30,9 @@ import { pulseOutline } from 'ionicons/icons';
   styleUrls: ['./position-item.component.scss'],
 })
 export class PositionItemComponent {
-  private readonly router = inject(Router);
-
   position = input.required<HLPerpPositionDetail>();
+
+  readonly clicked = output<string>();
 
   isLong = () => parseFloat(this.position().szi) > 0;
 
@@ -54,10 +53,8 @@ export class PositionItemComponent {
     this.expanded.set(!this.expanded());
   }
 
-  openWatchlist(event: Event): void {
+  onClick(event: MouseEvent): void {
     event.stopPropagation();
-    this.router.navigate(['/secure/watchlist/detail', this.position().coin], {
-      state: { backHref: '/secure/perp-summary' },
-    });
+    this.clicked.emit(this.position().coin);
   }
 }

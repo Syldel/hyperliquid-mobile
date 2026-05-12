@@ -25,7 +25,7 @@
       <p>
         Liq.: {{ position().liquidationPx | smartDecimal }} · Lev.: {{ position().leverage.type }}
       </p>
-      <!-- <p>Funding: {{ position().cumFunding.sinceOpen | smartDecimal }}</p> -->
+      <p>Funding: {{ position().cumFunding.sinceOpen | smartDecimal }}</p>
     }
   </ion-label>
 
@@ -33,7 +33,7 @@
     slot="end"
     fill="clear"
     size="small"
-    (click)="openWatchlist($event)"
+    (click)="onClick($event)"
     aria-label="View on watchlist"
   >
     <ion-icon slot="icon-only" name="pulse-outline" />

@@ -87,7 +87,7 @@
 
   <ion-list>
     @for (fill of filteredFills(); track fill.tid) {
-    <ion-item>
+    <ion-item (click)="openWatchlist($event, fill.coin)">
       <ion-label>
         <div class="fill-half" [class]="isOpen(fill) ? 'fill-half--left' : 'fill-half--right'">
           <div class="fill-header">

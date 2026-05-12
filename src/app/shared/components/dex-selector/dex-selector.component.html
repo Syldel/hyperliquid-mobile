@@ -1,0 +1,26 @@
+@if (isLoading()) {
+  <ion-item class="dex-selector__skeleton">
+    <ion-label>
+      <ion-skeleton-text animated style="width: 60%" />
+    </ion-label>
+  </ion-item>
+} @else if (availableDexs().length > 0) {
+  <ion-item class="dex-selector__item">
+    <ion-select
+      class="dex-selector__select"
+      multiple="true"
+      placeholder="Default dex"
+      label="Dex"
+      labelPlacement="start"
+      [value]="selectedDexNames()"
+      (ionChange)="onDexChange($event)"
+    >
+      <ion-select-option value="default">Default</ion-select-option>
+      @for (dex of availableDexs(); track dex.name) {
+        <ion-select-option [value]="dex.name">
+          {{ dex.fullName || dex.name }}
+        </ion-select-option>
+      }
+    </ion-select>
+  </ion-item>
+}

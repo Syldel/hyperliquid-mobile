@@ -28,10 +28,11 @@ export class HyperliquidInfoService {
     return this.http.post<T>(`${this.config.hyperliquidPublicUrl}/info`, body);
   }
 
-  getClearinghouseState(): Observable<HLClearinghouseState> {
+  getClearinghouseState(dex?: string): Observable<HLClearinghouseState> {
     return this.post<HLClearinghouseState>({
       type: 'clearinghouseState',
       user: this.auth.currentAddress(),
+      ...(dex !== undefined && dex !== '' ? { dex } : {}),
     });
   }
 
@@ -46,7 +47,7 @@ export class HyperliquidInfoService {
     return this.post<HLOpenOrder[]>({
       type: 'openOrders',
       user: this.auth.currentAddress(),
-      ...(dex && { dex }),
+      ...(dex !== undefined && dex !== '' ? { dex } : {}),
     });
   }
 
@@ -54,7 +55,7 @@ export class HyperliquidInfoService {
     return this.post<HLFrontendOpenOrder[]>({
       type: 'frontendOpenOrders',
       user: this.auth.currentAddress(),
-      ...(dex && { dex }),
+      ...(dex !== undefined && dex !== '' ? { dex } : {}),
     });
   }
 

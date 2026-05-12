@@ -35,7 +35,6 @@ import {
   INTERVAL_LABELS,
   WatchlistItem,
 } from '../../models/watchlist-item.model';
-import { WatchlistService } from '../../services/watchlist.service';
 
 @Component({
   selector: 'app-watchlist-detail',
@@ -49,7 +48,6 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   private readonly hlCandle = inject(HyperliquidCandleService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly watchlistService = inject(WatchlistService);
   private readonly lifecycle = inject(AppLifecycleService);
 
   readonly chartEl = viewChild<ElementRef<HTMLDivElement>>('chartEl');
@@ -101,15 +99,15 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       return;
     }
 
-    const found = this.watchlistService.getByCoin(coin);
-    if (!found) {
-      this.router.navigate(['/secure/watchlist']);
-      return;
-    }
+    const rawInterval =
+      this.route.snapshot.paramMap.get('interval') ||
+      this.route.snapshot.queryParamMap.get('interval');
+    const interval: CandleInterval = CANDLE_INTERVALS.includes(rawInterval as CandleInterval)
+      ? (rawInterval as CandleInterval)
+      : '1h';
 
-    this.item.set(found);
-    this.selectedInterval.set(found.interval);
-
+    this.item.set({ coin, interval, addedAt: Date.now() });
+    this.selectedInterval.set(interval);
     this.fetchFn.set(this.buildFetchFn());
   }
 

@@ -1,9 +1,10 @@
 <app-refreshable-layout
   title="Open Orders"
-  [fetchFn]="fetchFn"
+  [fetchFn]="fetchFn()"
   emptyMessage="No open order found"
   (dataLoaded)="openOrders.set($event)"
 >
+  <app-dex-selector filters (selectionChanged)="onSelectionChanged($event)" />
   <ion-list>
     @for (openOrder of openOrders(); track openOrder.oid) {
     <ion-item>

@@ -1,9 +1,11 @@
 <app-refreshable-layout
   title="Perp Summary"
-  [fetchFn]="fetchFn"
+  [fetchFn]="fetchFn()"
   emptyMessage="No Perp Summary found"
-  (dataLoaded)="clearinghouseState.set($event)"
+  (dataLoaded)="clearinghouseStates.set($event)"
 >
+  <app-dex-selector filters (selectionChanged)="onSelectionChanged($event)" />
+
   <ion-segment [value]="activeSegment()" (ionChange)="activeSegment.set($any($event.detail.value))">
     <ion-segment-button value="positions">
       <ion-label>Positions</ion-label>
@@ -16,7 +18,7 @@
   @if (activeSegment() === 'positions') {
   <ion-list>
     @for (position of positions(); track position.coin) {
-    <app-position-item [position]="position" />
+    <app-position-item [position]="position" (clicked)="openWatchlist($event)" />
     } @empty {
     <ion-item class="ion-text-center">
       <ion-label color="medium">No open position</ion-label>

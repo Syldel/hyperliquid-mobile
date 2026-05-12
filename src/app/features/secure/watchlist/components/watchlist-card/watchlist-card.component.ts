@@ -13,7 +13,6 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { Router } from '@angular/router';
 import {
   AlertController,
   IonCard,
@@ -56,12 +55,12 @@ export class WatchlistCardComponent implements AfterViewInit, OnDestroy {
   readonly item = input.required<WatchlistItem>();
   readonly removeRequested = output<string>();
   readonly itemUpdated = output<{ coin: string } & Partial<WatchlistItem>>();
+  readonly clicked = output<string>();
 
   // ── View query — always in DOM, never inside @if ────────────────────────────
   readonly chartEl = viewChild<ElementRef<HTMLDivElement>>('chartEl');
 
   private readonly hlCandle = inject(HyperliquidCandleService);
-  private readonly router = inject(Router);
   private readonly alertCtrl = inject(AlertController);
   private readonly lifecycle = inject(AppLifecycleService);
   private readonly modalCtrl = inject(ModalController);
@@ -96,8 +95,9 @@ export class WatchlistCardComponent implements AfterViewInit, OnDestroy {
     this.chart?.remove();
   }
 
-  navigateToDetail(): void {
-    this.router.navigate(['/secure/watchlist/detail', this.item().coin]);
+  onClick(event: MouseEvent): void {
+    event.stopPropagation();
+    this.clicked.emit(this.item().coin);
   }
 
   async openEditModal(event: Event): Promise<void> {

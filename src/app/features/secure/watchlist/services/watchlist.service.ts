@@ -1,18 +1,26 @@
-import { Injectable, signal } from '@angular/core';
-import { Preferences } from '@capacitor/preferences';
+import { inject, Injectable, signal } from '@angular/core';
+import { AuthService } from '@auth/auth.service';
+import { StorageService } from '@storage/storage.service';
 import { CandleInterval } from '@syldel/hl-shared-types';
 import { WatchlistItem } from '../models/watchlist-item.model';
 
-const STORAGE_KEY = 'watchlist_items';
+type WatchlistStorage = Record<string, WatchlistItem[]>;
 
 @Injectable({ providedIn: 'root' })
 export class WatchlistService {
+  private readonly storage = inject(StorageService);
+  private readonly auth = inject(AuthService);
+
   private _items = signal<WatchlistItem[]>([]);
   readonly items = this._items.asReadonly();
 
+  private readonly STORAGE_KEY = 'watchlist_items';
+
   async load(): Promise<WatchlistItem[]> {
-    const { value } = await Preferences.get({ key: STORAGE_KEY });
-    const items: WatchlistItem[] = value ? JSON.parse(value) : [];
+    const all = (await this.storage.get<WatchlistStorage>(this.STORAGE_KEY)) ?? {};
+    const address = this.auth.currentAddress();
+    if (!address) return [];
+    const items = all[address] ?? [];
     this._items.set(items);
     return items;
   }
@@ -45,7 +53,11 @@ export class WatchlistService {
   }
 
   private async persist(items: WatchlistItem[]): Promise<void> {
+    const all = (await this.storage.get<WatchlistStorage>(this.STORAGE_KEY)) ?? {};
+    const address = this.auth.currentAddress();
+    if (!address) return;
+    all[address] = items;
     this._items.set(items);
-    await Preferences.set({ key: STORAGE_KEY, value: JSON.stringify(items) });
+    await this.storage.set(this.STORAGE_KEY, all);
   }
 }
