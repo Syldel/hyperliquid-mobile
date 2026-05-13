@@ -17,6 +17,7 @@ import {
   ModalController,
 } from '@ionic/angular/standalone';
 import { BotSettings, ProtectiveOrderEntry, TradingPair, User } from '@models/user.interface';
+import { BotService } from '@services/bot.service';
 import { UserService } from '@services/user.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
@@ -30,7 +31,6 @@ import {
   trendingUpOutline,
 } from 'ionicons/icons';
 import { debounceTime, Subject, switchMap } from 'rxjs';
-
 import {
   ProtectiveModalComponent,
   ProtectiveModalResult,
@@ -67,6 +67,7 @@ import {
 export class BotStrategiesPage extends MenuBasePage {
   private readonly userService = inject(UserService);
   private readonly modalCtrl = inject(ModalController);
+  private readonly botService = inject(BotService);
 
   user = signal<User | null>(null);
   fetchFn = () => this.userService.getMe();
@@ -76,6 +77,8 @@ export class BotStrategiesPage extends MenuBasePage {
   );
 
   private readonly save$ = new Subject<Record<string, BotSettings>>();
+
+  readonly exitBehaviorLabels = this.botService.exitBehaviorLabels;
 
   constructor() {
     super();
@@ -87,6 +90,8 @@ export class BotStrategiesPage extends MenuBasePage {
       trendingUpOutline,
       trendingDownOutline,
     });
+
+    this.botService.getExchangeFormMetadata().subscribe();
 
     this.save$
       .pipe(

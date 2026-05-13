@@ -29,3 +29,28 @@
     font-size: 0.75rem;
   }
 }
+
+.exit-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-right: 3px;
+  background: var(--ion-color-medium);
+
+  &--STRATEGY_SIGNAL {
+    background: var(--ion-color-success);
+  }
+  &--EXIT_ON_PROFIT_ONLY {
+    background: var(--ion-color-warning);
+  }
+  &--NEVER {
+    background: var(--ion-color-danger);
+  }
+}
+
+.exit-label {
+  font-size: 0.75rem;
+  color: var(--ion-color-medium);
+}

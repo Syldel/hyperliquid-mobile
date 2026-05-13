@@ -48,3 +48,13 @@ ion-item {
     padding-top: 0;
   }
 }
+
+.exit-behavior {
+  &__description {
+    display: block;
+    padding: 6px 0;
+    font-size: 0.8rem;
+    color: var(--ion-color-medium);
+    line-height: 1.4;
+  }
+}

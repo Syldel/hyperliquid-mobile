@@ -86,6 +86,71 @@
       </ion-item>
     </ion-list>
 
+    <!-- Exit Behavior -->
+    <ion-list inset>
+      <ion-item>
+        @if (isLoadingMetadata()) {
+          <ion-spinner name="crescent" slot="end" />
+        } @else if (metadataError()) {
+          <ion-note color="danger" slot="end">
+            <ion-icon name="alert-circle-outline" />
+            Failed to load
+          </ion-note>
+        }
+        <ion-select
+          formControlName="exitBehavior"
+          label="Exit Behavior"
+          labelPlacement="stacked"
+          interface="action-sheet"
+          placeholder="Select an exit behavior"
+        >
+          @for (eb of exitBehaviors(); track eb.value) {
+            <ion-select-option [value]="eb.value">{{ eb.label }}</ion-select-option>
+          }
+        </ion-select>
+      </ion-item>
+      @if (selectedExitBehaviorDescription()) {
+        <ion-note class="exit-behavior__description">
+          {{ selectedExitBehaviorDescription() }}
+        </ion-note>
+      }
+    </ion-list>
+
+    <!-- Strategy Parameters (dynamiques) -->
+    @if (currentStrategyParams().length > 0) {
+      <ion-list inset [formGroup]="strategyParamsForm()">
+        @for (param of currentStrategyParams(); track param.id) {
+          <ion-item>
+            <!-- SELECT -->
+            @if (param.type === 'select') {
+              <ion-select
+                [formControlName]="param.id"
+                [label]="param.label"
+                labelPlacement="stacked"
+                interface="action-sheet"
+              >
+                @for (opt of param.options ?? []; track opt.value) {
+                  <ion-select-option [value]="opt.value">{{ opt.label }}</ion-select-option>
+                }
+              </ion-select>
+            }
+
+            <!-- NUMBER -->
+            @if (param.type === 'number') {
+              <ion-label position="stacked">{{ param.label }}</ion-label>
+              <ion-input type="number" [formControlName]="param.id" />
+            }
+
+            <!-- BOOLEAN -->
+            @if (param.type === 'boolean') {
+              <ion-label>{{ param.label }}</ion-label>
+              <ion-toggle slot="end" [formControlName]="param.id" />
+            }
+          </ion-item>
+        }
+      </ion-list>
+    }
+
     <!-- Ratio -->
     <ion-list inset>
       <ion-label class="ratio__label">

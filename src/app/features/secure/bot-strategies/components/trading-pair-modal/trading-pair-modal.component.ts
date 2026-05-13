@@ -14,6 +14,7 @@ import {
   AbstractControl,
   FormBuilder,
   FormControl,
+  FormGroup,
   ReactiveFormsModule,
   ValidationErrors,
   ValidatorFn,
@@ -25,6 +26,7 @@ import {
   IonContent,
   IonHeader,
   IonIcon,
+  IonInput,
   IonItem,
   IonLabel,
   IonList,
@@ -39,8 +41,14 @@ import {
   IonToolbar,
   ModalController,
 } from '@ionic/angular/standalone';
-import { ChartInterval, ExchangeStrategy } from '@models/bot.interfaces';
-import { BotSettings, TradingPair, TradingStrategy } from '@models/user.interface';
+import { ChartInterval, ExchangeStrategy, ExitBehaviorMeta } from '@models/bot.interfaces';
+import {
+  BotSettings,
+  ExitBehavior,
+  StrategyParameter,
+  TradingPair,
+  TradingStrategy,
+} from '@models/user.interface';
 import { BotService } from '@services/bot.service';
 import { MarketPickerModalComponent } from '@shared/components/market-picker-modal/market-picker-modal.component';
 import { addIcons } from 'ionicons';
@@ -57,6 +65,7 @@ interface TradingPairForm {
   exchangeKey: FormControl<string>;
   pairName: FormControl<string>;
   strategy: FormControl<TradingStrategy>;
+  exitBehavior: FormControl<ExitBehavior>;
   ratio: FormControl<number>;
   interval: FormControl<ChartInterval>;
   enabled: FormControl<boolean>;
@@ -90,6 +99,7 @@ export interface TradingPairModalResult {
     IonToggle,
     IonNote,
     IonText,
+    IonInput,
   ],
   templateUrl: './trading-pair-modal.component.html',
   styleUrls: ['./trading-pair-modal.component.scss'],
@@ -101,16 +111,11 @@ export class TradingPairModalComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   // ------------------------------------------------------------------
-  //  Inputs — provided by the caller via ModalController componentProps
+  //  Inputs
   // ------------------------------------------------------------------
 
-  /** Existing exchanges on the user account. */
   readonly exchanges = input<{ key: string; value: BotSettings }[]>([]);
-
-  /** Pre-fill when editing an existing pair. */
   readonly editPair = input<TradingPair | undefined>();
-
-  /** Pre-fill when editing — the exchange this pair belongs to. */
   readonly editExchangeKey = input<string | undefined>();
 
   // ------------------------------------------------------------------
@@ -123,6 +128,13 @@ export class TradingPairModalComponent implements OnInit {
   availableExchanges = signal<string[]>([]);
   strategiesByExchange = signal<Record<string, ExchangeStrategy[]>>({});
   metadataError = signal(false);
+  exitBehaviors = signal<ExitBehaviorMeta[]>([]);
+
+  /** FormGroup reconstruit dynamiquement à chaque changement de strategy */
+  strategyParamsForm = signal<FormGroup>(this.fb.group({}));
+
+  /** Paramètres de la strategy actuellement sélectionnée */
+  readonly currentStrategyParams = signal<StrategyParameter[]>([]);
 
   // ------------------------------------------------------------------
   //  Computed
@@ -140,39 +152,10 @@ export class TradingPairModalComponent implements OnInit {
     return [...new Set([...fromApi, ...fromInput])];
   });
 
-  // ------------------------------------------------------------------
-  //  Metadata loading
-  // ------------------------------------------------------------------
-
-  private loadMetadata(): void {
-    this.isLoadingMetadata.set(true);
-    this.metadataError.set(false);
-    this.form.controls.strategy.disable();
-    this.form.controls.interval.disable();
-
-    this.botService.getExchangeFormMetadata().subscribe({
-      next: (meta) => {
-        this.candleIntervals.set(meta.intervals);
-        this.availableExchanges.set(meta.exchanges);
-        this.strategiesByExchange.set(meta.strategies);
-
-        const all = Object.values(meta.strategies).flat();
-        this.strategies.set(all);
-
-        this.form.controls.strategy.enable();
-        this.form.controls.interval.enable();
-      },
-      error: () => {
-        this.metadataError.set(true);
-        this.isLoadingMetadata.set(false);
-      },
-      complete: () => this.isLoadingMetadata.set(false),
-    });
-  }
-
-  // ------------------------------------------------------------------
-  //  State
-  // ------------------------------------------------------------------
+  readonly selectedExitBehaviorDescription = computed(() => {
+    const value = this.formValue().exitBehavior;
+    return this.exitBehaviors().find((eb) => eb.value === value)?.description ?? '';
+  });
 
   readonly isEditMode = computed(() => !!this.editPair());
 
@@ -188,7 +171,6 @@ export class TradingPairModalComponent implements OnInit {
 
       const existingNames = exchange.value.pairs.map((p) => p.name);
       const currentName = this.editPair?.()?.name;
-
       const conflict = existingNames.filter((n) => n !== currentName).includes(control.value);
 
       return conflict ? { pairNameExists: true } : null;
@@ -202,6 +184,7 @@ export class TradingPairModalComponent implements OnInit {
       this.pairNameExistsValidator(),
     ]),
     strategy: this.fb.nonNullable.control<TradingStrategy>(null as any, Validators.required),
+    exitBehavior: this.fb.nonNullable.control<ExitBehavior>('STRATEGY_SIGNAL', Validators.required),
     ratio: this.fb.nonNullable.control(0, [
       Validators.required,
       Validators.min(0),
@@ -219,7 +202,71 @@ export class TradingPairModalComponent implements OnInit {
     initialValue: this.form.status,
   });
 
-  readonly isValid = computed(() => this.formStatus() === 'VALID');
+  /** Valide si le form principal ET les paramètres dynamiques sont valides */
+  readonly isValid = computed(
+    () => this.formStatus() === 'VALID' && this.strategyParamsForm().valid,
+  );
+
+  // ------------------------------------------------------------------
+  //  Metadata loading
+  // ------------------------------------------------------------------
+
+  private loadMetadata(): void {
+    this.isLoadingMetadata.set(true);
+    this.metadataError.set(false);
+    this.form.controls.strategy.disable();
+    this.form.controls.interval.disable();
+
+    this.botService.getExchangeFormMetadata().subscribe({
+      next: (meta) => {
+        this.candleIntervals.set(meta.intervals);
+        this.availableExchanges.set(meta.exchanges);
+        this.strategiesByExchange.set(meta.strategies);
+        this.exitBehaviors.set(meta.globalOptions?.exitBehaviors ?? []);
+
+        const all = Object.values(meta.strategies).flat();
+        this.strategies.set(all);
+
+        this.form.controls.strategy.enable();
+        this.form.controls.interval.enable();
+      },
+      error: () => {
+        this.metadataError.set(true);
+        this.isLoadingMetadata.set(false);
+      },
+      complete: () => this.isLoadingMetadata.set(false),
+    });
+  }
+
+  // ------------------------------------------------------------------
+  //  Dynamic params form builder
+  // ------------------------------------------------------------------
+
+  /**
+   * Reconstruit le FormGroup des paramètres dynamiques
+   * à chaque fois que la strategy change.
+   */
+  private buildStrategyParamsForm(
+    params: StrategyParameter[],
+    existingValues?: Record<string, any>,
+  ): void {
+    const controls: Record<string, FormControl> = {};
+
+    for (const param of params) {
+      const savedValue = existingValues?.[param.id];
+      const initialValue = savedValue !== undefined ? savedValue : param.default;
+
+      const validators = [];
+      if (param.type === 'number') {
+        validators.push(Validators.required);
+      }
+
+      controls[param.id] = this.fb.nonNullable.control(initialValue, validators);
+    }
+
+    this.strategyParamsForm.set(this.fb.group(controls));
+    this.currentStrategyParams.set(params);
+  }
 
   // ------------------------------------------------------------------
   //  Lifecycle
@@ -235,10 +282,10 @@ export class TradingPairModalComponent implements OnInit {
       chevronForwardOutline,
     });
 
+    // Pré-remplissage en mode édition
     effect(() => {
       const pair = this.editPair();
       const exchangeKey = this.editExchangeKey();
-
       if (!pair) return;
 
       this.form.patchValue({
@@ -248,7 +295,20 @@ export class TradingPairModalComponent implements OnInit {
         ratio: pair.ratio,
         interval: pair.interval,
         enabled: pair.enabled,
+        exitBehavior: pair.exitBehavior ?? 'STRATEGY_SIGNAL',
       });
+
+      // Reconstruit les params avec les valeurs sauvegardées
+      if (pair.strategy?.parameters?.length) {
+        this.buildStrategyParamsForm(pair.strategy.parameters, pair.strategyParameters);
+      }
+    });
+
+    // Reconstruction du form dynamique à chaque changement de strategy
+    effect(() => {
+      const strategy = this.formValue().strategy as TradingStrategy | null;
+      const params = strategy?.parameters ?? [];
+      this.buildStrategyParamsForm(params);
     });
   }
 
@@ -263,7 +323,7 @@ export class TradingPairModalComponent implements OnInit {
   }
 
   // ------------------------------------------------------------------
-  //  UI handlers
+  //  UI helpers
   // ------------------------------------------------------------------
 
   async openMarketPicker(): Promise<void> {
@@ -284,9 +344,8 @@ export class TradingPairModalComponent implements OnInit {
     }
   }
 
-  compareStrategies = (s1: TradingStrategy, s2: TradingStrategy): boolean => {
-    return s1 && s2 ? s1.shortname === s2.shortname : s1 === s2;
-  };
+  compareStrategies = (s1: TradingStrategy, s2: TradingStrategy): boolean =>
+    s1 && s2 ? s1.shortname === s2.shortname : s1 === s2;
 
   readonly pinFormatter = (value: number) => `${value}%`;
 
@@ -304,6 +363,8 @@ export class TradingPairModalComponent implements OnInit {
     if (!this.isValid()) return;
 
     const formValue = this.form.getRawValue();
+    const strategyParams = this.strategyParamsForm().getRawValue();
+    const hasParams = Object.keys(strategyParams).length > 0;
 
     const result: TradingPairModalResult = {
       exchangeKey: formValue.exchangeKey,
@@ -313,6 +374,8 @@ export class TradingPairModalComponent implements OnInit {
         interval: formValue.interval,
         enabled: formValue.enabled,
         strategy: formValue.strategy,
+        exitBehavior: formValue.exitBehavior,
+        strategyParameters: hasParams ? strategyParams : undefined,
       },
     };
 

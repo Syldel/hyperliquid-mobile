@@ -12,7 +12,11 @@ import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { DexSelectorComponent } from '@shared/components/dex-selector/dex-selector.component';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
-import { HLClearinghouseState, HLPerpPositionDetail } from '@syldel/hl-shared-types';
+import {
+  HLClearinghouseState,
+  HLPerpMarginSummary,
+  HLPerpPositionDetail,
+} from '@syldel/hl-shared-types';
 import { forkJoin, Observable } from 'rxjs';
 import { MarginSummaryComponent } from './components/margin-summary/margin-summary.component';
 import { PositionItemComponent } from './components/position-item/position-item.component';
@@ -66,7 +70,48 @@ export class PerpSummaryPage extends MenuBasePage {
     };
   }
 
-  clearinghouseState = computed(() => this.clearinghouseStates()[0]);
+  clearinghouseState = computed((): HLClearinghouseState | undefined => {
+    const states = this.clearinghouseStates();
+    if (states.length === 0) return undefined;
+    if (states.length === 1) return states[0];
+
+    // Cumul des valeurs numériques à travers les dexs
+    const sumMargin = (key: keyof HLPerpMarginSummary) =>
+      states
+        .map((s) => parseFloat(s.marginSummary[key] as string))
+        .reduce((a, b) => a + b, 0)
+        .toString();
+
+    const sumCrossMargin = (key: keyof HLPerpMarginSummary) =>
+      states
+        .map((s) => parseFloat(s.crossMarginSummary[key] as string))
+        .reduce((a, b) => a + b, 0)
+        .toString();
+
+    return {
+      ...states[0], // assetPositions, time, etc. déjà gérés ailleurs
+      withdrawable: states
+        .map((s) => parseFloat(s.withdrawable))
+        .reduce((a, b) => a + b, 0)
+        .toString(),
+      crossMaintenanceMarginUsed: states
+        .map((s) => parseFloat(s.crossMaintenanceMarginUsed))
+        .reduce((a, b) => a + b, 0)
+        .toString(),
+      marginSummary: {
+        accountValue: sumMargin('accountValue'),
+        totalMarginUsed: sumMargin('totalMarginUsed'),
+        totalNtlPos: sumMargin('totalNtlPos'),
+        totalRawUsd: sumMargin('totalRawUsd'),
+      },
+      crossMarginSummary: {
+        accountValue: sumCrossMargin('accountValue'),
+        totalMarginUsed: sumCrossMargin('totalMarginUsed'),
+        totalNtlPos: sumCrossMargin('totalNtlPos'),
+        totalRawUsd: sumCrossMargin('totalRawUsd'),
+      },
+    };
+  });
 
   positions = computed((): HLPerpPositionDetail[] =>
     this.clearinghouseStates()

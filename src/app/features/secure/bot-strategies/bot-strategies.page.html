@@ -25,7 +25,14 @@
               <strong>{{ pair.name }}</strong>
               <ion-badge color="primary">{{ pair.strategy.name }}</ion-badge>
             </div>
-            <p>Ratio: {{ pair.ratio }}% · Interval: {{ pair.interval }}</p>
+            <p>
+              Ratio: {{ pair.ratio }}% · Interval: {{ pair.interval }} @if (pair.exitBehavior) { ·
+              <span class="exit-dot exit-dot--{{ pair.exitBehavior }}" aria-hidden="true"></span>
+              <span class="exit-label">
+                {{ exitBehaviorLabels()[pair.exitBehavior] || pair.exitBehavior }}
+              </span>
+              }
+            </p>
             <div class="prot-summary">
               @if (pair.strategy.protective?.entries?.length) { @for (group of
               protGroups(pair.strategy.protective!.entries); track $index) {

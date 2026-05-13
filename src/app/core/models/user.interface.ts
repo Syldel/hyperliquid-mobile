@@ -7,11 +7,26 @@ export interface User {
   createdAt: string;
 }
 
+export type ExitBehavior = 'STRATEGY_SIGNAL' | 'EXIT_ON_PROFIT_ONLY' | 'NEVER';
+
+export interface StrategyParameterOption {
+  label: string;
+  value: any;
+}
+
+export interface StrategyParameter {
+  id: string;
+  label: string;
+  type: 'select' | 'number' | 'boolean';
+  options?: StrategyParameterOption[];
+  default: any;
+}
+
 export interface TradingStrategy {
   name: string;
   shortname: string;
-  // source?: string;
   protective?: ProtectiveOrderStrategy;
+  parameters?: StrategyParameter[];
 }
 
 export interface TradingPair {
@@ -20,6 +35,8 @@ export interface TradingPair {
   interval: string;
   enabled: boolean;
   strategy: TradingStrategy;
+  exitBehavior?: ExitBehavior;
+  strategyParameters?: Record<string, any>;
 }
 
 export interface BotSettings {

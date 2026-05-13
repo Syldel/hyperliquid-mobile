@@ -25,7 +25,14 @@
     </ion-item>
     }
   </ion-list>
-  } @if (activeSegment() === 'account') { @if (clearinghouseState(); as info) {
+  } @if (activeSegment() === 'account') { @if (clearinghouseState(); as info) { @if
+  (clearinghouseStates().length > 1) {
+  <ion-item color="light">
+    <ion-label>
+      <p>Aggregated across {{ clearinghouseStates().length }} dexs</p>
+    </ion-label>
+  </ion-item>
+  }
   <ion-list>
     <ion-item>
       <ion-label>
