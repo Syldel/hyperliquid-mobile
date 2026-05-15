@@ -17,7 +17,7 @@ import {
   HLPerpMarginSummary,
   HLPerpPositionDetail,
 } from '@syldel/hl-shared-types';
-import { forkJoin, Observable } from 'rxjs';
+import { forkJoin, Observable, of } from 'rxjs';
 import { MarginSummaryComponent } from './components/margin-summary/margin-summary.component';
 import { PositionItemComponent } from './components/position-item/position-item.component';
 
@@ -43,7 +43,7 @@ export class PerpSummaryPage extends MenuBasePage {
   private readonly hlInfo = inject(HyperliquidInfoService);
   private readonly lifecycle = inject(AppLifecycleService);
 
-  selectedDexNames = signal<string[]>([]);
+  selectedDexNames = signal<string[] | null>(null);
   clearinghouseStates = signal<HLClearinghouseState[]>([]);
   activeSegment = signal<'positions' | 'account'>('positions');
 
@@ -61,6 +61,8 @@ export class PerpSummaryPage extends MenuBasePage {
 
   private buildFetchFn() {
     const dexs = this.selectedDexNames();
+    if (dexs === null) return (): Observable<HLClearinghouseState[]> => of([]);
+
     return (): Observable<HLClearinghouseState[]> => {
       const calls =
         dexs.length > 0

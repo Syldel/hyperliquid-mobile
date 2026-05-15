@@ -7,7 +7,7 @@ import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { DexSelectorComponent } from '@shared/components/dex-selector/dex-selector.component';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import { HLFrontendOpenOrder } from '@syldel/hl-shared-types';
-import { forkJoin, map, Observable } from 'rxjs';
+import { forkJoin, map, Observable, of } from 'rxjs';
 
 @Component({
   selector: 'app-open-orders',
@@ -29,7 +29,7 @@ export class OpenOrdersPage extends MenuBasePage {
   private readonly lifecycle = inject(AppLifecycleService);
 
   openOrders = signal<HLFrontendOpenOrder[]>([]);
-  selectedDexNames = signal<string[]>([]);
+  selectedDexNames = signal<string[] | null>(null);
 
   fetchFn = signal(this.buildFetchFn());
 
@@ -45,6 +45,8 @@ export class OpenOrdersPage extends MenuBasePage {
 
   private buildFetchFn() {
     const dexs = this.selectedDexNames();
+    if (dexs === null) return (): Observable<HLFrontendOpenOrder[]> => of([]);
+
     return (): Observable<HLFrontendOpenOrder[]> => {
       const calls =
         dexs.length > 0
