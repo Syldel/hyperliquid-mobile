@@ -111,9 +111,14 @@
   padding: 8px 0 0;
 }
 
-.chart-el {
-  width: 100%;
-  height: 100%;
+.chart-container {
+  position: relative;
+}
+.chart-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
 }
 
 .chart-loading {

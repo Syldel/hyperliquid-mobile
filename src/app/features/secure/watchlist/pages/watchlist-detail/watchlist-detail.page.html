@@ -51,7 +51,9 @@
   </div>
 
   <div class="chart-wrapper">
-    <div #chartEl class="chart-el"></div>
+    <div #chartEl class="chart-container">
+      <canvas #overlayEl class="chart-overlay"></canvas>
+    </div>
 
     @if (loading()) {
     <div class="chart-loading">
