@@ -10,12 +10,16 @@
     <p>
       {{ position().leverage.value }}x · PnL:
       <ion-text [color]="pnlColor()">{{ position().unrealizedPnl | smartDecimal }}</ion-text>
-      · Size: {{ position().szi | smartDecimal }}
+      · Funding:
+      <ion-text [color]="+position().cumFunding.sinceOpen >= 0 ? 'danger' : 'success'">
+        {{ position().cumFunding.sinceOpen | smartDecimal }}
+      </ion-text>
     </p>
 
     @if (expanded()) {
       <p>
-        Entry: {{ position().entryPx | smartDecimal }} · Value:
+        Entry: {{ position().entryPx | smartDecimal }} · Size: {{ position().szi | smartDecimal }} ·
+        Value:
         {{ position().positionValue | smartDecimal }}
       </p>
       <p>
@@ -25,7 +29,6 @@
       <p>
         Liq.: {{ position().liquidationPx | smartDecimal }} · Lev.: {{ position().leverage.type }}
       </p>
-      <p>Funding: {{ position().cumFunding.sinceOpen | smartDecimal }}</p>
     }
   </ion-label>
 
