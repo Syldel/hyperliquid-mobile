@@ -418,6 +418,13 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     }
   }
 
+  private getOrderPrice(order: HLFrontendOpenOrder): string {
+    if ((order.isTrigger || order.isPositionTpsl) && parseFloat(order.triggerPx) > 0) {
+      return order.triggerPx;
+    }
+    return order.limitPx;
+  }
+
   private drawOpenOrders(ctx: CanvasRenderingContext2D, orders: HLFrontendOpenOrder[]): void {
     if (!orders.length) return;
 
@@ -425,7 +432,8 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     const rightTime = visibleRange?.to ?? null;
 
     for (const order of orders) {
-      const price = parseFloat(order.limitPx);
+      const priceLabel = this.getOrderPrice(order);
+      const price = parseFloat(priceLabel);
       const y = this.candleSeries!.priceToCoordinate(price);
       if (y === null || y < 0 || y > ctx.canvas.height) continue;
 
@@ -445,7 +453,6 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       if (rightTime !== null) {
         const x = this.chart!.timeScale().timeToCoordinate(rightTime);
         if (x !== null) {
-          const priceLabel = order.limitPx;
           const fSize = 10;
           ctx.font = `${fSize}px monospace`;
           const tw = ctx.measureText(priceLabel).width;
