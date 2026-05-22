@@ -60,4 +60,11 @@ export class OpenOrdersPage extends MenuBasePage {
     this.selectedDexNames.set(dexNames);
     this.fetchFn.set(this.buildFetchFn());
   }
+
+  openWatchlist(event: Event, coin: string): void {
+    event.stopPropagation();
+    this.router.navigate(['/secure/watchlist/detail', coin], {
+      state: { backHref: '/secure/open-orders' },
+    });
+  }
 }

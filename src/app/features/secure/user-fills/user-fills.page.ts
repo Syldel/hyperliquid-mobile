@@ -151,7 +151,7 @@ export class UserFillsPage extends MenuBasePage {
   openWatchlist(event: Event, coin: string): void {
     event.stopPropagation();
     this.router.navigate(['/secure/watchlist/detail', coin], {
-      state: { backHref: '/secure/perp-summary' },
+      state: { backHref: '/secure/user-fills' },
     });
   }
 }

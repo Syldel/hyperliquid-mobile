@@ -57,4 +57,11 @@ export class HistoryPage extends MenuBasePage {
         return 'medium';
     }
   }
+
+  openWatchlist(event: Event, coin: string): void {
+    event.stopPropagation();
+    this.router.navigate(['/secure/watchlist/detail', coin], {
+      state: { backHref: '/secure/history' },
+    });
+  }
 }

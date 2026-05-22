@@ -7,7 +7,7 @@
   <app-dex-selector filters (selectionChanged)="onSelectionChanged($event)" />
   <ion-list>
     @for (openOrder of openOrders(); track openOrder.oid) {
-    <ion-item>
+    <ion-item (click)="openWatchlist($event, openOrder.coin)">
       <ion-label>
         <div class="order-header">
           <strong>{{ openOrder.coin }}</strong>

@@ -6,7 +6,7 @@
 >
   <ion-list>
     @for (entry of historicalOrders(); track entry.order.oid) {
-    <ion-item>
+    <ion-item (click)="openWatchlist($event, entry.order.coin)">
       <ion-label>
         <div class="order-header">
           <strong>{{ entry.order.coin }}</strong>
