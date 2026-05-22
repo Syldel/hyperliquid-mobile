@@ -9,10 +9,10 @@
 
     <p>
       {{ position().leverage.value }}x · PnL:
-      <ion-text [color]="pnlColor()">{{ position().unrealizedPnl | smartDecimal }}</ion-text>
+      <ion-text [color]="pnlColor()">{{ position().unrealizedPnl | number: '1.2-2' }}</ion-text>
       · Funding:
       <ion-text [color]="+position().cumFunding.sinceOpen >= 0 ? 'danger' : 'success'">
-        {{ position().cumFunding.sinceOpen | smartDecimal }}
+        {{ fundingDisplay(position().cumFunding.sinceOpen) }}
       </ion-text>
     </p>
 
@@ -32,13 +32,7 @@
     }
   </ion-label>
 
-  <ion-button
-    slot="end"
-    fill="clear"
-    size="small"
-    (click)="onClick($event)"
-    aria-label="View on watchlist"
-  >
-    <ion-icon slot="icon-only" name="pulse-outline" />
-  </ion-button>
+  <div slot="end" class="mini-chart-wrapper">
+    <app-mini-chart [coin]="position().coin" [interval]="'1h'" (chartClick)="onClick()" />
+  </div>
 </ion-item>

@@ -1,0 +1,8 @@
+<div #chartEl class="mini-chart" (click)="$event.stopPropagation(); chartClick.emit()">
+  @if (loading()) {
+    <div class="mini-chart__skeleton"></div>
+  }
+  @if (hasError()) {
+    <div class="mini-chart__error">—</div>
+  }
+</div>

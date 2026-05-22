@@ -1,17 +1,9 @@
-import { PercentPipe } from '@angular/common';
+import { DecimalPipe, PercentPipe } from '@angular/common';
 import { Component, computed, input, output, signal } from '@angular/core';
-import {
-  IonBadge,
-  IonButton,
-  IonIcon,
-  IonItem,
-  IonLabel,
-  IonText,
-} from '@ionic/angular/standalone';
+import { IonBadge, IonItem, IonLabel, IonText } from '@ionic/angular/standalone';
 import { SmartDecimalPipe } from '@pipes/smart-decimal.pipe';
+import { MiniChartComponent } from '@shared/components/mini-chart/mini-chart.component';
 import { HLPerpPositionDetail } from '@syldel/hl-shared-types';
-import { addIcons } from 'ionicons';
-import { pulseOutline } from 'ionicons/icons';
 
 @Component({
   selector: 'app-position-item',
@@ -21,8 +13,8 @@ import { pulseOutline } from 'ionicons/icons';
     IonLabel,
     IonBadge,
     IonText,
-    IonButton,
-    IonIcon,
+    MiniChartComponent,
+    DecimalPipe,
     SmartDecimalPipe,
     PercentPipe,
   ],
@@ -45,16 +37,17 @@ export class PositionItemComponent {
 
   expanded = signal<boolean>(false);
 
-  constructor() {
-    addIcons({ pulseOutline });
-  }
-
   toggle() {
     this.expanded.set(!this.expanded());
   }
 
-  onClick(event: MouseEvent): void {
-    event.stopPropagation();
+  onClick(): void {
     this.clicked.emit(this.position().coin);
+  }
+
+  fundingDisplay(value: string): string {
+    const n = +value;
+    const abs = Math.abs(n).toFixed(2);
+    return n >= 0 ? `-${abs}` : `${abs}`;
   }
 }
