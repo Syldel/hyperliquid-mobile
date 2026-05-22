@@ -1,4 +1,5 @@
-<div #chartEl class="mini-chart" (click)="$event.stopPropagation(); chartClick.emit()">
+<div #chartEl class="mini-chart">
+  <div class="mini-chart__overlay" (click)="$event.stopPropagation(); chartClick.emit()"></div>
   @if (loading()) {
     <div class="mini-chart__skeleton"></div>
   }
