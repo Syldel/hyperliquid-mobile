@@ -176,6 +176,15 @@
             <ion-icon slot="icon-only" name="add-outline" />
           </ion-button>
         </div>
+        @if (ratioInUsd() !== null) {
+          <ion-note class="ratio__usd">
+            @if (isLoadingCapital()) {
+              <ion-spinner name="dots" />
+            } @else {
+              ≈ {{ ratioInUsd() | currency: 'USD' : 'symbol' : '1.0-0' }}
+            }
+          </ion-note>
+        }
       </ion-label>
       <ion-item>
         <ion-range

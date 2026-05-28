@@ -1,4 +1,4 @@
-import { TitleCasePipe } from '@angular/common';
+import { CurrencyPipe, TitleCasePipe } from '@angular/common';
 import {
   Component,
   computed,
@@ -50,6 +50,7 @@ import {
   TradingStrategy,
 } from '@models/user.interface';
 import { BotService } from '@services/bot.service';
+import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
 import { MarketPickerModalComponent } from '@shared/components/market-picker-modal/market-picker-modal.component';
 import { addIcons } from 'ionicons';
 import {
@@ -60,6 +61,7 @@ import {
   closeOutline,
   removeOutline,
 } from 'ionicons/icons';
+import { combineLatest, debounceTime, map, Observable, of, tap } from 'rxjs';
 
 interface TradingPairForm {
   exchangeKey: FormControl<string>;
@@ -82,6 +84,7 @@ export interface TradingPairModalResult {
   imports: [
     ReactiveFormsModule,
     TitleCasePipe,
+    CurrencyPipe,
     IonHeader,
     IonToolbar,
     IonTitle,
@@ -109,6 +112,7 @@ export class TradingPairModalComponent implements OnInit {
   private readonly botService = inject(BotService);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly hlInfo = inject(HyperliquidInfoService);
 
   // ------------------------------------------------------------------
   //  Inputs
@@ -239,6 +243,73 @@ export class TradingPairModalComponent implements OnInit {
   }
 
   // ------------------------------------------------------------------
+  //  Available Capital
+  // ------------------------------------------------------------------
+
+  private readonly capitalCache = new Map<string, number>();
+
+  private getAvailableCapital(dex: string, pairName: string): Observable<number> {
+    const isSpot = pairName.includes('/');
+    const cacheKey = `${dex || 'hl'}:${isSpot ? 'spot' : 'perp'}`;
+
+    const cached = this.capitalCache.get(cacheKey);
+    if (cached !== undefined) return of(cached);
+
+    const request$ = isSpot
+      ? this.hlInfo.getTokenBalances().pipe(
+          map((balances) => {
+            const usdc = balances.find((b) => b.coin === 'USDC');
+            return usdc ? parseFloat(usdc.total) : 0;
+          }),
+        )
+      : this.hlInfo
+          .getClearinghouseState(dex)
+          .pipe(map((state) => parseFloat(state.marginSummary.accountValue)));
+
+    return request$.pipe(tap((capital) => this.capitalCache.set(cacheKey, capital)));
+  }
+
+  availableCapital = signal<number | null>(null);
+  isLoadingCapital = signal(false);
+
+  private extractDex(pairName: string): string {
+    const parts = pairName.split(':');
+    return parts.length > 1 ? parts[0] : '';
+  }
+
+  private loadCapital(exchangeKey: string, pairName: string): void {
+    if (!pairName) {
+      this.availableCapital.set(null);
+      return;
+    }
+
+    if (exchangeKey === 'hyperliquid') {
+      const dex = this.extractDex(pairName);
+
+      this.isLoadingCapital.set(true);
+      this.getAvailableCapital(dex, pairName)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (capital) => this.availableCapital.set(capital),
+          error: () => {
+            this.availableCapital.set(null);
+            this.isLoadingCapital.set(false);
+          },
+          complete: () => this.isLoadingCapital.set(false),
+        });
+    } else {
+      this.availableCapital.set(null);
+    }
+  }
+
+  readonly ratioInUsd = computed(() => {
+    const capital = this.availableCapital();
+    const ratio = this.formValue().ratio;
+    if (capital === null || !ratio) return null;
+    return (capital * ratio) / 100;
+  });
+
+  // ------------------------------------------------------------------
   //  Dynamic params form builder
   // ------------------------------------------------------------------
 
@@ -320,6 +391,15 @@ export class TradingPairModalComponent implements OnInit {
       });
 
     this.loadMetadata();
+
+    combineLatest([
+      this.form.controls.exchangeKey.valueChanges,
+      this.form.controls.pairName.valueChanges,
+    ])
+      .pipe(debounceTime(200), takeUntilDestroyed(this.destroyRef))
+      .subscribe(([exchangeKey, pairName]) => {
+        this.loadCapital(exchangeKey, pairName);
+      });
   }
 
   // ------------------------------------------------------------------
@@ -327,6 +407,7 @@ export class TradingPairModalComponent implements OnInit {
   // ------------------------------------------------------------------
 
   async openMarketPicker(): Promise<void> {
+    // TODO: Should depend on the selected exchange
     const modal = await this.modalCtrl.create({
       component: MarketPickerModalComponent,
       componentProps: {

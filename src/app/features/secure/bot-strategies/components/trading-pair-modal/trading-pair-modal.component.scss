@@ -47,6 +47,12 @@ ion-item {
   &__range {
     padding-top: 0;
   }
+
+  &__usd {
+    margin-left: auto;
+    font-size: 0.8rem;
+    color: var(--ion-color-medium);
+  }
 }
 
 .exit-behavior {
