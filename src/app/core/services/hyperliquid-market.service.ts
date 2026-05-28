@@ -12,7 +12,6 @@ interface CacheEntry<T> {
 }
 
 interface CacheMap {
-  perp: HLPerpMeta;
   spot: HLSpotMeta;
   hip3: HLPerpDex[];
 }
@@ -24,11 +23,10 @@ export class HyperliquidMarketService {
   private readonly config = inject(ConfigService);
   private readonly http = inject(HttpClient);
 
-  private cache: CacheStore = {
-    perp: null,
-    spot: null,
-    hip3: null,
-  };
+  private cache: CacheStore = { spot: null, hip3: null };
+
+  // Cache perp unifié par dex ('' = dex natif HL)
+  private perpCache = new Map<string, CacheEntry<HLPerpMeta>>();
 
   private post<T>(body: object): Observable<T> {
     return this.http.post<T>(`${this.config.hyperliquidPublicUrl}/info`, body);
@@ -38,16 +36,11 @@ export class HyperliquidMarketService {
   //  Perp
   // ------------------------------------------------------------------ //
 
-  getPerpMeta(): Observable<HLPerpMeta> {
-    const cached = this.getCache('perp');
-    if (cached) return of(cached);
-    return this.post<HLPerpMeta>({ type: 'meta' }).pipe(tap((data) => this.setCache('perp', data)));
-  }
-
-  /** Returns only active (non-delisted) perp names, e.g. ["BTC", "ETH", …] */
-  getPerpNames(): Observable<string[]> {
-    return this.getPerpMeta().pipe(
-      map((meta) => meta.universe.filter((m) => !m.isDelisted).map((m) => m.name)),
+  getPerpMeta(dex = ''): Observable<HLPerpMeta> {
+    const entry = this.perpCache.get(dex);
+    if (entry && Date.now() < entry.expiresAt) return of(entry.data);
+    return this.post<HLPerpMeta>({ type: 'meta', ...(dex && { dex }) }).pipe(
+      tap((data) => this.perpCache.set(dex, { data, expiresAt: Date.now() + CACHE_DURATION_MS })),
     );
   }
 
@@ -118,10 +111,11 @@ export class HyperliquidMarketService {
     return entry && Date.now() < entry.expiresAt ? entry.data : null;
   }
 
-  clearCache(target: keyof CacheMap | 'all' = 'all'): void {
+  clearCache(target: keyof CacheMap | 'perp' | 'all' = 'all'): void {
+    if (target === 'all' || target === 'perp') this.perpCache.clear();
     if (target === 'all') {
       (Object.keys(this.cache) as (keyof CacheMap)[]).forEach((k) => (this.cache[k] = null));
-    } else {
+    } else if (target !== 'perp') {
       this.cache[target] = null;
     }
   }

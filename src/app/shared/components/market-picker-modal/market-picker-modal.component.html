@@ -70,16 +70,21 @@
     </div>
   } @else {
     <ion-list>
-      @for (name of filteredMarkets(); track name) {
+      @for (entry of filteredMarkets(); track entry.name) {
         <ion-item
           button
           [detail]="false"
-          (click)="select(name)"
-          [class.selected]="name === initialValue()"
+          (click)="!entry.isDelisted && select(entry.name)"
+          [disabled]="entry.isDelisted"
         >
-          <ion-label>{{ name }}</ion-label>
-          @if (name === initialValue()) {
-            <ion-icon name="checkmark-outline" slot="end" color="primary" />
+          <ion-label [color]="entry.isDelisted ? 'medium' : ''">
+            {{ entry.name }}
+          </ion-label>
+          @if (entry.isDelisted) {
+            <ion-badge slot="end" color="medium">delisted</ion-badge>
+          }
+          @if (entry.name === initialValue()) {
+            <ion-icon slot="end" name="checkmark-circle" color="primary" />
           }
         </ion-item>
       }

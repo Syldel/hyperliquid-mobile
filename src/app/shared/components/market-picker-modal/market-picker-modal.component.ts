@@ -1,6 +1,7 @@
 import { Component, computed, inject, input, OnInit, signal } from '@angular/core';
 import { ModalController } from '@ionic/angular';
 import {
+  IonBadge,
   IonButton,
   IonButtons,
   IonContent,
@@ -19,11 +20,16 @@ import {
   IonToolbar,
 } from '@ionic/angular/standalone';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
-import { HLPerpDex } from '@syldel/hl-shared-types';
+import { HLPerpDex, HLPerpMeta } from '@syldel/hl-shared-types';
 import { addIcons } from 'ionicons';
-import { closeOutline } from 'ionicons/icons';
+import { closeOutline, searchOutline } from 'ionicons/icons';
 
 export type MarketType = 'perp' | 'spot' | 'hip3';
+
+interface MarketEntry {
+  name: string;
+  isDelisted: boolean;
+}
 
 @Component({
   selector: 'app-market-picker-modal',
@@ -45,6 +51,7 @@ export type MarketType = 'perp' | 'spot' | 'hip3';
     IonSearchbar,
     IonSpinner,
     IonNote,
+    IonBadge,
   ],
   providers: [ModalController],
   templateUrl: './market-picker-modal.component.html',
@@ -67,32 +74,44 @@ export class MarketPickerModalComponent implements OnInit {
   searchQuery = signal('');
   isLoadingMarkets = signal(false);
   selectedDex = signal<string>('');
+  isLoadingDexMeta = signal(false);
 
-  private perpNames = signal<string[]>([]);
+  private perpMeta = signal<HLPerpMeta | null>(null);
   private spotNames = signal<string[]>([]);
   private perpDexs = signal<HLPerpDex[]>([]);
+  private dexMeta = signal<HLPerpMeta | null>(null);
 
   readonly dexNames = computed(() => this.perpDexs().map((d) => d.name));
 
-  readonly filteredMarkets = computed(() => {
-    let list: string[];
+  readonly filteredMarkets = computed((): MarketEntry[] => {
+    let assets: string[];
+    let delistedSet = new Set<string>();
+
     if (this.marketType() === 'perp') {
-      list = this.perpNames();
+      const meta = this.perpMeta();
+      assets = meta?.universe.map((u) => u.name) ?? [];
+      delistedSet = new Set(meta?.universe.filter((u) => u.isDelisted).map((u) => u.name) ?? []);
     } else if (this.marketType() === 'spot') {
-      list = this.spotNames();
+      assets = this.spotNames();
     } else {
+      // HIP-3
       const dex = this.perpDexs().find((d) => d.name === this.selectedDex());
-      list = dex ? dex.assetToStreamingOiCap.map(([asset]) => asset) : [];
+      assets = dex ? dex.assetToStreamingOiCap.map(([asset]) => asset) : [];
+      const meta = this.dexMeta();
+      delistedSet = new Set(meta?.universe.filter((u) => u.isDelisted).map((u) => u.name) ?? []);
     }
+
     const q = this.searchQuery().toLowerCase().trim();
-    return q ? list.filter((n) => n.toLowerCase().includes(q)) : list;
+    const filtered = q ? assets.filter((n) => n.toLowerCase().includes(q)) : assets;
+
+    return filtered.map((name) => ({ name, isDelisted: delistedSet.has(name) }));
   });
 
   // ------------------------------------------------------------------
   //  Lifecycle
   // ------------------------------------------------------------------
   ngOnInit(): void {
-    addIcons({ closeOutline });
+    addIcons({ closeOutline, searchOutline });
 
     this.loadMarkets();
 
@@ -107,7 +126,7 @@ export class MarketPickerModalComponent implements OnInit {
   }
 
   // ------------------------------------------------------------------
-  //  Markets loading — repris de TradingPairModalComponent
+  //  Markets loading
   // ------------------------------------------------------------------
   private loadCount = 0;
 
@@ -115,8 +134,8 @@ export class MarketPickerModalComponent implements OnInit {
     this.isLoadingMarkets.set(true);
     this.loadCount = 0;
 
-    this.marketService.getPerpNames().subscribe({
-      next: (names) => this.perpNames.set(names),
+    this.marketService.getPerpMeta().subscribe({
+      next: (meta) => this.perpMeta.set(meta),
       complete: () => this.checkLoadingDone(),
     });
 
@@ -129,8 +148,11 @@ export class MarketPickerModalComponent implements OnInit {
       next: (dexs) => {
         const activeDexs = dexs.filter((d) => d.assetToStreamingOiCap.length > 0);
         this.perpDexs.set(activeDexs);
-        if (activeDexs.length > 0 && !this.selectedDex()) {
-          this.selectedDex.set(activeDexs[0].name);
+
+        const firstDex = this.selectedDex() || activeDexs[0]?.name;
+        if (firstDex) {
+          this.selectedDex.set(firstDex);
+          this.loadDexMeta(firstDex);
         }
       },
       complete: () => this.checkLoadingDone(),
@@ -139,6 +161,18 @@ export class MarketPickerModalComponent implements OnInit {
 
   private checkLoadingDone(): void {
     if (++this.loadCount >= 3) this.isLoadingMarkets.set(false);
+  }
+
+  // ------------------------------------------------------------------
+  //  Load Dex Meta
+  // ------------------------------------------------------------------
+  private loadDexMeta(dexName: string): void {
+    this.isLoadingDexMeta.set(true);
+    this.dexMeta.set(null);
+    this.marketService.getPerpMeta(dexName).subscribe({
+      next: (meta) => this.dexMeta.set(meta),
+      complete: () => this.isLoadingDexMeta.set(false),
+    });
   }
 
   // ------------------------------------------------------------------
@@ -156,6 +190,7 @@ export class MarketPickerModalComponent implements OnInit {
     if (!dexName || dexName === this.selectedDex()) return;
     this.selectedDex.set(dexName);
     this.searchQuery.set('');
+    this.loadDexMeta(dexName);
   }
 
   // ------------------------------------------------------------------
