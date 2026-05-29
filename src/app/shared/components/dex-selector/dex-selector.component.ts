@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, output, signal } from '@angular/core';
+import { Component, inject, input, OnInit, output, signal } from '@angular/core';
 import { AuthService } from '@auth/auth.service';
 import {
   IonItem,
@@ -30,6 +30,8 @@ export class DexSelectorComponent implements OnInit {
   availableDexs = signal<HLPerpDex[]>([]);
   selectedDexNames = signal<string[]>([DEFAULT_DEX_NAME]);
   isLoading = signal(true);
+
+  labelStacked = input<boolean>(false);
 
   selectionChanged = output<string[]>();
 

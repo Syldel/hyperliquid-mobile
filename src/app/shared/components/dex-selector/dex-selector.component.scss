@@ -1,13 +1,12 @@
 .dex-selector {
   &__skeleton {
-    --background: transparent;
-    --padding-start: 16px;
+    --border-width: 0;
+    --inner-border-width: 0;
   }
 
   &__item {
-    --background: transparent;
-    --padding-start: 16px;
-    --inner-padding-end: 16px;
+    --border-width: 0;
+    --inner-border-width: 0;
   }
 
   &__select {

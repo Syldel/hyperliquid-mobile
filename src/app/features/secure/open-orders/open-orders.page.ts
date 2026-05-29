@@ -1,6 +1,13 @@
 import { DatePipe } from '@angular/common';
-import { Component, effect, inject, signal, untracked } from '@angular/core';
-import { IonBadge, IonItem, IonLabel, IonList } from '@ionic/angular/standalone';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import {
+  IonBadge,
+  IonItem,
+  IonLabel,
+  IonList,
+  IonSelect,
+  IonSelectOption,
+} from '@ionic/angular/standalone';
 import { AppLifecycleService } from '@services/app-lifecycle.service';
 import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
@@ -20,6 +27,8 @@ import { forkJoin, map, Observable, of } from 'rxjs';
     IonLabel,
     IonBadge,
     DatePipe,
+    IonSelect,
+    IonSelectOption,
   ],
   templateUrl: './open-orders.page.html',
   styleUrls: ['./open-orders.page.scss'],
@@ -30,8 +39,24 @@ export class OpenOrdersPage extends MenuBasePage {
 
   openOrders = signal<HLFrontendOpenOrder[]>([]);
   selectedDexNames = signal<string[] | null>(null);
+  coinFilter = signal<string>('');
 
   fetchFn = signal(this.buildFetchFn());
+
+  availableCoins = computed(() => [...new Set(this.openOrders().map((o) => o.coin))].sort());
+
+  coinCounts = computed(() => {
+    const map = new Map<string, number>();
+    for (const o of this.openOrders()) {
+      map.set(o.coin, (map.get(o.coin) ?? 0) + 1);
+    }
+    return map;
+  });
+
+  filteredOrders = computed(() => {
+    const coin = this.coinFilter();
+    return coin ? this.openOrders().filter((o) => o.coin === coin) : this.openOrders();
+  });
 
   constructor() {
     super();
@@ -58,6 +83,7 @@ export class OpenOrdersPage extends MenuBasePage {
 
   onSelectionChanged(dexNames: string[]) {
     this.selectedDexNames.set(dexNames);
+    this.coinFilter.set('');
     this.fetchFn.set(this.buildFetchFn());
   }
 

@@ -4,9 +4,33 @@
   emptyMessage="No open order found"
   (dataLoaded)="openOrders.set($event)"
 >
-  <app-dex-selector filters (selectionChanged)="onSelectionChanged($event)" />
+  <div filters class="order-filters">
+    <ion-item class="order-filters__coin" lines="none">
+      <ion-label position="stacked">Asset</ion-label>
+      <ion-select
+        placeholder="All"
+        [value]="coinFilter()"
+        (ionChange)="coinFilter.set($event.detail.value)"
+        interface="popover"
+      >
+        <ion-select-option value="">All ({{ openOrders().length }})</ion-select-option>
+        @for (coin of availableCoins(); track coin) {
+        <ion-select-option [value]="coin">
+          {{ coin }} ({{ coinCounts().get(coin) }})
+        </ion-select-option>
+        }
+      </ion-select>
+    </ion-item>
+
+    <app-dex-selector
+      class="order-filters__dex"
+      [labelStacked]="true"
+      (selectionChanged)="onSelectionChanged($event)"
+    />
+  </div>
+
   <ion-list>
-    @for (openOrder of openOrders(); track openOrder.oid) {
+    @for (openOrder of filteredOrders(); track openOrder.oid) {
     <ion-item (click)="openWatchlist($event, openOrder.coin)">
       <ion-label>
         <div class="order-header">
