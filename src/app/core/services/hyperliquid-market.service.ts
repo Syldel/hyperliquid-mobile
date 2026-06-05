@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { ConfigService } from '@services/config.service';
 import { HLPerpDex, HLPerpDexsResponse, HLPerpMeta, HLSpotMeta } from '@syldel/hl-shared-types';
-import { map, Observable, of, tap } from 'rxjs';
+import { map, Observable, of, switchMap, tap } from 'rxjs';
 
 const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24h
 
@@ -118,5 +118,63 @@ export class HyperliquidMarketService {
     } else if (target !== 'perp') {
       this.cache[target] = null;
     }
+  }
+
+  // ------------------------------------------------------------------ //
+  //  Asset Index
+  // ------------------------------------------------------------------ //
+
+  getAssetIndex(coin: string): Observable<number> {
+    // ── Spot : "TOKEN/USDC" ──────────────────────────────────────────────
+    if (coin.includes('/')) {
+      return this.getSpotMeta().pipe(
+        map((meta) => {
+          const idx = meta.universe.findIndex((pair) => pair.name === coin);
+          if (idx === -1) throw new Error(`Spot asset not found for coin: ${coin}`);
+          // asset = 10000 + spotInfo["index"]
+          return 10000 + meta.universe[idx].index;
+        }),
+      );
+    }
+
+    // ── HIP-3 / builder-deployed perp : "dex:COIN" ──────────────────────
+    if (coin.includes(':')) {
+      const dex = this.extractDex(coin); // "vntl", "test", etc.
+      return this.getPerpDexs().pipe(
+        switchMap((dexs) => {
+          const perpDexIndex = dexs.findIndex((d) => d.name === dex);
+          if (perpDexIndex === -1) throw new Error(`PerpDex not found for dex: ${dex}`);
+          return this.getPerpMeta(dex).pipe(
+            map((meta) => {
+              const indexInMeta = meta.universe.findIndex((a) => a.name === coin);
+              if (indexInMeta === -1)
+                throw new Error(`Asset not found in perpDex meta for coin: ${coin}`);
+              // asset = 100000 + perp_dex_index * 10000 + index_in_meta
+              return 100000 + perpDexIndex * 10000 + indexInMeta;
+            }),
+          );
+        }),
+      );
+    }
+
+    // ── Perp natif HL : "BTC", "ETH", etc. ──────────────────────────────
+    const entry = this.perpCache.get('');
+    const universe = entry?.data?.universe;
+    if (universe) {
+      const idx = universe.findIndex((a) => a.name === coin);
+      if (idx !== -1) return of(idx);
+    }
+    return this.getPerpMeta('').pipe(
+      map((meta) => {
+        const idx = meta.universe.findIndex((a) => a.name === coin);
+        if (idx === -1) throw new Error(`Perp asset not found for coin: ${coin}`);
+        return idx;
+      }),
+    );
+  }
+
+  private extractDex(pairName: string): string {
+    const parts = pairName.split(':');
+    return parts.length > 1 ? parts[0] : '';
   }
 }

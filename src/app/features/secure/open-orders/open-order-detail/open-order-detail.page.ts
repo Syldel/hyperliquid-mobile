@@ -1,0 +1,122 @@
+import { DatePipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
+import {
+  AlertController,
+  IonBadge,
+  IonButton,
+  IonIcon,
+  IonItem,
+  IonLabel,
+  IonNote,
+} from '@ionic/angular/standalone';
+import { HyperliquidGatewayService } from '@services/hyperliquid-gateway.service';
+import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
+import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
+import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
+import { HLFrontendOpenOrder } from '@syldel/hl-shared-types';
+import { addIcons } from 'ionicons';
+import { trashOutline } from 'ionicons/icons';
+import { of, switchMap } from 'rxjs';
+
+@Component({
+  selector: 'app-open-order-detail',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    RefreshableLayoutComponent,
+    IonButton,
+    IonIcon,
+    IonItem,
+    IonLabel,
+    IonNote,
+    IonBadge,
+    DatePipe,
+  ],
+  templateUrl: './open-order-detail.page.html',
+  styleUrls: ['./open-order-detail.page.scss'],
+})
+export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
+  private readonly route = inject(ActivatedRoute);
+  private readonly hlGateway = inject(HyperliquidGatewayService);
+  private readonly market = inject(HyperliquidMarketService);
+  private readonly alertCtrl = inject(AlertController);
+
+  oid = signal<number | null>(null);
+  coin = signal<string>('');
+  order = signal<HLFrontendOpenOrder | null>(null);
+  cancelling = signal(false);
+
+  fetchFn = signal(this.buildFetchFn());
+
+  constructor() {
+    super();
+    addIcons({ trashOutline });
+  }
+
+  ngOnInit(): void {
+    const params = this.route.snapshot.queryParamMap;
+    const oid = Number(params.get('oid'));
+    const coin = params.get('coin') ?? '';
+    this.oid.set(oid);
+    this.coin.set(coin);
+
+    const stateOrder = history.state?.order as HLFrontendOpenOrder | undefined;
+    if (stateOrder) this.order.set(stateOrder);
+
+    this.fetchFn.set(this.buildFetchFn());
+  }
+
+  private buildFetchFn() {
+    const oid = this.oid();
+    if (!oid) return () => of(null);
+    return () => this.hlGateway.getOrderStatus(oid);
+  }
+
+  onDataLoaded(data: HLFrontendOpenOrder | null): void {
+    if (data) this.order.set(data);
+  }
+
+  async confirmCancel(): Promise<void> {
+    const alert = await this.alertCtrl.create({
+      header: 'Cancel order',
+      message: `Cancel ${this.order()?.side === 'B' ? 'Buy' : 'Sell'} order on ${this.coin()} ?`,
+      buttons: [
+        { text: 'Back', role: 'cancel' },
+        {
+          text: 'Confirm',
+          role: 'destructive',
+          handler: () => this.doCancel(),
+        },
+      ],
+    });
+    await alert.present();
+  }
+
+  private doCancel(): void {
+    const oid = this.oid();
+    const coin = this.coin();
+    if (!oid || !coin) return;
+
+    this.cancelling.set(true);
+    this.market
+      .getAssetIndex(coin)
+      .pipe(switchMap((asset) => this.hlGateway.cancelOrder([{ asset, oid }])))
+      .subscribe({
+        next: (res) => {
+          this.cancelling.set(false);
+          const status = res.data.statuses[0];
+          if (status === 'success') {
+            this.router.navigate(['/secure/open-orders'], {
+              queryParams: { coin: this.coin() },
+            });
+          } else {
+            console.error('Cancel failed:', status.error);
+          }
+        },
+        error: () => {
+          this.cancelling.set(false);
+        },
+      });
+  }
+}

@@ -24,7 +24,7 @@ import {
   HLUserFill,
 } from '@syldel/hl-shared-types';
 import { addIcons } from 'ionicons';
-import { calendarOutline, refreshOutline } from 'ionicons/icons';
+import { calendarOutline, receiptOutline, refreshOutline } from 'ionicons/icons';
 import {
   CandlestickSeries,
   ColorType,
@@ -74,6 +74,8 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   selectedInterval = signal<CandleInterval>('1h');
   selectedPreset = signal<DatePreset>(DATE_PRESETS[1]);
 
+  readonly coinSnapshot = this.hlCache.coinSnapshot;
+
   readonly presets = DATE_PRESETS;
   readonly intervals = CANDLE_INTERVALS;
   readonly intervalLabels = INTERVAL_LABELS;
@@ -100,7 +102,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   private readonly COLOR_TPSL = '#f4a261';
 
   constructor() {
-    addIcons({ calendarOutline, refreshOutline });
+    addIcons({ calendarOutline, refreshOutline, receiptOutline });
 
     const state = window.history.state as { backHref?: string };
     if (state?.backHref) this.backHref.set(state.backHref);
@@ -533,5 +535,11 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
 
   get changeSign(): string {
     return this.priceChange() >= 0 ? '+' : '';
+  }
+
+  navigateToOpenOrders(): void {
+    this.router.navigate(['/secure/open-orders'], {
+      queryParams: { coin: this.item()?.coin },
+    });
   }
 }

@@ -35,8 +35,21 @@ export const SECURE_ROUTES: Routes = [
       },
       {
         path: 'open-orders',
-        loadComponent: () => import('./open-orders/open-orders.page').then((m) => m.OpenOrdersPage),
-        title: 'Open Orders',
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./open-orders/open-orders.page').then((m) => m.OpenOrdersPage),
+            title: 'Open Orders',
+          },
+          {
+            path: 'detail',
+            loadComponent: () =>
+              import('./open-orders/open-order-detail/open-order-detail.page').then(
+                (m) => m.OpenOrderDetailPage,
+              ),
+          },
+        ],
       },
       {
         path: 'perp-summary',

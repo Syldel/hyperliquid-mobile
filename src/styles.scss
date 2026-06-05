@@ -42,3 +42,7 @@ ion-badge {
 a[href*='tradingview.com'] {
   display: none !important;
 }
+
+.canvas-pointer-events-none canvas {
+  pointer-events: none;
+}

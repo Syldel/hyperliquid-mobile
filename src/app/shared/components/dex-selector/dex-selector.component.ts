@@ -32,6 +32,7 @@ export class DexSelectorComponent implements OnInit {
   isLoading = signal(true);
 
   labelStacked = input<boolean>(false);
+  forcedDex = input<string | null>(null);
 
   selectionChanged = output<string[]>();
 
@@ -48,6 +49,16 @@ export class DexSelectorComponent implements OnInit {
 
   private async restoreSelection() {
     const address = this.auth.currentAddress();
+    const forced = this.forcedDex();
+
+    // forcedDex prioritaire : on l'émet sans toucher au storage
+    if (forced !== null) {
+      const selection = forced === '' ? [DEFAULT_DEX_NAME] : [forced];
+      this.selectedDexNames.set(selection);
+      this.selectionChanged.emit(this.toApiDexNames(selection));
+      return;
+    }
+
     if (!address) return;
 
     try {
@@ -77,13 +88,14 @@ export class DexSelectorComponent implements OnInit {
     if (!address) return;
 
     const updated: string[] = event.detail.value ?? [DEFAULT_DEX_NAME];
-
     this.selectedDexNames.set(updated);
 
-    const all = (await this.storage.get<DexSelectionStorage>(this.STORAGE_KEY)) ?? {};
-    all[address] = updated;
-
-    await this.storage.set(this.STORAGE_KEY, all);
+    // On ne touche au storage que si pas de forcedDex
+    if (this.forcedDex() === null) {
+      const all = (await this.storage.get<DexSelectionStorage>(this.STORAGE_KEY)) ?? {};
+      all[address] = updated;
+      await this.storage.set(this.STORAGE_KEY, all);
+    }
 
     this.selectionChanged.emit(this.toApiDexNames(updated));
   }

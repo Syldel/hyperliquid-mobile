@@ -1,0 +1,81 @@
+<app-refreshable-layout
+  [title]="coin() || 'Order'"
+  [fetchFn]="fetchFn()"
+  [requiresAuth]="true"
+  [pageHeaderParams]="{
+    startButton: 'back',
+    defaultHref: '/secure/open-orders?coin=' + coin()
+  }"
+  (dataLoaded)="onDataLoaded($event)"
+>
+  <ng-template #endButtons>
+    <ion-button
+      (click)="confirmCancel()"
+      [disabled]="cancelling() || !authService.isLoggedIn()"
+      color="danger"
+    >
+      <ion-icon slot="icon-only" name="trash-outline" />
+    </ion-button>
+  </ng-template>
+
+  @if (order(); as o) {
+  <ion-item lines="full">
+    <ion-label>Side</ion-label>
+    <ion-badge slot="end" [color]="o.side === 'B' ? 'success' : 'danger'">
+      {{ o.side === 'B' ? 'Buy' : 'Sell' }}
+    </ion-badge>
+  </ion-item>
+
+  <ion-item lines="full">
+    <ion-label>Type</ion-label>
+    <ion-note slot="end">{{ o.orderType }}</ion-note>
+  </ion-item>
+
+  <ion-item lines="full">
+    <ion-label>TIF</ion-label>
+    <ion-note slot="end">{{ o.tif }}</ion-note>
+  </ion-item>
+
+  <ion-item lines="full">
+    <ion-label>Limit price</ion-label>
+    <ion-note slot="end">{{ o.limitPx }}</ion-note>
+  </ion-item>
+
+  <ion-item lines="full">
+    <ion-label>Size</ion-label>
+    <ion-note slot="end">{{ o.sz }} / {{ o.origSz }}</ion-note>
+  </ion-item>
+
+  @if (o.isTrigger) {
+  <ion-item lines="full">
+    <ion-label>Trigger</ion-label>
+    <ion-note slot="end">{{ o.triggerCondition }} @ {{ o.triggerPx }}</ion-note>
+  </ion-item>
+  }
+
+  <ion-item lines="full">
+    <ion-label>Date</ion-label>
+    <ion-note slot="end">{{ o.timestamp | date:'dd/MM/yy HH:mm:ss' }}</ion-note>
+  </ion-item>
+
+  <ion-item lines="full">
+    <ion-label>OID</ion-label>
+    <ion-note slot="end">{{ o.oid }}</ion-note>
+  </ion-item>
+
+  @if (o.cloid) {
+  <ion-item lines="full">
+    <ion-label>CLOID</ion-label>
+    <ion-note slot="end" class="cloid">{{ o.cloid }}</ion-note>
+  </ion-item>
+  }
+
+  <div class="detail-badges">
+    @if (o.reduceOnly) {
+    <ion-badge color="warning">Reduce Only</ion-badge>
+    } @if (o.isPositionTpsl) {
+    <ion-badge color="primary">TP/SL</ion-badge>
+    }
+  </div>
+  }
+</app-refreshable-layout>

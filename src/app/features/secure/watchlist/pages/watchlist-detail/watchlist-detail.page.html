@@ -66,4 +66,14 @@
     </div>
     }
   </div>
+
+  <ion-button
+    fill="outline"
+    expand="block"
+    class="ion-margin-horizontal"
+    (click)="navigateToOpenOrders()"
+  >
+    <ion-icon slot="start" name="receipt-outline" />
+    Open Orders ({{ (coinSnapshot()?.openOrders || []).length }})
+  </ion-button>
 </app-refreshable-layout>

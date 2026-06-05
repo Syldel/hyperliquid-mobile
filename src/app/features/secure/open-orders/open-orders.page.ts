@@ -1,8 +1,14 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, computed, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute } from '@angular/router';
 import {
   IonBadge,
+  IonIcon,
   IonItem,
+  IonItemOption,
+  IonItemOptions,
+  IonItemSliding,
   IonLabel,
   IonList,
   IonSelect,
@@ -14,6 +20,8 @@ import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { DexSelectorComponent } from '@shared/components/dex-selector/dex-selector.component';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import { HLFrontendOpenOrder } from '@syldel/hl-shared-types';
+import { addIcons } from 'ionicons';
+import { createOutline } from 'ionicons/icons';
 import { forkJoin, map, Observable, of } from 'rxjs';
 
 @Component({
@@ -29,6 +37,10 @@ import { forkJoin, map, Observable, of } from 'rxjs';
     DatePipe,
     IonSelect,
     IonSelectOption,
+    IonIcon,
+    IonItemSliding,
+    IonItemOptions,
+    IonItemOption,
   ],
   templateUrl: './open-orders.page.html',
   styleUrls: ['./open-orders.page.scss'],
@@ -36,6 +48,8 @@ import { forkJoin, map, Observable, of } from 'rxjs';
 export class OpenOrdersPage extends MenuBasePage {
   private readonly hlInfo = inject(HyperliquidInfoService);
   private readonly lifecycle = inject(AppLifecycleService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
 
   openOrders = signal<HLFrontendOpenOrder[]>([]);
   selectedDexNames = signal<string[] | null>(null);
@@ -58,14 +72,43 @@ export class OpenOrdersPage extends MenuBasePage {
     return coin ? this.openOrders().filter((o) => o.coin === coin) : this.openOrders();
   });
 
+  forcedDex = signal<string | null>(null);
+
   constructor() {
     super();
+    addIcons({ createOutline });
     effect(() => {
       this.lifecycle.foregroundCount();
       untracked(() => {
         this.fetchFn.set(this.buildFetchFn());
       });
     });
+  }
+
+  ngOnInit(): void {
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const raw = params.get('coin');
+      if (raw) {
+        const coin = this.normalizeCoin(raw);
+        this.coinFilter.set(coin);
+        this.forcedDex.set(this.extractDex(coin));
+      } else {
+        this.forcedDex.set(null);
+      }
+    });
+  }
+
+  private normalizeCoin(coin: string): string {
+    const parts = coin.split(':');
+    if (parts.length === 2) {
+      return `${parts[0]}:${parts[1].toUpperCase()}`;
+    }
+    return coin.toUpperCase();
+  }
+
+  private extractDex(coin: string): string {
+    const parts = coin.split(':');
+    return parts.length > 1 ? parts[0] : '';
   }
 
   private buildFetchFn() {
@@ -83,8 +126,17 @@ export class OpenOrdersPage extends MenuBasePage {
 
   onSelectionChanged(dexNames: string[]) {
     this.selectedDexNames.set(dexNames);
-    this.coinFilter.set('');
+    if (this.forcedDex() === null) {
+      this.coinFilter.set('');
+    }
     this.fetchFn.set(this.buildFetchFn());
+  }
+
+  openOrderDetail(order: HLFrontendOpenOrder): void {
+    this.router.navigate(['/secure/open-orders/detail'], {
+      queryParams: { oid: order.oid, coin: order.coin },
+      state: { order },
+    });
   }
 
   openWatchlist(event: Event, coin: string): void {
