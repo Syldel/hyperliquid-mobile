@@ -16,6 +16,7 @@ import { IonButton, IonChip, IonIcon, IonSkeletonText } from '@ionic/angular/sta
 import { AppLifecycleService } from '@services/app-lifecycle.service';
 import { HyperliquidCacheService } from '@services/hyperliquid-cache.service';
 import { HyperliquidCandleService } from '@services/hyperliquid-candle.service';
+import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import {
   CandleInterval,
@@ -55,6 +56,7 @@ import {
 export class WatchlistDetailPage implements OnInit, OnDestroy {
   private readonly hlCandle = inject(HyperliquidCandleService);
   private readonly hlCache = inject(HyperliquidCacheService);
+  private readonly hlMarket = inject(HyperliquidMarketService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly lifecycle = inject(AppLifecycleService);
@@ -73,6 +75,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   backHref = signal('/secure/watchlist');
   selectedInterval = signal<CandleInterval>('1h');
   selectedPreset = signal<DatePreset>(DATE_PRESETS[1]);
+  coinTitle = signal<string>('—');
 
   readonly coinSnapshot = this.hlCache.coinSnapshot;
 
@@ -152,6 +155,8 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     this.hlCache.reloadAll();
 
     this.fetchFn.set(this.buildFetchFn());
+
+    this.hlMarket.resolveCoin(coin).subscribe((name) => this.coinTitle.set(name));
   }
 
   ngOnDestroy(): void {

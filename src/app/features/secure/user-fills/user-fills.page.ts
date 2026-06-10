@@ -15,6 +15,7 @@ import {
 } from '@ionic/angular/standalone';
 import { AppLifecycleService } from '@services/app-lifecycle.service';
 import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
+import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import { HLUserFill } from '@syldel/hl-shared-types';
@@ -43,6 +44,7 @@ import { interval, Observable } from 'rxjs';
 })
 export class UserFillsPage extends MenuBasePage {
   private readonly hlInfo = inject(HyperliquidInfoService);
+  private readonly hlMarket = inject(HyperliquidMarketService);
   private readonly lifecycle = inject(AppLifecycleService);
 
   fills = signal<HLUserFill[]>([]);
@@ -110,12 +112,26 @@ export class UserFillsPage extends MenuBasePage {
     return () => this.hlInfo.getUserFillsByTime({ startTime, endTime }) as Observable<HLUserFill[]>;
   }
 
+  onDataLoaded(fills: HLUserFill[]): void {
+    this.fills.set(fills);
+
+    const coins = fills.map((f) => f.coin);
+    this.hlMarket.resolveCoins(coins).subscribe(() => {
+      // force le re-render via un signal
+      this.fills.set([...this.fills()]);
+    });
+  }
+
   private toLocalISO(date: Date): string {
     return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 19);
   }
 
   private daysAgo(days: number): Date {
     return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  }
+
+  displayCoin(coin: string): string {
+    return this.hlMarket.displayCoin(coin);
   }
 
   isOpen(fill: HLUserFill): boolean {

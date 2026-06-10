@@ -1,5 +1,5 @@
 <app-refreshable-layout
-  [title]="item()?.coin ?? '—'"
+  [title]="coinTitle()"
   [fetchFn]="fetchFn()"
   [pageHeaderParams]="{ startButton: 'back', defaultHref: backHref() }"
 >

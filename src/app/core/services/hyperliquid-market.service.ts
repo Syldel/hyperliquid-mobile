@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { ConfigService } from '@services/config.service';
 import { HLPerpDex, HLPerpDexsResponse, HLPerpMeta, HLSpotMeta } from '@syldel/hl-shared-types';
-import { map, Observable, of, switchMap, tap } from 'rxjs';
+import { forkJoin, map, Observable, of, switchMap, tap } from 'rxjs';
 
 const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24h
 
@@ -56,25 +56,65 @@ export class HyperliquidMarketService {
     );
   }
 
+  private buildSpotNameMap(meta: HLSpotMeta): Map<string, string> {
+    // Clé = name de l'entrée universe (ex: "@230", "PURR/USDC")
+    // Valeur = nom lisible résolu
+    const tokensByIndex: Record<number, string> = {};
+    meta.tokens.forEach((t) => (tokensByIndex[t.index] = t.name));
+
+    const nameMap = new Map<string, string>();
+    meta.universe.forEach((pair) => {
+      const resolved = pair.isCanonical
+        ? pair.name
+        : pair.tokens.map((idx) => tokensByIndex[idx]).join('/');
+      nameMap.set(pair.name, resolved); // "@230" → "DHYPE/USDH"
+    });
+
+    return nameMap;
+  }
+
   getSpotNames(): Observable<string[]> {
     return this.getSpotMeta().pipe(
       map((meta) => {
-        const tokensByIndex: Record<number, string> = {};
-        meta.tokens.forEach((t) => {
-          tokensByIndex[t.index] = t.name;
-        });
-
-        return meta.universe
-          .filter((pair) => !pair.name.startsWith('@') || !pair.isCanonical)
-          .map((pair) => {
-            if (pair.isCanonical) {
-              return pair.name;
-            } else {
-              return pair.tokens.map((idx) => tokensByIndex[idx]).join('/');
-            }
-          });
+        const nameMap = this.buildSpotNameMap(meta);
+        return meta.universe.map((pair) => nameMap.get(pair.name) ?? pair.name);
       }),
     );
+  }
+
+  /** Résout un coin brut API (@230, PURR/USDC, BTC, vntl:SPACEX…) en nom lisible */
+  resolveCoinName(coin: string): Observable<string> {
+    if (!coin.startsWith('@')) return of(coin);
+    return this.getSpotMeta().pipe(map((meta) => this.buildSpotNameMap(meta).get(coin) ?? coin));
+  }
+
+  private resolvedCoins = new Map<string, string>();
+
+  resolveCoin(coin: string): Observable<string> {
+    const cached = this.resolvedCoins.get(coin);
+    if (cached) return of(cached);
+    return this.resolveCoinName(coin).pipe(tap((name) => this.resolvedCoins.set(coin, name)));
+  }
+
+  resolveCoins(coins: string[]): Observable<Map<string, string>> {
+    const unresolved = [...new Set(coins)].filter((c) => !this.resolvedCoins.has(c));
+
+    if (unresolved.length === 0) return of(new Map(this.resolvedCoins));
+
+    const requests = unresolved.map((coin) =>
+      this.resolveCoinName(coin).pipe(
+        map((name): { coin: string; name: string } => ({ coin, name })),
+      ),
+    );
+
+    return forkJoin(requests).pipe(
+      tap((results) => results.forEach(({ coin, name }) => this.resolvedCoins.set(coin, name))),
+      map(() => new Map(this.resolvedCoins)),
+    );
+  }
+
+  displayCoin(coin: string): string {
+    return this.resolvedCoins.get(coin) ?? coin;
   }
 
   // ------------------------------------------------------------------ //
@@ -129,10 +169,10 @@ export class HyperliquidMarketService {
     if (coin.includes('/')) {
       return this.getSpotMeta().pipe(
         map((meta) => {
-          const idx = meta.universe.findIndex((pair) => pair.name === coin);
-          if (idx === -1) throw new Error(`Spot asset not found for coin: ${coin}`);
-          // asset = 10000 + spotInfo["index"]
-          return 10000 + meta.universe[idx].index;
+          const nameMap = this.buildSpotNameMap(meta);
+          const pair = meta.universe.find((p) => nameMap.get(p.name) === coin);
+          if (!pair) throw new Error(`Spot asset not found for coin: ${coin}`);
+          return 10000 + pair.index;
         }),
       );
     }

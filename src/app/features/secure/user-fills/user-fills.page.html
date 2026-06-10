@@ -2,7 +2,7 @@
   title="Trade History"
   [fetchFn]="fetchFn()"
   emptyMessage="No fills found for this period"
-  (dataLoaded)="fills.set($event)"
+  (dataLoaded)="onDataLoaded($event)"
 >
   <div filters class="date-filters">
     <div class="date-filters__inputs">
@@ -91,7 +91,7 @@
       <ion-label>
         <div class="fill-half" [class]="isOpen(fill) ? 'fill-half--left' : 'fill-half--right'">
           <div class="fill-header">
-            <span class="fill-coin">{{ fill.coin }}</span>
+            <span class="fill-coin">{{ displayCoin(fill.coin) }}</span>
             <ion-badge [color]="fill.side === 'B' ? 'success' : 'danger'">
               {{ fill.side === 'B' ? 'BUY' : 'SELL' }}
             </ion-badge>
