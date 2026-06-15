@@ -41,6 +41,7 @@ export class HistoryPage extends MenuBasePage {
 
   historicalOrders = signal<HLOrderStatusData[]>([]);
   coinFilter = signal<string>('');
+  coinsResolved = signal(false);
 
   fetchFn = signal(this.buildFetchFn());
 
@@ -81,14 +82,14 @@ export class HistoryPage extends MenuBasePage {
 
   onDataLoaded(orders: HLOrderStatusData[]): void {
     this.historicalOrders.set(orders);
+    this.coinsResolved.set(false);
     this.resolveAllCoins(orders);
   }
 
   private resolveAllCoins(orders: HLOrderStatusData[]): void {
     const coins = orders.map((o) => o.order.coin);
     this.hlMarket.resolveCoins(coins).subscribe(() => {
-      // force le re-render via un signal
-      this.historicalOrders.set([...this.historicalOrders()]);
+      this.coinsResolved.set(true);
     });
   }
 
