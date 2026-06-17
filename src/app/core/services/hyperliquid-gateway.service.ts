@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { ConfigService } from '@services/config.service';
-import { HLCancelOrderResponse, HLOid, HLOrderStatusDetails } from '@syldel/hl-shared-types';
+import { HLCancelOrderResponse, HLOid, HLOrderStatusResponse } from '@syldel/hl-shared-types';
 import { Observable } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
@@ -15,8 +15,8 @@ export class HyperliquidGatewayService {
 
   // ── Orders info ────────────────────────────────────────────────────────────
 
-  getOrderStatus(oid: number): Observable<HLOrderStatusDetails> {
-    return this.http.get<HLOrderStatusDetails>(
+  getOrderStatus(oid: number): Observable<HLOrderStatusResponse> {
+    return this.http.get<HLOrderStatusResponse>(
       `${this.config.hyperliquidGatewayUrl}/hyperliquid/orders/open/${oid}`,
     );
   }

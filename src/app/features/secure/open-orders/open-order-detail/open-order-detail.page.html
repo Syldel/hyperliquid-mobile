@@ -31,10 +31,12 @@
     <ion-note slot="end">{{ o.orderType }}</ion-note>
   </ion-item>
 
+  @if (o.tif) {
   <ion-item lines="full">
     <ion-label>TIF</ion-label>
     <ion-note slot="end">{{ o.tif }}</ion-note>
   </ion-item>
+  }
 
   <ion-item lines="full">
     <ion-label>Limit price</ion-label>
@@ -70,12 +72,15 @@
   </ion-item>
   }
 
-  <div class="detail-badges">
-    @if (o.reduceOnly) {
-    <ion-badge color="warning">Reduce Only</ion-badge>
-    } @if (o.isPositionTpsl) {
-    <ion-badge color="primary">TP/SL</ion-badge>
-    }
-  </div>
+  <ion-item lines="none">
+    <ion-label></ion-label>
+    <div slot="end" class="detail-badges">
+      @if (o.reduceOnly) {
+      <ion-badge color="warning">Reduce Only</ion-badge>
+      } @if (o.isPositionTpsl) {
+      <ion-badge color="primary">TP/SL</ion-badge>
+      }
+    </div>
+  </ion-item>
   }
 </app-refreshable-layout>

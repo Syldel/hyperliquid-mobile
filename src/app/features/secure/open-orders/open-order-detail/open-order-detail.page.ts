@@ -14,7 +14,12 @@ import { HyperliquidGatewayService } from '@services/hyperliquid-gateway.service
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
-import { HLFrontendOpenOrder } from '@syldel/hl-shared-types';
+import {
+  HLOrderStatus,
+  HLOrderStatusDetails,
+  HLOrderStatusResponse,
+  Timestamp,
+} from '@syldel/hl-shared-types';
 import { addIcons } from 'ionicons';
 import { trashOutline } from 'ionicons/icons';
 import { of, switchMap } from 'rxjs';
@@ -44,8 +49,10 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
 
   oid = signal<number | null>(null);
   coin = signal<string>('');
-  order = signal<HLFrontendOpenOrder | null>(null);
+  order = signal<HLOrderStatusDetails | null>(null);
   cancelling = signal(false);
+  orderStatus = signal<HLOrderStatus | null>(null);
+  statusTimestamp = signal<Timestamp | null>(null);
 
   fetchFn = signal(this.buildFetchFn());
 
@@ -61,7 +68,7 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
     this.oid.set(oid);
     this.coin.set(coin);
 
-    const stateOrder = history.state?.order as HLFrontendOpenOrder | undefined;
+    const stateOrder = history.state?.order as HLOrderStatusDetails | undefined;
     if (stateOrder) this.order.set(stateOrder);
 
     this.fetchFn.set(this.buildFetchFn());
@@ -73,8 +80,10 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
     return () => this.hlGateway.getOrderStatus(oid);
   }
 
-  onDataLoaded(data: HLFrontendOpenOrder | null): void {
-    if (data) this.order.set(data);
+  onDataLoaded(data: HLOrderStatusResponse | null): void {
+    if (data?.order?.order) this.order.set(data.order.order);
+    if (data?.order?.status) this.orderStatus.set(data.order.status);
+    if (data?.order?.statusTimestamp) this.statusTimestamp.set(data.order.statusTimestamp);
   }
 
   async confirmCancel(): Promise<void> {
