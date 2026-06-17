@@ -92,6 +92,7 @@
   height: 18px;
   width: 80px;
   border-radius: 4px;
+  margin: 0;
 }
 
 .wl-card__chart-wrap {
@@ -110,6 +111,7 @@
   border-radius: 8px;
   position: absolute;
   top: 0;
+  margin: 0;
 }
 
 .wl-card__error {
@@ -144,6 +146,13 @@
     background: rgba(235, 68, 90, 0.15);
     color: #eb445a;
   }
+}
+
+.wl-card__badge-skeleton {
+  height: 20px;
+  width: 70px;
+  border-radius: 6px;
+  margin: 0;
 }
 
 .edit-btn {

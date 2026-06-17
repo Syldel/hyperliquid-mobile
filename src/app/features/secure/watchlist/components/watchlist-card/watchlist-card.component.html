@@ -39,6 +39,9 @@
         {{ changeSign() }}{{ priceChange().toFixed(2) }}%
       </div>
     }
+    @if (loading()) {
+      <ion-skeleton-text animated class="wl-card__badge-skeleton" />
+    }
 
     <button class="edit-btn" (click)="openEditModal($event)" aria-label="Edit">
       <ion-icon name="ellipsis-horizontal-outline" />
