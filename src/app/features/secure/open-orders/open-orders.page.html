@@ -2,7 +2,7 @@
   title="Open Orders"
   [fetchFn]="fetchFn()"
   emptyMessage="No open order found"
-  (dataLoaded)="openOrders.set($event)"
+  (dataLoaded)="onDataLoaded($event)"
 >
   <div filters class="order-filters">
     <ion-item class="order-filters__coin" lines="none">
@@ -12,11 +12,12 @@
         [value]="coinFilter()"
         (ionChange)="coinFilter.set($event.detail.value)"
         interface="popover"
+        [disabled]="!coinsResolved()"
       >
         <ion-select-option value="">All ({{ openOrders().length }})</ion-select-option>
         @for (coin of availableCoins(); track coin) {
         <ion-select-option [value]="coin">
-          {{ coin }} ({{ coinCounts().get(coin) }})
+          {{ displayCoin(coin) }} ({{ coinCounts().get(coin) }})
         </ion-select-option>
         }
       </ion-select>
@@ -36,7 +37,7 @@
       <ion-item (click)="openWatchlist($event, openOrder.coin)">
         <ion-label>
           <div class="order-header">
-            <strong>{{ openOrder.coin }}</strong>
+            <strong>{{ displayCoin(openOrder.coin) }}</strong>
             <ion-badge [color]="openOrder.side === 'B' ? 'success' : 'danger'">
               {{ openOrder.side === 'B' ? 'Buy' : 'Sell' }}
             </ion-badge>

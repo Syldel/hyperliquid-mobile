@@ -46,6 +46,7 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
   private readonly hlGateway = inject(HyperliquidGatewayService);
   private readonly market = inject(HyperliquidMarketService);
   private readonly alertCtrl = inject(AlertController);
+  private readonly hlMarket = inject(HyperliquidMarketService);
 
   oid = signal<number | null>(null);
   coin = signal<string>('');
@@ -53,6 +54,7 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
   cancelling = signal(false);
   orderStatus = signal<HLOrderStatus | null>(null);
   statusTimestamp = signal<Timestamp | null>(null);
+  coinTitle = signal<string>('—');
 
   fetchFn = signal(this.buildFetchFn());
 
@@ -72,6 +74,8 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
     if (stateOrder) this.order.set(stateOrder);
 
     this.fetchFn.set(this.buildFetchFn());
+
+    this.hlMarket.resolveCoin(coin).subscribe((name) => this.coinTitle.set(name));
   }
 
   private buildFetchFn() {

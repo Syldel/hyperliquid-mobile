@@ -49,6 +49,7 @@ export class UserFillsPage extends MenuBasePage {
 
   fills = signal<HLUserFill[]>([]);
   coinFilter = signal<string>('');
+  coinsResolved = signal(false);
 
   filteredFills = computed(() => {
     const coin = this.coinFilter().trim().toUpperCase();
@@ -114,12 +115,19 @@ export class UserFillsPage extends MenuBasePage {
 
   onDataLoaded(fills: HLUserFill[]): void {
     this.fills.set(fills);
+    this.coinsResolved.set(false);
+    this.resolveAllCoins(fills);
+  }
 
+  private resolveAllCoins(fills: HLUserFill[]): void {
     const coins = fills.map((f) => f.coin);
     this.hlMarket.resolveCoins(coins).subscribe(() => {
-      // force le re-render via un signal
-      this.fills.set([...this.fills()]);
+      this.coinsResolved.set(true);
     });
+  }
+
+  displayCoin(coin: string): string {
+    return this.hlMarket.displayCoin(coin);
   }
 
   private toLocalISO(date: Date): string {
@@ -128,10 +136,6 @@ export class UserFillsPage extends MenuBasePage {
 
   private daysAgo(days: number): Date {
     return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  }
-
-  displayCoin(coin: string): string {
-    return this.hlMarket.displayCoin(coin);
   }
 
   isOpen(fill: HLUserFill): boolean {

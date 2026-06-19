@@ -65,11 +65,12 @@
         [value]="coinFilter()"
         (ionChange)="coinFilter.set($event.detail.value)"
         interface="popover"
+        [disabled]="!coinsResolved()"
       >
         <ion-select-option value="">All ({{ fills().length }})</ion-select-option>
         @for (coin of availableCoins(); track coin) {
         <ion-select-option [value]="coin">
-          {{ coin }} ({{ coinCounts().get(coin) }})
+          {{ displayCoin(coin) }} ({{ coinCounts().get(coin) }})
         </ion-select-option>
         }
       </ion-select>

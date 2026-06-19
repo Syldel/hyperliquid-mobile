@@ -16,6 +16,7 @@ import {
 } from '@ionic/angular/standalone';
 import { AppLifecycleService } from '@services/app-lifecycle.service';
 import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
+import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { DexSelectorComponent } from '@shared/components/dex-selector/dex-selector.component';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
@@ -50,10 +51,12 @@ export class OpenOrdersPage extends MenuBasePage {
   private readonly lifecycle = inject(AppLifecycleService);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly hlMarket = inject(HyperliquidMarketService);
 
   openOrders = signal<HLFrontendOpenOrder[]>([]);
   selectedDexNames = signal<string[] | null>(null);
   coinFilter = signal<string>('');
+  coinsResolved = signal(false);
 
   fetchFn = signal(this.buildFetchFn());
 
@@ -91,7 +94,7 @@ export class OpenOrdersPage extends MenuBasePage {
       if (raw) {
         const coin = this.normalizeCoin(raw);
         this.coinFilter.set(coin);
-        this.forcedDex.set(this.extractDex(coin));
+        this.forcedDex.set(this.hlMarket.extractDex(coin));
       } else {
         this.forcedDex.set(null);
       }
@@ -106,11 +109,6 @@ export class OpenOrdersPage extends MenuBasePage {
     return coin.toUpperCase();
   }
 
-  private extractDex(coin: string): string {
-    const parts = coin.split(':');
-    return parts.length > 1 ? parts[0] : '';
-  }
-
   private buildFetchFn() {
     const dexs = this.selectedDexNames();
     if (dexs === null) return (): Observable<HLFrontendOpenOrder[]> => of([]);
@@ -122,6 +120,23 @@ export class OpenOrdersPage extends MenuBasePage {
           : [this.hlInfo.getFrontendOpenOrders()];
       return forkJoin(calls).pipe(map((results) => results.flat()));
     };
+  }
+
+  onDataLoaded(orders: HLFrontendOpenOrder[]): void {
+    this.openOrders.set(orders);
+    this.coinsResolved.set(false);
+    this.resolveAllCoins(orders);
+  }
+
+  private resolveAllCoins(orders: HLFrontendOpenOrder[]): void {
+    const coins = orders.map((o) => o.coin);
+    this.hlMarket.resolveCoins(coins).subscribe(() => {
+      this.coinsResolved.set(true);
+    });
+  }
+
+  displayCoin(coin: string): string {
+    return this.hlMarket.displayCoin(coin);
   }
 
   onSelectionChanged(dexNames: string[]) {

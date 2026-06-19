@@ -213,7 +213,7 @@ export class HyperliquidMarketService {
     );
   }
 
-  private extractDex(pairName: string): string {
+  extractDex(pairName: string): string {
     const parts = pairName.split(':');
     return parts.length > 1 ? parts[0] : '';
   }
