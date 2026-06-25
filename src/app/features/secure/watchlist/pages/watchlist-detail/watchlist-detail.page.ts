@@ -21,7 +21,7 @@ import { RefreshableLayoutComponent } from '@shared/components/refreshable-layou
 import {
   CandleInterval,
   CandleSnapshot,
-  HLFrontendOpenOrder,
+  HLOrderStatusData,
   HLUserFill,
 } from '@syldel/hl-shared-types';
 import { addIcons } from 'ionicons';
@@ -390,8 +390,8 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
 
     if (!snap) return;
 
+    this.drawOrderLines(ctx, snap.historicalOrders);
     this.drawFills(ctx, snap.fills);
-    this.drawOpenOrders(ctx, snap.openOrders);
   }
 
   private drawFills(ctx: CanvasRenderingContext2D, fills: HLUserFill[]): void {
@@ -425,92 +425,6 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     }
   }
 
-  private getOrderPrice(order: HLFrontendOpenOrder): string {
-    if ((order.isTrigger || order.isPositionTpsl) && parseFloat(order.triggerPx) > 0) {
-      return order.triggerPx;
-    }
-    return order.limitPx;
-  }
-
-  private drawOpenOrders(ctx: CanvasRenderingContext2D, orders: HLFrontendOpenOrder[]): void {
-    if (!orders.length) return;
-
-    const visibleRange = this.chart!.timeScale().getVisibleRange();
-    const rightTime = visibleRange?.to ?? null;
-
-    for (const order of orders) {
-      const priceLabel = this.getOrderPrice(order);
-      const price = parseFloat(priceLabel);
-      const y = this.candleSeries!.priceToCoordinate(price);
-      if (y === null || y < 0 || y > ctx.canvas.height) continue;
-
-      const { color, label, dash } = this.getOrderStyle(order);
-
-      // Ligne
-      ctx.beginPath();
-      ctx.setLineDash(dash);
-      ctx.moveTo(0, y);
-      ctx.lineTo(ctx.canvas.width, y);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      // Pastille prix bord droit
-      if (rightTime !== null) {
-        const x = this.chart!.timeScale().timeToCoordinate(rightTime);
-        if (x !== null) {
-          const fSize = 10;
-          ctx.font = `${fSize}px monospace`;
-          const tw = ctx.measureText(priceLabel).width;
-          const padX = 6,
-            padY = 4;
-
-          ctx.fillStyle = color;
-          ctx.beginPath();
-          ctx.roundRect(
-            x - tw - padX * 2,
-            y - fSize / 2 - padY,
-            tw + padX * 2,
-            fSize + padY * 2,
-            3,
-          );
-          ctx.fill();
-
-          ctx.fillStyle = '#000';
-          ctx.fillText(priceLabel, x - tw - padX, y + fSize / 2 - 2);
-        }
-      }
-
-      // Label type + size bord gauche
-      ctx.fillStyle = color;
-      ctx.font = '10px monospace';
-      ctx.fillText(`${label}  ${parseFloat(order.sz).toFixed(4)}`, 8, y - 4);
-    }
-  }
-
-  private getOrderStyle(order: HLFrontendOpenOrder): {
-    color: string;
-    label: string;
-    dash: number[];
-  } {
-    const type = order.orderType.toLowerCase();
-
-    if (type.includes('take profit')) {
-      return { color: '#2dd36f', label: 'TP', dash: [6, 3] };
-    }
-    if (type.includes('stop')) {
-      return { color: '#eb445a', label: 'SL', dash: [6, 3] };
-    }
-    // Limit order classique
-    const isBuy = order.side === 'B';
-    return {
-      color: isBuy ? this.COLOR_BUY : this.COLOR_SELL,
-      label: isBuy ? 'BUY' : 'SELL',
-      dash: [],
-    };
-  }
-
   /** Supprime toutes les price lines natives (si utilisées ailleurs). */
   private clearOverlay(): void {
     this.priceLines.forEach((pl) => {
@@ -521,6 +435,122 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       }
     });
     this.priceLines = [];
+  }
+
+  private isTerminal(status: string): boolean {
+    return (
+      status.includes('canceled') ||
+      status === 'filled' ||
+      status === 'triggered' ||
+      status.includes('rejected')
+    );
+  }
+
+  private drawOrderLines(ctx: CanvasRenderingContext2D, orders: HLOrderStatusData[]): void {
+    const groups = new Map<string, HLOrderStatusData[]>();
+    for (const entry of orders) {
+      const o = entry.order;
+      const key = `${o.oid}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(entry);
+    }
+
+    for (const chain of groups.values()) {
+      chain.sort((a, b) => a.statusTimestamp - b.statusTimestamp);
+      this.drawOrderChain(ctx, chain);
+    }
+  }
+
+  private drawOrderChain(ctx: CanvasRenderingContext2D, chain: HLOrderStatusData[]): void {
+    const visibleRange = this.chart!.timeScale().getVisibleRange();
+    const intervalSec = this.getIntervalSeconds();
+
+    if (!visibleRange) return;
+
+    const visibleFromMs = (visibleRange.from as unknown as number) * 1000;
+    const visibleToMs = (visibleRange.to as unknown as number) * 1000;
+
+    const isTrigger = chain[0].order.isTrigger;
+    const orderType = chain[0].order.orderType.toLowerCase();
+    const isTP = orderType.includes('take profit');
+    const isSL = orderType.includes('stop');
+
+    let color: string;
+    if (isTrigger) {
+      // TP toujours vert, SL toujours rouge
+      color = isTP ? this.COLOR_BUY : this.COLOR_SELL;
+    } else {
+      // Limit : couleur selon le side
+      color = chain[0].order.side === 'B' ? this.COLOR_BUY : this.COLOR_SELL;
+    }
+    const dash = isTrigger ? [5, 4] : [];
+
+    for (let i = 0; i < chain.length; i++) {
+      const entry = chain[i];
+      const order = entry.order;
+      const status = entry.status.toLowerCase();
+
+      if (this.isTerminal(status)) continue;
+
+      const price = parseFloat(isTrigger ? order.triggerPx : order.limitPx);
+      if (!price) continue;
+
+      const nextTerminal = chain.find(
+        (e, idx) => idx > i && this.isTerminal(e.status.toLowerCase()),
+      );
+
+      const endTs = nextTerminal ? nextTerminal.statusTimestamp : visibleToMs;
+      const isActive = !nextTerminal;
+
+      if (!isActive && (endTs < visibleFromMs || entry.statusTimestamp > visibleToMs)) continue;
+
+      const y = this.candleSeries!.priceToCoordinate(price);
+      if (y === null) continue;
+
+      const snappedStart = (Math.round(entry.statusTimestamp / 1000 / intervalSec) *
+        intervalSec) as unknown as Time;
+      const xStartRaw = this.chart!.timeScale().timeToCoordinate(snappedStart);
+      const xLeftEdge = this.chart!.timeScale().timeToCoordinate(visibleRange.from) ?? 0;
+      const xStart = xStartRaw !== null && xStartRaw > xLeftEdge ? xStartRaw : xLeftEdge;
+
+      const snappedEnd = nextTerminal
+        ? ((Math.round(nextTerminal.statusTimestamp / 1000 / intervalSec) *
+            intervalSec) as unknown as Time)
+        : visibleRange.to;
+      let xEnd = this.chart!.timeScale().timeToCoordinate(snappedEnd);
+      if (xEnd === null) continue;
+
+      // ── Segment horizontal ────────────────────────────────────────────────
+      ctx.beginPath();
+      ctx.setLineDash(dash);
+      ctx.moveTo(xStart, y);
+      ctx.lineTo(xEnd, y);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = isActive ? 1.5 : 1;
+      ctx.globalAlpha = isActive ? 1 : 0.6;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+
+      // ── Label bord droit si segment actif ────────────────────────────────
+      if (isActive) {
+        const priceLabel = isTrigger ? order.triggerPx : order.limitPx;
+
+        const fSize = 10;
+        ctx.font = `${fSize}px monospace`;
+        const tw = ctx.measureText(priceLabel).width;
+        const padX = 6,
+          padY = 4;
+
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.roundRect(xEnd, y - fSize / 2 - padY, tw + padX * 2, fSize + padY * 2, 3);
+        ctx.fill();
+
+        ctx.fillStyle = '#000';
+        ctx.fillText(priceLabel, xEnd + padX, y + fSize / 2 - 2);
+      }
+    }
   }
 
   // ── UI handlers ────────────────────────────────────────────────────────────
