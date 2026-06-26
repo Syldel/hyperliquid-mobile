@@ -15,7 +15,7 @@
     <div>
       <p class="section-label">Asset</p>
       <ion-list inset>
-        <ion-item [button]="!isModify()" (click)="openMarketPicker()">
+        <ion-item [button]="!isModify()" (click)="openMarketPicker()" lines="none">
           <ion-label>
             {{ coinTitle() !== '—' ? coinTitle() : selectedCoin() || 'Select an asset' }}
             @if (!isModify()) {
@@ -23,6 +23,12 @@
             }
           </ion-label>
         </ion-item>
+        @if (!isSpot() && leverage() && maxLeverage()) {
+          <p class="leverage-hint">
+            {{ leverage()!.type === 'cross' ? 'Cross' : 'Isolated' }} · {{ leverage()!.value }}x /
+            {{ maxLeverage() }}x
+          </p>
+        }
       </ion-list>
     </div>
 

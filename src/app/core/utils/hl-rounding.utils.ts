@@ -17,6 +17,7 @@ export function roundSize(sz: number, szDecimals: number): string {
  */
 export function roundPrice(px: number, szDecimals: number, isSpot = false): string {
   if (Number.isInteger(px)) return String(px);
+  if (isNaN(px)) return String(px);
 
   const maxDecimals = (isSpot ? MAX_DECIMALS_SPOT : MAX_DECIMALS_PERP) - szDecimals;
 

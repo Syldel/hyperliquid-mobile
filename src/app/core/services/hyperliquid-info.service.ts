@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { AuthService } from '@auth/auth.service';
+import { HlActiveAssetData } from '@models/hl-active-asset-data.model';
 import type {
   CandleSnapshot,
   CandleSnapshotRequest,
@@ -93,6 +94,14 @@ export class HyperliquidInfoService {
       type: 'userFillsByTime',
       user: this.auth.currentAddress(),
       ...req,
+    });
+  }
+
+  getActiveAssetData(coin: string): Observable<HlActiveAssetData> {
+    return this.post<HlActiveAssetData>({
+      type: 'activeAssetData',
+      user: this.auth.currentAddress(),
+      coin,
     });
   }
 }

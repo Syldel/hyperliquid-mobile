@@ -37,8 +37,8 @@ export class AvailableCapitalService {
     return this.hlInfo.getTokenBalances().pipe(
       map((balances) => {
         for (const stable of SPOT_STABLECOIN_FALLBACK) {
-          const entry = balances.find((b) => b.coin === stable && parseFloat(b.total) > 0);
-          if (entry) return parseFloat(entry.total);
+          const entry = balances.find((b) => b.coin === stable && parseFloat(b.hold) > 0);
+          if (entry) return parseFloat(entry.hold);
         }
         return 0;
       }),

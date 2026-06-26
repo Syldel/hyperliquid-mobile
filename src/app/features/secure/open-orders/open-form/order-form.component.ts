@@ -25,14 +25,14 @@ import {
   ModalController,
   ToastController,
 } from '@ionic/angular/standalone';
+import { HlActiveAssetData, HlActiveAssetLeverage } from '@models/hl-active-asset-data.model';
 import { AvailableCapitalService } from '@services/available-capital.service';
-import { HyperliquidCandleService } from '@services/hyperliquid-candle.service';
 import { HyperliquidGatewayService } from '@services/hyperliquid-gateway.service';
+import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { MarketPickerModalComponent } from '@shared/components/market-picker-modal/market-picker-modal.component';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import {
-  CandleSnapshot,
   HLFrontendOpenOrder,
   HLOrderDetails,
   HLPlaceOrderResponse,
@@ -42,7 +42,7 @@ import {
 import { roundPrice, roundSize } from 'app/core/utils/hl-rounding.utils';
 import { addIcons } from 'ionicons';
 import { chevronForwardOutline, closeOutline } from 'ionicons/icons';
-import { of, switchMap, tap } from 'rxjs';
+import { catchError, Observable, of } from 'rxjs';
 
 export type OrderFormMode = 'place' | 'modify';
 
@@ -72,7 +72,7 @@ export class OrderFormComponent implements OnInit {
   private readonly modalCtrl = inject(ModalController);
   private readonly hlGateway = inject(HyperliquidGatewayService);
   private readonly hlMarket = inject(HyperliquidMarketService);
-  private readonly hlCandle = inject(HyperliquidCandleService);
+  private readonly hlInfo = inject(HyperliquidInfoService);
   private readonly toastCtrl = inject(ToastController);
   private readonly availableCapitalService = inject(AvailableCapitalService);
 
@@ -83,6 +83,8 @@ export class OrderFormComponent implements OnInit {
 
   szDecimals = signal<number>(3);
   currentPrice = signal<number | null>(null);
+  leverage = signal<HlActiveAssetLeverage | null>(null);
+  maxLeverage = signal<number | null>(null);
 
   priceDiffPct = computed(() => {
     const current = this.currentPrice();
@@ -152,11 +154,15 @@ export class OrderFormComponent implements OnInit {
   }
 
   private applyTriggerSlippage(triggerPx: number): number {
-    return parseFloat(roundPrice(triggerPx * this.getTriggerFactor(), this.szDecimals()));
+    return parseFloat(
+      roundPrice(triggerPx * this.getTriggerFactor(), this.szDecimals(), this.isSpot()),
+    );
   }
 
   private applyReverseTrigger(limitPx: number): number {
-    return parseFloat(roundPrice(limitPx / this.getTriggerFactor(), this.szDecimals()));
+    return parseFloat(
+      roundPrice(limitPx / this.getTriggerFactor(), this.szDecimals(), this.isSpot()),
+    );
   }
 
   constructor() {
@@ -175,10 +181,20 @@ export class OrderFormComponent implements OnInit {
       untracked(() => {
         this.fetchFn.set(this.buildFetchFn());
         if (!coin) return;
-        this.hlMarket.getPerpMeta().subscribe((meta) => {
-          const market = meta.universe.find((m) => m.name === coin || coin.includes(m.name));
-          if (market) this.szDecimals.set(market.szDecimals);
-        });
+        if (this.isSpot()) {
+          this.hlMarket.getSpotMeta().subscribe((meta) => {
+            const market = meta.tokens.find((m) => m.name === coin || coin.includes(m.name));
+            if (market) this.szDecimals.set(market.szDecimals);
+          });
+        } else {
+          this.hlMarket.getPerpMeta().subscribe((meta) => {
+            const market = meta.universe.find((m) => m.name === coin || coin.includes(m.name));
+            if (market) {
+              this.szDecimals.set(market.szDecimals);
+              this.maxLeverage.set(market.maxLeverage);
+            }
+          });
+        }
       });
     });
 
@@ -247,19 +263,18 @@ export class OrderFormComponent implements OnInit {
 
   private buildFetchFn() {
     const selectedCoin = this.selectedCoin();
-    if (!selectedCoin) return () => of([{ fake: true } as any]);
+    if (!selectedCoin) return () => of({ fake: true } as any);
 
-    return () =>
-      this.hlMarket.resolveToProtocolName(selectedCoin).pipe(
-        tap(() => this.loadCapital(selectedCoin)),
-        switchMap((protocolCoin) => this.hlCandle.getRecentCandles(protocolCoin, '1h', 60)),
-      );
+    return () => {
+      this.loadCapital(selectedCoin);
+      return this.loadActiveAssetData(selectedCoin);
+    };
   }
 
-  onDataLoaded(data: CandleSnapshot[] | null): void {
-    if (!data?.length) return;
-    const last = data[data.length - 1];
-    this.currentPrice.set(parseFloat(last.c));
+  onDataLoaded(data: HlActiveAssetData | null): void {
+    if (!data) return;
+    this.currentPrice.set(parseFloat(data.markPx));
+    this.leverage.set(data.leverage);
   }
 
   private loadCapital(pairName: string): void {
@@ -267,14 +282,20 @@ export class OrderFormComponent implements OnInit {
       this.availableCapital.set(null);
       return;
     }
-
     const dex = this.hlMarket.extractDex(pairName);
     this.availableCapitalService.getAvailableCapital(dex, pairName).subscribe({
       next: (capital) => this.availableCapital.set(capital),
-      error: () => {
-        this.availableCapital.set(null);
-      },
+      error: () => this.availableCapital.set(null),
     });
+  }
+
+  private loadActiveAssetData(coin: string): Observable<HlActiveAssetData | null> {
+    return this.hlInfo.getActiveAssetData(coin).pipe(
+      catchError((err) => {
+        console.error('loadActiveAssetData error', err);
+        return of(null);
+      }),
+    );
   }
 
   async openMarketPicker(): Promise<void> {
