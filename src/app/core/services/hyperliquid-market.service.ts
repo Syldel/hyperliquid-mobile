@@ -16,6 +16,11 @@ interface CacheMap {
   hip3: HLPerpDex[];
 }
 
+interface HLToken {
+  index: number;
+  name: string;
+}
+
 type CacheStore = { [K in keyof CacheMap]: CacheEntry<CacheMap[K]> | null };
 
 @Injectable({ providedIn: 'root' })
@@ -56,36 +61,76 @@ export class HyperliquidMarketService {
     );
   }
 
-  private buildSpotNameMap(meta: HLSpotMeta): Map<string, string> {
-    // Clé = name de l'entrée universe (ex: "@230", "PURR/USDC")
-    // Valeur = nom lisible résolu
-    const tokensByIndex: Record<number, string> = {};
-    meta.tokens.forEach((t) => (tokensByIndex[t.index] = t.name));
+  private readonly HYPERUNIT_TOKENS = new Set(['UBTC', 'UETH', 'USOL']);
 
-    const nameMap = new Map<string, string>();
+  private spotNameMap: Map<string, string> | null = null;
+  private spotProtocolMap: Map<string, string> | null = null;
+
+  private buildSpotMaps(meta: HLSpotMeta): void {
+    const tokensByIndex: Record<number, HLToken> = {};
+    meta.tokens.forEach((t) => (tokensByIndex[t.index] = t));
+
+    this.spotNameMap = new Map();
+    this.spotProtocolMap = new Map();
+
     meta.universe.forEach((pair) => {
-      const resolved = pair.isCanonical
-        ? pair.name
-        : pair.tokens.map((idx) => tokensByIndex[idx]).join('/');
-      nameMap.set(pair.name, resolved); // "@230" → "DHYPE/USDH"
-    });
+      if (pair.tokens.length < 2) return;
+      const base = tokensByIndex[pair.tokens[0]];
+      const quote = tokensByIndex[pair.tokens[1]];
+      if (!base || !quote) return;
 
-    return nameMap;
+      const protocolName = pair.index === 0 ? 'PURR/USDC' : `@${pair.index}`;
+      const officialName = `${base.name}/${quote.name}`;
+      const isHyperunit = this.HYPERUNIT_TOKENS.has(base.name);
+      const displayName = isHyperunit
+        ? `${base.name.substring(1)}/${quote.name}` // "BTC/USDC"
+        : pair.isCanonical
+          ? pair.name
+          : officialName;
+
+      // name map : toutes les clés connues → nom d'affichage
+      this.spotNameMap!.set(protocolName, displayName);
+      this.spotNameMap!.set(officialName, displayName);
+      if (isHyperunit) this.spotNameMap!.set(displayName, displayName);
+
+      // protocol map : toutes les clés connues → nom protocole API
+      this.spotProtocolMap!.set(protocolName, protocolName);
+      this.spotProtocolMap!.set(officialName, protocolName);
+      if (isHyperunit) this.spotProtocolMap!.set(displayName, protocolName);
+    });
   }
 
-  getSpotNames(): Observable<string[]> {
+  private getSpotMaps(): Observable<{
+    nameMap: Map<string, string>;
+    protocolMap: Map<string, string>;
+  }> {
+    if (this.spotNameMap && this.spotProtocolMap) {
+      return of({ nameMap: this.spotNameMap, protocolMap: this.spotProtocolMap });
+    }
     return this.getSpotMeta().pipe(
-      map((meta) => {
-        const nameMap = this.buildSpotNameMap(meta);
-        return meta.universe.map((pair) => nameMap.get(pair.name) ?? pair.name);
-      }),
+      tap((meta) => this.buildSpotMaps(meta)),
+      map(() => ({ nameMap: this.spotNameMap!, protocolMap: this.spotProtocolMap! })),
     );
   }
 
-  /** Résout un coin brut API (@230, PURR/USDC, BTC, vntl:SPACEX…) en nom lisible */
+  getSpotNames(): Observable<string[]> {
+    return this.getSpotMaps().pipe(
+      map(({ nameMap }) =>
+        [...nameMap.entries()]
+          .filter(([key]) => key.startsWith('@') || key === 'PURR/USDC')
+          .map(([, displayName]) => displayName),
+      ),
+    );
+  }
+
   resolveCoinName(coin: string): Observable<string> {
-    if (!coin.startsWith('@')) return of(coin);
-    return this.getSpotMeta().pipe(map((meta) => this.buildSpotNameMap(meta).get(coin) ?? coin));
+    if (!coin.startsWith('@') && !coin.includes('/')) return of(coin);
+    return this.getSpotMaps().pipe(map(({ nameMap }) => nameMap.get(coin) ?? coin));
+  }
+
+  resolveToProtocolName(coin: string): Observable<string> {
+    if (!coin.includes('/')) return of(coin);
+    return this.getSpotMaps().pipe(map(({ protocolMap }) => protocolMap.get(coin) ?? coin));
   }
 
   private resolvedCoins = new Map<string, string>();
@@ -167,12 +212,18 @@ export class HyperliquidMarketService {
   getAssetIndex(coin: string): Observable<number> {
     // ── Spot : "TOKEN/USDC" ──────────────────────────────────────────────
     if (coin.includes('/')) {
-      return this.getSpotMeta().pipe(
-        map((meta) => {
-          const nameMap = this.buildSpotNameMap(meta);
-          const pair = meta.universe.find((p) => nameMap.get(p.name) === coin);
-          if (!pair) throw new Error(`Spot asset not found for coin: ${coin}`);
-          return 10000 + pair.index;
+      return this.getSpotMaps().pipe(
+        switchMap(({ protocolMap }) => {
+          const protocolName = protocolMap.get(coin) ?? coin;
+          return this.getSpotMeta().pipe(
+            map((meta) => {
+              const pair = meta.universe.find((p) =>
+                p.index === 0 ? protocolName === 'PURR/USDC' : protocolName === `@${p.index}`,
+              );
+              if (!pair) throw new Error(`Spot asset not found for coin: ${coin}`);
+              return 10000 + pair.index;
+            }),
+          );
         }),
       );
     }

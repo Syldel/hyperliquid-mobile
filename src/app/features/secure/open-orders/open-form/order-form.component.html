@@ -1,0 +1,198 @@
+<app-refreshable-layout
+  [title]="isModify() ? 'Edit Order' : 'New Order'"
+  [fetchFn]="fetchFn()"
+  [requiresAuth]="true"
+  [pageHeaderParams]="{ startButton: 'none' }"
+  (dataLoaded)="onDataLoaded($event)"
+>
+  <ng-template #endButtons>
+    <ion-button (click)="dismiss()">
+      <ion-icon slot="icon-only" name="close-outline" />
+    </ion-button>
+  </ng-template>
+
+  <div class="form-section asset-side-row">
+    <div>
+      <p class="section-label">Asset</p>
+      <ion-list inset>
+        <ion-item [button]="!isModify()" (click)="openMarketPicker()">
+          <ion-label>
+            {{ coinTitle() !== '—' ? coinTitle() : selectedCoin() || 'Select an asset' }}
+            @if (!isModify()) {
+              <ion-icon name="chevron-forward-outline" />
+            }
+          </ion-label>
+        </ion-item>
+      </ion-list>
+    </div>
+
+    <div>
+      <p class="section-label">Side</p>
+      <ion-list inset>
+        <div class="side-pills">
+          <ion-button
+            [fill]="isBuy() ? 'solid' : 'outline'"
+            [color]="isBuy() ? 'success' : 'medium'"
+            (click)="isBuy.set(true)"
+          >
+            {{ isSpot() ? 'Buy' : 'Long' }}
+          </ion-button>
+          <ion-button
+            [fill]="!isBuy() ? 'solid' : 'outline'"
+            [color]="!isBuy() ? 'danger' : 'medium'"
+            (click)="isBuy.set(false)"
+          >
+            {{ isSpot() ? 'Sell' : 'Short' }}
+          </ion-button>
+        </div>
+      </ion-list>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <p class="section-label">Order details</p>
+    <ion-list inset>
+      <div class="two-col">
+        <ion-item lines="full">
+          <ion-label position="stacked">
+            <div>Limit price</div>
+            @if (currentPrice(); as price) {
+              <span class="current-price-hint">
+                Market: {{ price | number: '1.2-6' }}
+                @if (priceDiffPct(); as pct) {
+                  <span class="diff" [class]="priceDiffClass()">
+                    {{ pct >= 0 ? '+' : '' }}{{ pct | number: '1.2-2' }}%
+                  </span>
+                }
+              </span>
+            }
+          </ion-label>
+          <ion-input
+            type="number"
+            inputmode="decimal"
+            placeholder="{{ currentPrice() ?? '0.00' }}"
+            [value]="limitPx()"
+            (ionInput)="limitPx.set($event.detail.value ?? '')"
+          />
+        </ion-item>
+        <ion-item lines="full">
+          <ion-label position="stacked">
+            <div>Size</div>
+            @if (sizeUsd(); as usd) {
+              <div class="current-price-hint" [class]="sizeUsdClass()">
+                ≈ {{ usd | number: '1.2-2' }} $
+                <span class="available-capital">
+                  / {{ (availableCapital() | number: '1.2-2') ?? '?' }} $
+                </span>
+              </div>
+            }
+          </ion-label>
+          <ion-input
+            type="number"
+            inputmode="decimal"
+            placeholder="0.00"
+            [value]="sz()"
+            (ionInput)="sz.set($event.detail.value ?? '')"
+          />
+        </ion-item>
+      </div>
+
+      <ion-item lines="full">
+        <ion-label>Order type</ion-label>
+        <ion-select
+          [value]="orderKind()"
+          (ionChange)="orderKind.set($event.detail.value)"
+          interface="popover"
+        >
+          <ion-select-option value="limit">Limit</ion-select-option>
+          <ion-select-option value="trigger">Trigger (TP/SL)</ion-select-option>
+        </ion-select>
+      </ion-item>
+
+      @if (orderKind() === 'limit') {
+        <ion-item lines="none">
+          <ion-label>Time in force</ion-label>
+          <ion-select
+            [value]="tif()"
+            (ionChange)="tif.set($event.detail.value)"
+            interface="popover"
+          >
+            <ion-select-option value="Gtc">GTC – Good till cancelled</ion-select-option>
+            <ion-select-option value="Alo">ALO – Post only</ion-select-option>
+            <ion-select-option value="Ioc">IOC – Immediate or cancel</ion-select-option>
+          </ion-select>
+        </ion-item>
+      }
+
+      @if (orderKind() === 'trigger') {
+        <ion-item lines="full">
+          <ion-label position="stacked">Trigger price</ion-label>
+          <ion-input
+            type="number"
+            inputmode="decimal"
+            placeholder="0.00"
+            [value]="triggerPx()"
+            (ionInput)="triggerPx.set($event.detail.value ?? '')"
+          />
+        </ion-item>
+        <ion-item lines="full">
+          <ion-label>TP / SL</ion-label>
+          <ion-select
+            [value]="tpsl()"
+            (ionChange)="tpsl.set($event.detail.value)"
+            interface="popover"
+          >
+            <ion-select-option value="tp">Take Profit</ion-select-option>
+            <ion-select-option value="sl">Stop Loss</ion-select-option>
+          </ion-select>
+        </ion-item>
+        <ion-item lines="none">
+          <ion-label>Market trigger</ion-label>
+          <ion-toggle [checked]="isMarket()" (ionChange)="isMarket.set($event.detail.checked)" />
+        </ion-item>
+      }
+    </ion-list>
+  </div>
+
+  <div class="form-section">
+    <p class="section-label">Options</p>
+    <ion-list inset>
+      <ion-item lines="none">
+        <ion-label>Reduce only</ion-label>
+        <ion-toggle [checked]="reduceOnly()" (ionChange)="reduceOnly.set($event.detail.checked)" />
+      </ion-item>
+    </ion-list>
+  </div>
+
+  @if (error()) {
+    <p class="error-message error-message--small error-message--padded">
+      {{ error() }}
+    </p>
+  }
+
+  <div class="submit-wrap">
+    <ion-button
+      expand="block"
+      [color]="isBuy() ? 'success' : 'danger'"
+      [disabled]="submitting() || isFormInvalid()"
+      (click)="submit()"
+    >
+      @if (submitting()) {
+        <ion-spinner name="crescent" slot="start" />
+      }
+      {{
+        submitting()
+          ? 'Sending…'
+          : isModify()
+            ? 'Update order'
+            : isBuy()
+              ? isSpot()
+                ? 'Place Buy'
+                : 'Place Long'
+              : isSpot()
+                ? 'Place Sell'
+                : 'Place Short'
+      }}
+    </ion-button>
+  </div>
+</app-refreshable-layout>

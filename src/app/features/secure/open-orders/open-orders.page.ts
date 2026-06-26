@@ -4,6 +4,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import {
   IonBadge,
+  IonFab,
+  IonFabButton,
   IonIcon,
   IonItem,
   IonItemOption,
@@ -13,6 +15,7 @@ import {
   IonList,
   IonSelect,
   IonSelectOption,
+  ModalController,
 } from '@ionic/angular/standalone';
 import { AppLifecycleService } from '@services/app-lifecycle.service';
 import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
@@ -22,8 +25,9 @@ import { DexSelectorComponent } from '@shared/components/dex-selector/dex-select
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import { HLFrontendOpenOrder } from '@syldel/hl-shared-types';
 import { addIcons } from 'ionicons';
-import { createOutline } from 'ionicons/icons';
+import { addOutline, createOutline } from 'ionicons/icons';
 import { forkJoin, map, Observable, of } from 'rxjs';
+import { OrderFormComponent } from './open-form/order-form.component';
 
 @Component({
   selector: 'app-open-orders',
@@ -42,6 +46,8 @@ import { forkJoin, map, Observable, of } from 'rxjs';
     IonItemSliding,
     IonItemOptions,
     IonItemOption,
+    IonFab,
+    IonFabButton,
   ],
   templateUrl: './open-orders.page.html',
   styleUrls: ['./open-orders.page.scss'],
@@ -52,6 +58,7 @@ export class OpenOrdersPage extends MenuBasePage {
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   private readonly hlMarket = inject(HyperliquidMarketService);
+  private readonly modalCtrl = inject(ModalController);
 
   openOrders = signal<HLFrontendOpenOrder[]>([]);
   selectedDexNames = signal<string[] | null>(null);
@@ -79,7 +86,7 @@ export class OpenOrdersPage extends MenuBasePage {
 
   constructor() {
     super();
-    addIcons({ createOutline });
+    addIcons({ createOutline, addOutline });
     effect(() => {
       this.lifecycle.foregroundCount();
       untracked(() => {
@@ -159,5 +166,22 @@ export class OpenOrdersPage extends MenuBasePage {
     this.router.navigate(['/secure/watchlist/detail', coin], {
       state: { backHref: '/secure/open-orders' },
     });
+  }
+
+  /** Ouvre le modal de création d'un nouvel ordre */
+  async openAddModal(): Promise<void> {
+    const defaultCoin = this.coinFilter() || '';
+    const modal = await this.modalCtrl.create({
+      component: OrderFormComponent,
+      componentProps: {
+        existingOrder: null,
+        defaultCoin,
+      },
+    });
+    await modal.present();
+    const { role } = await modal.onWillDismiss();
+    if (role === 'confirm') {
+      this.fetchFn.set(this.buildFetchFn());
+    }
   }
 }

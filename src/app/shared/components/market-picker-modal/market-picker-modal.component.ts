@@ -22,7 +22,7 @@ import {
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { HLPerpDex, HLPerpMeta } from '@syldel/hl-shared-types';
 import { addIcons } from 'ionicons';
-import { closeOutline, searchOutline } from 'ionicons/icons';
+import { checkmarkCircle, closeOutline, searchOutline } from 'ionicons/icons';
 
 export type MarketType = 'perp' | 'spot' | 'hip3';
 
@@ -111,7 +111,7 @@ export class MarketPickerModalComponent implements OnInit {
   //  Lifecycle
   // ------------------------------------------------------------------
   ngOnInit(): void {
-    addIcons({ closeOutline, searchOutline });
+    addIcons({ closeOutline, searchOutline, checkmarkCircle });
 
     this.loadMarkets();
 

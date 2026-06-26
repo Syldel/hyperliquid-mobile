@@ -11,3 +11,26 @@
   text-align: right;
   max-width: 60%;
 }
+
+ion-note {
+  font-size: 1rem;
+}
+
+.size-usd {
+  font-size: 0.8rem;
+  color: var(--ion-color-medium);
+  margin-inline-start: 4px;
+}
+
+.status-badge {
+  vertical-align: middle;
+  display: flex;
+  font-size: 0.85rem;
+  padding: 4px 10px;
+}
+
+.side-badge {
+  vertical-align: middle;
+  display: flex;
+  text-transform: uppercase;
+}

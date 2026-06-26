@@ -1,5 +1,12 @@
-import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { DatePipe, DecimalPipe } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import {
   AlertController,
@@ -9,6 +16,7 @@ import {
   IonItem,
   IonLabel,
   IonNote,
+  ModalController,
 } from '@ionic/angular/standalone';
 import { HyperliquidGatewayService } from '@services/hyperliquid-gateway.service';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
@@ -21,8 +29,9 @@ import {
   Timestamp,
 } from '@syldel/hl-shared-types';
 import { addIcons } from 'ionicons';
-import { trashOutline } from 'ionicons/icons';
+import { createOutline, trashOutline } from 'ionicons/icons';
 import { of, switchMap } from 'rxjs';
+import { OrderFormComponent } from '../open-form/order-form.component';
 
 @Component({
   selector: 'app-open-order-detail',
@@ -37,6 +46,7 @@ import { of, switchMap } from 'rxjs';
     IonNote,
     IonBadge,
     DatePipe,
+    DecimalPipe,
   ],
   templateUrl: './open-order-detail.page.html',
   styleUrls: ['./open-order-detail.page.scss'],
@@ -47,6 +57,7 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
   private readonly market = inject(HyperliquidMarketService);
   private readonly alertCtrl = inject(AlertController);
   private readonly hlMarket = inject(HyperliquidMarketService);
+  private readonly modalCtrl = inject(ModalController);
 
   oid = signal<number | null>(null);
   coin = signal<string>('');
@@ -58,9 +69,47 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
 
   fetchFn = signal(this.buildFetchFn());
 
+  isSpot = computed(() => {
+    const coin = this.coin();
+    return coin.includes('/') || coin.includes('-');
+  });
+
+  statusColor = computed(() => {
+    switch (this.orderStatus()) {
+      case 'open':
+        return 'success';
+      case 'canceled':
+        return 'medium';
+      case 'filled':
+        return 'primary';
+      case 'triggered':
+        return 'tertiary';
+      default:
+        return 'medium';
+    }
+  });
+
+  sizeUsd = computed(() => {
+    const o = this.order();
+    if (!o) return null;
+    const sz = parseFloat(o.sz);
+    const px = parseFloat(o.limitPx);
+    if (!sz || !px) return null;
+    return sz * px;
+  });
+
+  origSizeUsd = computed(() => {
+    const o = this.order();
+    if (!o) return null;
+    const sz = parseFloat(o.origSz);
+    const px = parseFloat(o.limitPx);
+    if (!sz || !px) return null;
+    return sz * px;
+  });
+
   constructor() {
     super();
-    addIcons({ trashOutline });
+    addIcons({ trashOutline, createOutline });
   }
 
   ngOnInit(): void {
@@ -88,6 +137,24 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
     if (data?.order?.order) this.order.set(data.order.order);
     if (data?.order?.status) this.orderStatus.set(data.order.status);
     if (data?.order?.statusTimestamp) this.statusTimestamp.set(data.order.statusTimestamp);
+  }
+
+  async openEditModal(): Promise<void> {
+    const current = this.order();
+    if (!current) return;
+
+    const modal = await this.modalCtrl.create({
+      component: OrderFormComponent,
+      componentProps: {
+        existingOrder: current,
+      },
+    });
+    await modal.present();
+    const { role } = await modal.onWillDismiss();
+    if (role === 'confirm') {
+      // Rafraîchit les données de la page
+      this.fetchFn.set(this.buildFetchFn());
+    }
   }
 
   async confirmCancel(): Promise<void> {

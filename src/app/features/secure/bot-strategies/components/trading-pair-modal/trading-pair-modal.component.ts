@@ -49,8 +49,8 @@ import {
   TradingPair,
   TradingStrategy,
 } from '@models/user.interface';
+import { AvailableCapitalService } from '@services/available-capital.service';
 import { BotService } from '@services/bot.service';
-import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
 import { MarketPickerModalComponent } from '@shared/components/market-picker-modal/market-picker-modal.component';
 import { addIcons } from 'ionicons';
 import {
@@ -61,7 +61,7 @@ import {
   closeOutline,
   removeOutline,
 } from 'ionicons/icons';
-import { combineLatest, debounceTime, map, Observable, of, tap } from 'rxjs';
+import { combineLatest, debounceTime } from 'rxjs';
 
 interface TradingPairForm {
   exchangeKey: FormControl<string>;
@@ -112,7 +112,7 @@ export class TradingPairModalComponent implements OnInit {
   private readonly botService = inject(BotService);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly hlInfo = inject(HyperliquidInfoService);
+  private readonly availableCapitalService = inject(AvailableCapitalService);
 
   // ------------------------------------------------------------------
   //  Inputs
@@ -242,33 +242,6 @@ export class TradingPairModalComponent implements OnInit {
     });
   }
 
-  // ------------------------------------------------------------------
-  //  Available Capital
-  // ------------------------------------------------------------------
-
-  private readonly capitalCache = new Map<string, number>();
-
-  private getAvailableCapital(dex: string, pairName: string): Observable<number> {
-    const isSpot = pairName.includes('/');
-    const cacheKey = `${dex || 'hl'}:${isSpot ? 'spot' : 'perp'}`;
-
-    const cached = this.capitalCache.get(cacheKey);
-    if (cached !== undefined) return of(cached);
-
-    const request$ = isSpot
-      ? this.hlInfo.getTokenBalances().pipe(
-          map((balances) => {
-            const usdc = balances.find((b) => b.coin === 'USDC');
-            return usdc ? parseFloat(usdc.total) : 0;
-          }),
-        )
-      : this.hlInfo
-          .getClearinghouseState(dex)
-          .pipe(map((state) => parseFloat(state.marginSummary.accountValue)));
-
-    return request$.pipe(tap((capital) => this.capitalCache.set(cacheKey, capital)));
-  }
-
   availableCapital = signal<number | null>(null);
   isLoadingCapital = signal(false);
 
@@ -287,7 +260,8 @@ export class TradingPairModalComponent implements OnInit {
       const dex = this.extractDex(pairName);
 
       this.isLoadingCapital.set(true);
-      this.getAvailableCapital(dex, pairName)
+      this.availableCapitalService
+        .getAvailableCapital(dex, pairName)
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
           next: (capital) => this.availableCapital.set(capital),

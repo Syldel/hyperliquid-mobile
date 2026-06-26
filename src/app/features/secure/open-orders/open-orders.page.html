@@ -58,6 +58,7 @@
           }
         </div>
       </ion-item>
+
       <ion-item-options side="end">
         <ion-item-option color="primary" (click)="openOrderDetail(openOrder)">
           <ion-icon slot="icon-only" name="create-outline" />
@@ -66,4 +67,10 @@
     </ion-item-sliding>
     }
   </ion-list>
+
+  <ion-fab slot="fixed" vertical="bottom" horizontal="end">
+    <ion-fab-button (click)="openAddModal()">
+      <ion-icon name="add-outline" />
+    </ion-fab-button>
+  </ion-fab>
 </app-refreshable-layout>

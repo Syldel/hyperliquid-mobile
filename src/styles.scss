@@ -27,9 +27,20 @@ body {
 }
 
 .error-message {
-  color: red;
+  color: var(--ion-color-danger, red);
   margin: 10px 0;
-  text-align: center;
+
+  &--centered {
+    text-align: center;
+  }
+
+  &--small {
+    font-size: 0.85rem;
+  }
+
+  &--padded {
+    padding: 0 16px;
+  }
 }
 
 ion-badge {

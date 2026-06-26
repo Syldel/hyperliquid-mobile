@@ -1,7 +1,15 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { ConfigService } from '@services/config.service';
-import { HLCancelOrderResponse, HLOid, HLOrderStatusResponse } from '@syldel/hl-shared-types';
+import {
+  HLCancelOrderResponse,
+  HLOid,
+  HLOrderDetails,
+  HLOrderGrouping,
+  HLOrderStatusResponse,
+  HLPlaceOrderResponse,
+  HLSuccessResponse,
+} from '@syldel/hl-shared-types';
 import { Observable } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
@@ -30,7 +38,27 @@ export class HyperliquidGatewayService {
     return this.post<HLCancelOrderResponse>('hyperliquid/order/cancel', { cancels, isTestnet });
   }
 
-  // Phase 2
-  // modifyOrder(oid: number, order: HLOrderDetails, isTestnet = false): Observable<unknown>
-  // batchModifyOrders(modifies: ..., isTestnet = false): Observable<unknown>
+  placeOrder(
+    order: HLOrderDetails,
+    grouping: HLOrderGrouping = 'na',
+    isTestnet = false,
+  ): Observable<HLSuccessResponse<HLPlaceOrderResponse>> {
+    return this.post<HLSuccessResponse<HLPlaceOrderResponse>>('hyperliquid/order', {
+      order,
+      grouping,
+      isTestnet,
+    });
+  }
+
+  modifyOrder(
+    oid: HLOid,
+    order: HLOrderDetails,
+    isTestnet = false,
+  ): Observable<HLSuccessResponse<HLPlaceOrderResponse>> {
+    return this.post<HLSuccessResponse<HLPlaceOrderResponse>>('hyperliquid/order/modify', {
+      oid,
+      order,
+      isTestnet,
+    });
+  }
 }

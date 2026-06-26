@@ -9,6 +9,10 @@
   (dataLoaded)="onDataLoaded($event)"
 >
   <ng-template #endButtons>
+    <ion-button (click)="openEditModal()" [disabled]="!order() || !authService.isLoggedIn()">
+      <ion-icon slot="icon-only" name="create-outline" />
+    </ion-button>
+
     <ion-button
       (click)="confirmCancel()"
       [disabled]="cancelling() || !authService.isLoggedIn()"
@@ -21,9 +25,21 @@
   @if (order(); as o) {
   <ion-item lines="full">
     <ion-label>Side</ion-label>
-    <ion-badge slot="end" [color]="o.side === 'B' ? 'success' : 'danger'">
-      {{ o.side === 'B' ? 'Buy' : 'Sell' }}
-    </ion-badge>
+    <div slot="end">
+      <ion-badge [color]="o.side === 'B' ? 'success' : 'danger'" class="side-badge">
+        @if (isSpot()) { {{ o.side === 'B' ? 'Buy' : 'Sell' }} } @else { {{ o.side === 'B' ? 'Long'
+        : 'Short' }} }
+      </ion-badge>
+    </div>
+  </ion-item>
+
+  <ion-item lines="full">
+    <ion-label>Status</ion-label>
+    <div slot="end">
+      @if (orderStatus()) {
+      <ion-badge [color]="statusColor()" class="status-badge">{{ orderStatus() }}</ion-badge>
+      }
+    </div>
   </ion-item>
 
   <ion-item lines="full">
@@ -45,7 +61,14 @@
 
   <ion-item lines="full">
     <ion-label>Size</ion-label>
-    <ion-note slot="end">{{ o.sz }} / {{ o.origSz }}</ion-note>
+    <ion-note slot="end">
+      {{ o.sz }} / {{ o.origSz }} @if (sizeUsd(); as usd) {
+      <span class="size-usd">
+        @if (usd === origSizeUsd()) { (≈ {{ usd | number:'1.2-2' }} $) } @else { (≈ {{ usd |
+        number:'1.2-2' }} $ / {{ origSizeUsd() | number:'1.2-2' }} $) }
+      </span>
+      }
+    </ion-note>
   </ion-item>
 
   @if (o.isTrigger) {
