@@ -1,10 +1,10 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { AuthService } from '@auth/auth.service';
-import { HlActiveAssetData } from '@models/hl-active-asset-data.model';
 import type {
   CandleSnapshot,
   CandleSnapshotRequest,
+  HlActiveAssetData,
   HLClearinghouseState,
   HLFrontendOpenOrder,
   HLOpenOrder,

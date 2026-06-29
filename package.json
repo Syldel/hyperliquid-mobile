@@ -34,7 +34,7 @@
     "@capacitor/core": "^8.3.0",
     "@capacitor/preferences": "^8.0.1",
     "@ionic/angular": "^8.8.2",
-    "@syldel/hl-shared-types": "^0.0.10",
+    "@syldel/hl-shared-types": "^0.0.14",
     "capacitor-secure-storage-plugin": "^0.13.0",
     "jwt-decode": "^4.0.0",
     "lightweight-charts": "^5.2.0",

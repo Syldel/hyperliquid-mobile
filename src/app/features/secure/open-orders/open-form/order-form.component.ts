@@ -25,7 +25,6 @@ import {
   ModalController,
   ToastController,
 } from '@ionic/angular/standalone';
-import { HlActiveAssetData, HlActiveAssetLeverage } from '@models/hl-active-asset-data.model';
 import { AvailableCapitalService } from '@services/available-capital.service';
 import { HyperliquidGatewayService } from '@services/hyperliquid-gateway.service';
 import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
@@ -33,6 +32,8 @@ import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { MarketPickerModalComponent } from '@shared/components/market-picker-modal/market-picker-modal.component';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import {
+  HlActiveAssetData,
+  HlActiveAssetLeverage,
   HLFrontendOpenOrder,
   HLOrderDetails,
   HLPlaceOrderResponse,
