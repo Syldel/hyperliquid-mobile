@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { ConfigService } from '@services/config.service';
-import { HLPerpDex, HLPerpDexsResponse, HLPerpMeta, HLSpotMeta } from '@syldel/hl-shared-types';
+import { HLPerpDexsResponse, HLPerpMeta, HLSpotMeta } from '@syldel/hl-shared-types';
 import { forkJoin, map, Observable, of, switchMap, tap } from 'rxjs';
 
 const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24h
@@ -13,7 +13,7 @@ interface CacheEntry<T> {
 
 interface CacheMap {
   spot: HLSpotMeta;
-  hip3: HLPerpDex[];
+  hip3: HLPerpDexsResponse;
 }
 
 interface HLToken {
@@ -166,19 +166,18 @@ export class HyperliquidMarketService {
   //  HIP-3 / PerpDexs
   // ------------------------------------------------------------------ //
 
-  getPerpDexs(): Observable<HLPerpDex[]> {
+  getPerpDexs(): Observable<HLPerpDexsResponse> {
     const cached = this.getCache('hip3');
     if (cached) return of(cached);
     return this.post<HLPerpDexsResponse>({ type: 'perpDexs' }).pipe(
-      map((res) => res.filter((d): d is HLPerpDex => d !== null)),
       tap((data) => this.setCache('hip3', data)),
     );
   }
 
   /** Returns the list of PerpDex short names, e.g. ["test", "myDex", …] */
-  getPerpDexNames(): Observable<string[]> {
-    return this.getPerpDexs().pipe(map((dexs) => dexs.map((d) => d.name)));
-  }
+  // getPerpDexNames(): Observable<string[]> {
+  //   return this.getPerpDexs().pipe(map((dexs) => dexs.flatMap((d) => (d ? [d.name] : []))));
+  // }
 
   // ------------------------------------------------------------------ //
   //  Cache helpers
@@ -233,7 +232,7 @@ export class HyperliquidMarketService {
       const dex = this.extractDex(coin); // "vntl", "test", etc.
       return this.getPerpDexs().pipe(
         switchMap((dexs) => {
-          const perpDexIndex = dexs.findIndex((d) => d.name === dex);
+          const perpDexIndex = dexs.findIndex((d) => d?.name === dex);
           if (perpDexIndex === -1) throw new Error(`PerpDex not found for dex: ${dex}`);
           return this.getPerpMeta(dex).pipe(
             map((meta) => {

@@ -132,7 +132,19 @@
 
       @if (orderKind() === 'trigger') {
         <ion-item lines="full">
-          <ion-label position="stacked">Trigger price</ion-label>
+          <ion-label position="stacked">
+            <div>Trigger price</div>
+            @if (currentPrice(); as price) {
+              <span class="current-price-hint">
+                Market: {{ price | number: '1.2-6' }}
+                @if (triggerDiffPct(); as pct) {
+                  <span class="diff" [class]="triggerDiffClass()">
+                    {{ pct >= 0 ? '+' : '' }}{{ pct | number: '1.2-2' }}%
+                  </span>
+                }
+              </span>
+            }
+          </ion-label>
           <ion-input
             type="number"
             inputmode="decimal"

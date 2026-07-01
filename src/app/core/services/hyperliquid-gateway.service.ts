@@ -34,8 +34,11 @@ export class HyperliquidGatewayService {
   cancelOrder(
     cancels: Array<{ asset: number; oid: HLOid }>,
     isTestnet = false,
-  ): Observable<HLCancelOrderResponse> {
-    return this.post<HLCancelOrderResponse>('hyperliquid/order/cancel', { cancels, isTestnet });
+  ): Observable<HLSuccessResponse<HLCancelOrderResponse>> {
+    return this.post<HLSuccessResponse<HLCancelOrderResponse>>('hyperliquid/order/cancel', {
+      cancels,
+      isTestnet,
+    });
   }
 
   placeOrder(
@@ -61,4 +64,14 @@ export class HyperliquidGatewayService {
       isTestnet,
     });
   }
+
+  // TODO
+  // POST 'hyperliquid/orders'
+  // HLOrderDetails[]
+
+  // TODO
+  // updateLeverage
+  // POST 'hyperliquid/leverage'
+  // UpdateLeverageParams
+  // return HLSuccessResponse
 }

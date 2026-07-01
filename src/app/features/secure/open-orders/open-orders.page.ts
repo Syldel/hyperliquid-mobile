@@ -79,7 +79,12 @@ export class OpenOrdersPage extends MenuBasePage {
 
   filteredOrders = computed(() => {
     const coin = this.coinFilter();
-    return coin ? this.openOrders().filter((o) => o.coin === coin) : this.openOrders();
+    return (coin ? this.openOrders().filter((o) => o.coin === coin) : this.openOrders()).map(
+      (o) => ({
+        ...o,
+        isSpot: o.coin.includes('/'),
+      }),
+    );
   });
 
   forcedDex = signal<string | null>(null);

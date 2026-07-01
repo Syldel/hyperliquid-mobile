@@ -146,7 +146,9 @@ export class MarketPickerModalComponent implements OnInit {
 
     this.marketService.getPerpDexs().subscribe({
       next: (dexs) => {
-        const activeDexs = dexs.filter((d) => d.assetToStreamingOiCap.length > 0);
+        const activeDexs = dexs
+          .filter((d): d is HLPerpDex => d !== null)
+          .filter((d) => d.assetToStreamingOiCap.length > 0);
         this.perpDexs.set(activeDexs);
 
         const firstDex = this.selectedDex() || activeDexs[0]?.name;

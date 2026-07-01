@@ -26,10 +26,7 @@
   <ion-item lines="full">
     <ion-label>Side</ion-label>
     <div slot="end">
-      <ion-badge [color]="o.side === 'B' ? 'success' : 'danger'" class="side-badge">
-        @if (isSpot()) { {{ o.side === 'B' ? 'Buy' : 'Sell' }} } @else { {{ o.side === 'B' ? 'Long'
-        : 'Short' }} }
-      </ion-badge>
+      <ion-badge [color]="orderSideColor()" class="side-badge">{{ orderSideLabel() }}</ion-badge>
     </div>
   </ion-item>
 

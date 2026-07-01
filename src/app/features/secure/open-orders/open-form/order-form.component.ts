@@ -94,14 +94,42 @@ export class OrderFormComponent implements OnInit {
     return ((limit - current) / current) * 100;
   });
   isPriceInvalid = computed(() => {
+    const current = this.currentPrice();
+    if (!current) return false;
+    const isBuy = this.isBuy();
+
+    if (this.orderKind() === 'trigger') {
+      const trigger = parseFloat(this.triggerPx());
+      if (!trigger) return false;
+      const triggerPct = ((trigger - current) / current) * 100;
+      return this.tpsl() === 'tp'
+        ? isBuy
+          ? triggerPct > 0
+          : triggerPct < 0
+        : isBuy
+          ? triggerPct < 0
+          : triggerPct > 0;
+    }
+
+    if (this.reduceOnly()) return false;
+
     const pct = this.priceDiffPct();
     if (pct === null) return false;
-    const isBuy = this.isBuy();
-    const isReduce = this.reduceOnly();
-    return isReduce ? (isBuy ? pct < 0 : pct > 0) : isBuy ? pct > 0 : pct < 0;
+    return isBuy ? pct > 0 : pct < 0;
   });
   priceDiffClass = computed(() =>
     this.priceDiffPct() === null ? '' : this.isPriceInvalid() ? 'diff--danger' : '',
+  );
+
+  triggerDiffPct = computed(() => {
+    const current = this.currentPrice();
+    const trigger = parseFloat(this.triggerPx());
+    if (!current || !trigger || isNaN(trigger)) return null;
+    return ((trigger - current) / current) * 100;
+  });
+
+  triggerDiffClass = computed(() =>
+    this.triggerDiffPct() === null ? '' : this.isPriceInvalid() ? 'diff--danger' : '',
   );
 
   sizeUsd = computed(() => {
@@ -188,7 +216,8 @@ export class OrderFormComponent implements OnInit {
             if (market) this.szDecimals.set(market.szDecimals);
           });
         } else {
-          this.hlMarket.getPerpMeta().subscribe((meta) => {
+          const dex = this.hlMarket.extractDex(coin);
+          this.hlMarket.getPerpMeta(dex).subscribe((meta) => {
             const market = meta.universe.find((m) => m.name === coin || coin.includes(m.name));
             if (market) {
               this.szDecimals.set(market.szDecimals);

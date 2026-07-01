@@ -1,4 +1,5 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -17,6 +18,7 @@ import {
   IonLabel,
   IonNote,
   ModalController,
+  ToastController,
 } from '@ionic/angular/standalone';
 import { HyperliquidGatewayService } from '@services/hyperliquid-gateway.service';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
@@ -28,8 +30,9 @@ import {
   HLOrderStatusResponse,
   Timestamp,
 } from '@syldel/hl-shared-types';
+import { extractErrorMessage } from 'app/core/utils/hl-error.utils';
 import { addIcons } from 'ionicons';
-import { createOutline, trashOutline } from 'ionicons/icons';
+import { closeOutline, createOutline, trashOutline } from 'ionicons/icons';
 import { of, switchMap } from 'rxjs';
 import { OrderFormComponent } from '../open-form/order-form.component';
 
@@ -57,6 +60,7 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
   private readonly market = inject(HyperliquidMarketService);
   private readonly alertCtrl = inject(AlertController);
   private readonly hlMarket = inject(HyperliquidMarketService);
+  private readonly toastCtrl = inject(ToastController);
   private readonly modalCtrl = inject(ModalController);
 
   oid = signal<number | null>(null);
@@ -107,9 +111,19 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
     return sz * px;
   });
 
+  protected readonly orderSideLabel = computed(() => {
+    const order = this.order();
+    return order ? this.getOrderLabel(order) : '';
+  });
+
+  readonly orderSideColor = computed(() => {
+    const order = this.order();
+    return order?.side === 'B' ? 'success' : 'danger';
+  });
+
   constructor() {
     super();
-    addIcons({ trashOutline, createOutline });
+    addIcons({ trashOutline, createOutline, closeOutline });
   }
 
   ngOnInit(): void {
@@ -157,10 +171,24 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
     }
   }
 
+  private getOrderLabel(order: HLOrderStatusDetails | null): string {
+    if (!order) {
+      return '';
+    }
+
+    return this.isSpot()
+      ? order.side === 'B'
+        ? 'Buy'
+        : 'Sell'
+      : order.side === 'B'
+        ? 'Long'
+        : 'Short';
+  }
+
   async confirmCancel(): Promise<void> {
     const alert = await this.alertCtrl.create({
       header: 'Cancel order',
-      message: `Cancel ${this.order()?.side === 'B' ? 'Buy' : 'Sell'} order on ${this.coin()} ?`,
+      message: `Cancel ${this.getOrderLabel(this.order())} order on ${this.coin()} ?`,
       buttons: [
         { text: 'Back', role: 'cancel' },
         {
@@ -185,18 +213,32 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
       .subscribe({
         next: (res) => {
           this.cancelling.set(false);
-          const status = res.data.statuses[0];
+          const status = res.response.data.statuses[0];
           if (status === 'success') {
+            this.showToast(`Order ${this.oid()} cancelled`, 'success');
             this.router.navigate(['/secure/open-orders'], {
               queryParams: { coin: this.coin() },
             });
           } else {
-            console.error('Cancel failed:', status.error);
+            this.showToast(`Cancel failed: ${status.error}`, 'danger');
           }
         },
-        error: () => {
+        error: (err: HttpErrorResponse) => {
           this.cancelling.set(false);
+          this.showToast(extractErrorMessage(err), 'danger');
         },
       });
+  }
+
+  private showToast(message: string, color: 'success' | 'danger' | 'primary' = 'primary'): void {
+    this.toastCtrl
+      .create({
+        message,
+        duration: 3000,
+        position: 'top',
+        color,
+        buttons: [{ icon: 'close-outline', role: 'cancel' }],
+      })
+      .then((t) => t.present());
   }
 }
