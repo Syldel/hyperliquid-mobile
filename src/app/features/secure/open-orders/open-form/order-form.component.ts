@@ -37,13 +37,28 @@ import {
   HLFrontendOpenOrder,
   HLOrderDetails,
   HLPlaceOrderResponse,
+  HLPlaceOrderStatus,
   HLSuccessResponse,
   HLTif,
 } from '@syldel/hl-shared-types';
+import { extractErrorMessage } from 'app/core/utils/hl-error.utils';
 import { roundPrice, roundSize } from 'app/core/utils/hl-rounding.utils';
+import {
+  buildProtectiveOrderDetails,
+  computeProtectiveTriggerPx,
+} from 'app/core/utils/protective-order.utils';
 import { addIcons } from 'ionicons';
-import { chevronForwardOutline, closeOutline } from 'ionicons/icons';
-import { catchError, Observable, of } from 'rxjs';
+import {
+  addOutline,
+  chevronForwardOutline,
+  closeOutline,
+  shieldCheckmarkOutline,
+} from 'ionicons/icons';
+import { catchError, map, Observable, of, tap } from 'rxjs';
+import {
+  ProtectiveOrderFormComponent,
+  ProtectiveOrderResult,
+} from '../protective-order-form/protective-order-form.component';
 
 export type OrderFormMode = 'place' | 'modify';
 
@@ -86,6 +101,10 @@ export class OrderFormComponent implements OnInit {
   currentPrice = signal<number | null>(null);
   leverage = signal<HlActiveAssetLeverage | null>(null);
   maxLeverage = signal<number | null>(null);
+
+  protectiveOrders = signal<ProtectiveOrderResult[]>([]);
+  showProtectiveSection = computed(() => this.orderKind() === 'limit' && !this.isModify());
+  canAddProtectiveOrder = computed(() => !!this.limitPx() && parseFloat(this.sz()) > 0);
 
   priceDiffPct = computed(() => {
     const current = this.currentPrice();
@@ -195,7 +214,7 @@ export class OrderFormComponent implements OnInit {
   }
 
   constructor() {
-    addIcons({ closeOutline, chevronForwardOutline });
+    addIcons({ closeOutline, chevronForwardOutline, addOutline, shieldCheckmarkOutline });
 
     effect(() => {
       const price = this.currentPrice();
@@ -348,8 +367,123 @@ export class OrderFormComponent implements OnInit {
     }
   }
 
+  async openProtectiveOrderModal(): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: ProtectiveOrderFormComponent,
+      componentProps: {
+        coin: this.selectedCoin(),
+        coinTitle: this.coinTitle(),
+        mainIsBuy: this.isBuy(),
+        mainLimitPx: this.limitPx(),
+        mainSz: this.sz(),
+        szDecimals: this.szDecimals(),
+        isSpotAsset: this.isSpot(),
+      },
+      breakpoints: [0, 1],
+      initialBreakpoint: 1,
+    });
+    await modal.present();
+
+    const { data, role } = await modal.onDidDismiss<ProtectiveOrderResult>();
+    if (role === 'confirm' && data) {
+      this.protectiveOrders.update((list) => [...list, data]);
+    }
+  }
+
+  removeProtectiveOrder(id: string): void {
+    this.protectiveOrders.update((list) => list.filter((p) => p.id !== id));
+  }
+
   dismiss(): void {
     this.modalCtrl.dismiss(null, 'cancel');
+  }
+
+  getProtectiveTriggerPx(p: ProtectiveOrderResult): string {
+    return computeProtectiveTriggerPx(
+      {
+        isBuy: this.isBuy(),
+        limitPx: this.limitPx(),
+        szDecimals: this.szDecimals(),
+        isSpot: this.isSpot(),
+      },
+      { kind: p.kind, priceOffsetPercent: p.priceOffsetPercent },
+    );
+  }
+
+  getProtectiveSize(p: ProtectiveOrderResult): string {
+    const mainSz = parseFloat(this.sz()) || 0;
+    return roundSize((mainSz * p.sizePercent) / 100, this.szDecimals());
+  }
+
+  private showOrderStatusToast(
+    status: HLPlaceOrderStatus | undefined,
+    label: string,
+    isModify = false,
+  ): void {
+    if (!status) {
+      this.presentToast(`${label}: no response`, 'danger');
+      return;
+    }
+    if (status.error) {
+      this.presentToast(`${label} failed: ${status.error}`, 'danger');
+      return;
+    }
+
+    const oid = status.resting?.oid ?? status.filled?.oid;
+    let message: string;
+    if (isModify) {
+      message = oid ? `${label} updated · OID ${oid}` : `${label} updated`;
+    } else if (status.filled) {
+      const { totalSz, avgPx } = status.filled;
+      message = oid
+        ? `${label} filled · sz ${totalSz} @ ${avgPx} · OID ${oid}`
+        : `${label} filled · sz ${totalSz} @ ${avgPx}`;
+    } else {
+      message = oid ? `${label} placed · OID ${oid}` : `${label} placed`;
+    }
+
+    this.presentToast(message, status.filled ? 'success' : 'primary');
+  }
+
+  private presentToast(message: string, color: string): void {
+    this.toastCtrl
+      .create({
+        message,
+        duration: 3000,
+        position: 'top',
+        color,
+        buttons: [{ icon: 'close-outline', role: 'cancel' }],
+      })
+      .then((t) => t.present());
+  }
+
+  private submitProtectiveOrders$(mainContext: {
+    assetName: string;
+    isBuy: boolean;
+    limitPx: string;
+    sz: string;
+    szDecimals: number;
+    isSpot: boolean;
+  }): Observable<void> {
+    const items = this.protectiveOrders();
+    if (items.length === 0) return of(undefined);
+
+    const orders = items.map((p) => buildProtectiveOrderDetails(mainContext, p));
+    const labels = items.map((p) => p.label);
+
+    return this.hlGateway.placeOrders(orders).pipe(
+      tap((res) => {
+        const statuses: HLPlaceOrderStatus[] = res?.response?.data?.statuses ?? [];
+        labels.forEach((label, i) => this.showOrderStatusToast(statuses[i], label));
+        this.availableCapitalService.invalidate();
+      }),
+      map(() => undefined),
+      catchError((err: HttpErrorResponse) => {
+        const message = extractErrorMessage(err);
+        labels.forEach((label) => this.presentToast(`${label} failed: ${message}`, 'danger'));
+        return of(undefined); // on avale l'erreur pour ne pas bloquer le dismiss
+      }),
+    );
   }
 
   buildOrderDetails(): HLOrderDetails {
@@ -388,7 +522,7 @@ export class OrderFormComponent implements OnInit {
     this.submitting.set(true);
 
     const existing = this.existingOrder;
-    const call$: import('rxjs').Observable<HLSuccessResponse<HLPlaceOrderResponse>> =
+    const call$: Observable<HLSuccessResponse<HLPlaceOrderResponse>> =
       this.isModify() && existing
         ? this.hlGateway.modifyOrder(existing.oid, order)
         : this.hlGateway.placeOrder(order);
@@ -397,7 +531,7 @@ export class OrderFormComponent implements OnInit {
       next: (res: HLSuccessResponse<HLPlaceOrderResponse>) => {
         this.submitting.set(false);
 
-        const statuses = res?.response?.data?.statuses ?? [];
+        const statuses: HLPlaceOrderStatus[] = res?.response?.data?.statuses ?? [];
         const first = statuses[0];
 
         if (first?.error) {
@@ -405,56 +539,31 @@ export class OrderFormComponent implements OnInit {
           return;
         }
 
-        const oid = first?.resting?.oid ?? first?.filled?.oid;
-        const isModify = this.isModify();
+        this.showOrderStatusToast(first, 'Order', this.isModify());
+        this.availableCapitalService.invalidate();
 
-        let message: string;
-        if (isModify) {
-          message = oid ? `Order updated · OID ${oid}` : 'Order updated';
-        } else if (first?.filled) {
-          const { totalSz, avgPx } = first.filled;
-          message = oid
-            ? `Filled · sz ${totalSz} @ ${avgPx} · OID ${oid}`
-            : `Filled · sz ${totalSz} @ ${avgPx}`;
-        } else {
-          message = oid ? `Order placed · OID ${oid}` : 'Order placed';
+        if (this.isModify()) {
+          this.modalCtrl.dismiss(null, 'confirm');
+          return;
         }
 
-        this.toastCtrl
-          .create({
-            message,
-            duration: 3000,
-            position: 'top',
-            color: first?.filled ? 'success' : 'primary',
-            buttons: [{ icon: 'close-outline', role: 'cancel' }],
-          })
-          .then((t) => t.present());
+        const mainContext = {
+          assetName: this.selectedCoin(),
+          isBuy: this.isBuy(),
+          limitPx: this.limitPx(),
+          sz: this.sz(),
+          szDecimals: this.szDecimals(),
+          isSpot: this.isSpot(),
+        };
 
-        this.modalCtrl.dismiss(null, 'confirm');
+        this.submitProtectiveOrders$(mainContext).subscribe(() => {
+          this.modalCtrl.dismiss(null, 'confirm');
+        });
       },
       error: (err: HttpErrorResponse) => {
         this.submitting.set(false);
-        this.error.set(this.extractErrorMessage(err));
+        this.error.set(extractErrorMessage(err));
       },
     });
-  }
-
-  private extractErrorMessage(err: HttpErrorResponse): string {
-    if (err.status === 0) {
-      return 'Network error (offline, DNS failure, CORS restriction, SSL error, timeout, or server unreachable).';
-    }
-
-    const body = err.error;
-    if (typeof body?.message === 'string' && body.message) {
-      return `[HTTP ${err.status}] ${body.message}`;
-    }
-    if (typeof body?.error === 'string' && body.error) {
-      return `[HTTP ${err.status}] ${body.error}`;
-    }
-    if (typeof body === 'string' && body) {
-      return `[HTTP ${err.status}] ${body}`;
-    }
-
-    return `[HTTP ${err.status}] ${err.message}`;
   }
 }

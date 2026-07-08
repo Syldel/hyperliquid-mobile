@@ -3,61 +3,110 @@ import { Observable, of } from 'rxjs';
 import { map, tap } from 'rxjs/operators';
 import { HyperliquidInfoService } from './hyperliquid-info.service';
 
-const SPOT_STABLECOIN_FALLBACK = ['USDC', 'USDT', 'USDT0', 'USDE'] as const;
+interface SpotBalance {
+  coin: string;
+  total: string;
+  hold: string;
+}
 
-interface CacheEntry {
-  value: number;
+interface CacheEntry<T> {
+  value: T;
   expiresAt: number;
 }
 
+/**
+ * Hypothèse structurante de ce service : le compte est TOUJOURS en mode
+ * Unified Account (cf. doc Hyperliquid, "Account abstraction modes").
+ *
+ * Conséquence directe (doc officielle) :
+ * "For API users, unified account ... show all balances and holds in the
+ *  spot clearinghouse state. Individual perp dex user states are not
+ *  meaningful."
+ *
+ * => Il n'y a donc PAS de branchement "perp state par DEX" ici. Le solde
+ *    spot (getTokenBalances) est l'unique source de collatéral, que la
+ *    paire soit spot ou perp. Si un jour le mode Standard/Manual doit être
+ *    supporté, il faudra réintroduire une branche équivalente à
+ *    `getCachedPerpState` côté Nest, gardée derrière la détection du mode.
+ */
 @Injectable({ providedIn: 'root' })
 export class AvailableCapitalService {
   private readonly hlInfo = inject(HyperliquidInfoService);
 
-  private readonly TTL_MS = 5_000;
-  private readonly cache = new Map<string, CacheEntry>();
+  private readonly BALANCE_TTL_MS = 10_000;
 
+  // Un seul cache global pour TOUS les soldes spot : on ne les récupère
+  // qu'une fois, puis on route vers le bon actif de collatéral en mémoire.
+  // Ça évite l'ancien bug de clé de cache par paire/dex qui pouvait faire
+  // collisionner deux quote assets différents (ex: XYZ/USDC et ABC/USDT).
+  private spotBalancesCache: CacheEntry<SpotBalance[]> | null = null;
+
+  /**
+   * Capital disponible = total - hold (et non `hold` seul, qui représente
+   * au contraire le montant bloqué par des ordres ouverts).
+   */
   getAvailableCapital(dex: string, pairName: string): Observable<number> {
-    const isSpot = pairName.includes('/');
-    const cacheKey = `${dex ?? 'hl'}:${isSpot ? 'spot' : 'perp'}`;
+    const collateralAsset = this.resolveCollateralAsset(dex, pairName);
 
-    const cached = this.cache.get(cacheKey);
-    if (cached && Date.now() < cached.expiresAt) {
-      return of(cached.value);
-    }
-
-    const request$ = isSpot ? this.resolveSpotCapital() : this.resolvePerpCapital(dex);
-
-    return request$.pipe(
-      tap((value) => this.cache.set(cacheKey, { value, expiresAt: Date.now() + this.TTL_MS })),
-    );
-  }
-
-  private resolveSpotCapital(): Observable<number> {
-    return this.hlInfo.getTokenBalances().pipe(
+    return this.getCachedSpotBalances().pipe(
       map((balances) => {
-        for (const stable of SPOT_STABLECOIN_FALLBACK) {
-          const entry = balances.find((b) => b.coin === stable && parseFloat(b.hold) > 0);
-          if (entry) return parseFloat(entry.hold);
-        }
-        return 0;
+        const entry = balances.find((b) => b.coin === collateralAsset);
+        if (!entry) return 0;
+
+        const total = parseFloat(entry.total);
+        const hold = parseFloat(entry.hold);
+        return Math.max(total - hold, 0);
       }),
     );
   }
 
-  private resolvePerpCapital(dex: string): Observable<number> {
-    return this.hlInfo
-      .getClearinghouseState(dex)
-      .pipe(map((state) => parseFloat(state.marginSummary.accountValue)));
+  /**
+   * Détermine l'actif de collatéral pertinent :
+   * - Spot  : le quote asset réel de la paire (ex: "XYZ/USDT" -> USDT),
+   *           jamais une liste de fallback statique.
+   * - Perp  : dépend du DEX de rattachement, à défaut d'override explicite
+   *           (mêmes règles que côté Nest : HYNA -> USDE, CASH -> USDT,
+   *           sinon USDC, cf. doc "USDC balance is the single source for
+   *           validator-operated perps... USDT balance is the single
+   *           source for CASH perps").
+   */
+  private resolveCollateralAsset(dex: string, pairName: string): string {
+    const isSpot = pairName.includes('/');
+
+    if (isSpot) {
+      const [, quote] = pairName.split('/');
+      return (quote ?? 'USDC').toUpperCase();
+    }
+
+    const dexLower = (dex ?? '').toLowerCase();
+    if (dexLower === 'hyna') return 'USDE';
+    if (dexLower === 'cash') return 'USDT';
+    return 'USDC';
   }
 
-  invalidate(dex?: string, pairName?: string): void {
-    if (!dex && !pairName) {
-      this.cache.clear();
-      return;
+  private getCachedSpotBalances(): Observable<SpotBalance[]> {
+    const now = Date.now();
+    if (this.spotBalancesCache && this.spotBalancesCache.expiresAt > now) {
+      return of(this.spotBalancesCache.value);
     }
-    const isSpot = pairName?.includes('/');
-    const cacheKey = `${dex ?? 'hl'}:${isSpot ? 'spot' : 'perp'}`;
-    this.cache.delete(cacheKey);
+
+    return this.hlInfo.getTokenBalances().pipe(
+      tap((balances) => {
+        this.spotBalancesCache = {
+          value: balances,
+          expiresAt: now + this.BALANCE_TTL_MS,
+        };
+      }),
+    );
+  }
+
+  /**
+   * Invalide le cache (ex: après un ordre exécuté, un dépôt/retrait...).
+   * Les paramètres sont conservés pour compat avec les appels existants
+   * mais n'ont plus d'effet : le cache est désormais global puisqu'il n'y
+   * a plus qu'une seule source (spot balances) à invalider.
+   */
+  invalidate(_dex?: string, _pairName?: string): void {
+    this.spotBalancesCache = null;
   }
 }

@@ -100,6 +100,11 @@ export class OpenOrdersPage extends MenuBasePage {
     });
   }
 
+  override ionViewWillEnter(): void {
+    super.ionViewWillEnter();
+    this.fetchFn.set(this.buildFetchFn());
+  }
+
   ngOnInit(): void {
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const raw = params.get('coin');

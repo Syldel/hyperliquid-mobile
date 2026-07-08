@@ -1,7 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
 
 export function extractErrorMessage(err: HttpErrorResponse): string {
-  if (err.status === 0) return 'Network error.';
+  if (err.status === 0) {
+    return 'Network error (offline, DNS failure, CORS restriction, SSL error, timeout, or server unreachable).';
+  }
   const body = err.error;
   if (typeof body === 'string' && body) return body;
   if (typeof body?.message === 'string' && body.message) return body.message;

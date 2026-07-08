@@ -1,0 +1,107 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Add protective order</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="dismiss()">
+        <ion-icon slot="icon-only" name="close-outline" />
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <p class="section-label">{{ coinTitle || coin }} · {{ mainIsBuy ? 'Long' : 'Short' }} position</p>
+
+  <ion-segment [value]="kind()" (ionChange)="onKindChange($event.detail.value)">
+    <ion-segment-button value="sl">
+      <ion-label>Stop Loss</ion-label>
+    </ion-segment-button>
+    <ion-segment-button value="tp">
+      <ion-label>Take Profit</ion-label>
+    </ion-segment-button>
+  </ion-segment>
+
+  <p class="closing-side-hint">
+    Closes with
+    <strong>{{ closingSideLabel() }}</strong>
+    · Reduce only · Trigger order
+  </p>
+
+  <ion-list inset class="section-block">
+    <ion-item lines="none">
+      <ion-label>Market execution</ion-label>
+      <ion-toggle [checked]="isMarket()" (ionChange)="isMarket.set($event.detail.checked)" />
+    </ion-item>
+  </ion-list>
+
+  <div class="two-col section-block">
+    <ion-item lines="full">
+      <ion-label position="stacked">Size %</ion-label>
+      <ion-input
+        type="number"
+        inputmode="decimal"
+        max="100"
+        min="0"
+        [value]="sizePercent()"
+        (ionInput)="onSizePercentInput($event.detail.value ?? '')"
+      />
+    </ion-item>
+    <ion-item lines="full">
+      <ion-label position="stacked">
+        <div>Size</div>
+        @if (sz() && !isSizeValid()) {
+          <span class="diff diff--danger">Exceeds position size</span>
+        }
+        @if (usdEquivalent(); as usd) {
+          <span class="current-price-hint">≈ {{ usd | number: '1.2-2' }} $</span>
+        }
+      </ion-label>
+      <ion-input
+        type="number"
+        inputmode="decimal"
+        [value]="sz()"
+        (ionInput)="onSizeInput($event.detail.value ?? '')"
+      />
+    </ion-item>
+  </div>
+
+  <div class="two-col section-block">
+    <ion-item lines="full">
+      <ion-label position="stacked">Price offset %</ion-label>
+      <ion-input
+        type="number"
+        inputmode="decimal"
+        placeholder="0.00"
+        [value]="priceOffsetPercent()"
+        (ionInput)="onPriceOffsetInput($event.detail.value ?? '')"
+      />
+    </ion-item>
+    <ion-item lines="full">
+      <ion-label position="stacked">
+        <div>Trigger price</div>
+        @if (triggerPx() && !isTriggerValid()) {
+          <span class="diff diff--danger">Wrong side of entry price</span>
+        }
+      </ion-label>
+      <ion-input
+        type="number"
+        inputmode="decimal"
+        placeholder="0.00"
+        [value]="triggerPx()"
+        (ionInput)="onTriggerPriceInput($event.detail.value ?? '')"
+      />
+    </ion-item>
+  </div>
+  <div class="two-col">
+    <span></span>
+    <p class="entry-price-hint">Entry (limit) price: {{ mainLimitPx | number: '1.2-6' }}</p>
+  </div>
+</ion-content>
+
+<ion-footer>
+  <ion-toolbar>
+    <ion-button class="ion-padding" expand="block" [disabled]="isFormInvalid()" (click)="confirm()">
+      Add order
+    </ion-button>
+  </ion-toolbar>
+</ion-footer>

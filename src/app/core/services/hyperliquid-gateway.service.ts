@@ -53,6 +53,18 @@ export class HyperliquidGatewayService {
     });
   }
 
+  placeOrders(
+    orders: HLOrderDetails[],
+    grouping: HLOrderGrouping = 'na',
+    isTestnet = false,
+  ): Observable<HLSuccessResponse<HLPlaceOrderResponse>> {
+    return this.post<HLSuccessResponse<HLPlaceOrderResponse>>('hyperliquid/orders', {
+      orders,
+      grouping,
+      isTestnet,
+    });
+  }
+
   modifyOrder(
     oid: HLOid,
     order: HLOrderDetails,
@@ -64,10 +76,6 @@ export class HyperliquidGatewayService {
       isTestnet,
     });
   }
-
-  // TODO
-  // POST 'hyperliquid/orders'
-  // HLOrderDetails[]
 
   // TODO
   // updateLeverage

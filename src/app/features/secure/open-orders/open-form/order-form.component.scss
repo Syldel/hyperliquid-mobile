@@ -96,6 +96,19 @@
   }
 }
 
+.protective-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+.sub-hint {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--ion-color-medium);
+}
+
 .submit-wrap {
   padding: 16px 12px 8px;
 

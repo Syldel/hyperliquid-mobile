@@ -20,6 +20,7 @@ import {
   ModalController,
   ToastController,
 } from '@ionic/angular/standalone';
+import { AvailableCapitalService } from '@services/available-capital.service';
 import { HyperliquidGatewayService } from '@services/hyperliquid-gateway.service';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
@@ -62,6 +63,7 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
   private readonly hlMarket = inject(HyperliquidMarketService);
   private readonly toastCtrl = inject(ToastController);
   private readonly modalCtrl = inject(ModalController);
+  private readonly availableCapitalService = inject(AvailableCapitalService);
 
   oid = signal<number | null>(null);
   coin = signal<string>('');
@@ -216,6 +218,7 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
           const status = res.response.data.statuses[0];
           if (status === 'success') {
             this.showToast(`Order ${this.oid()} cancelled`, 'success');
+            this.availableCapitalService.invalidate();
             this.router.navigate(['/secure/open-orders'], {
               queryParams: { coin: this.coin() },
             });
