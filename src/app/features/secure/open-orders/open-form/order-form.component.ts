@@ -244,6 +244,9 @@ export class OrderFormComponent implements OnInit {
             }
           });
         }
+        if (this.orderKind() === 'trigger') {
+          this.prefillFromExistingPosition();
+        }
       });
     });
 
@@ -255,7 +258,12 @@ export class OrderFormComponent implements OnInit {
         const kindChanged = kind !== this.previousKind();
         this.previousKind.set(kind);
         this.reduceOnly.set(kind === 'trigger');
-        if (kindChanged) this.isBuy.set(!isBuy);
+        if (kindChanged) {
+          this.isBuy.set(!isBuy);
+          if (kind === 'trigger') {
+            this.prefillFromExistingPosition();
+          }
+        }
         if (kind === 'trigger') {
           const limit = parseFloat(this.limitPx());
           if (limit) this.triggerPx.set(String(this.applyReverseTrigger(limit)));
@@ -345,6 +353,29 @@ export class OrderFormComponent implements OnInit {
         return of(null);
       }),
     );
+  }
+
+  private prefillFromExistingPosition(): void {
+    if (this.isModify()) return;
+    const coin = this.selectedCoin();
+    if (!coin) return;
+
+    const dex = this.hlMarket.extractDex(coin);
+    this.hlInfo.getClearinghouseState(dex).subscribe({
+      next: (state) => {
+        const position = state.assetPositions.find((ap) => ap.position?.coin === coin)?.position;
+        if (!position) return;
+
+        const szi = parseFloat(position.szi);
+        if (!szi) return;
+
+        this.sz.set(roundSize(Math.abs(szi), this.szDecimals()));
+        this.isBuy.set(szi > 0 ? false : true);
+      },
+      error: () => {
+        // pas de position ou erreur réseau : on garde le comportement par défaut (flip manuel)
+      },
+    });
   }
 
   async openMarketPicker(): Promise<void> {
