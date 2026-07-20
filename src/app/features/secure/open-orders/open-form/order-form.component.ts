@@ -101,6 +101,7 @@ export class OrderFormComponent implements OnInit {
   currentPrice = signal<number | null>(null);
   leverage = signal<HlActiveAssetLeverage | null>(null);
   maxLeverage = signal<number | null>(null);
+  activePosition = signal<{ isBuy: boolean; sz: string; entryPx: string } | null>(null);
 
   protectiveOrders = signal<ProtectiveOrderResult[]>([]);
   showProtectiveSection = computed(() => this.orderKind() === 'limit' && !this.isModify());
@@ -197,6 +198,8 @@ export class OrderFormComponent implements OnInit {
   previousKind = signal<'limit' | 'trigger'>(this.orderKind());
   readonly TRIGGER_OFFSET = 0.001; // 0.1%
 
+  private defaultSizeApplied = false;
+
   private getTriggerFactor(): number {
     return this.isBuy() ? 1 + this.TRIGGER_OFFSET : 1 - this.TRIGGER_OFFSET;
   }
@@ -218,9 +221,10 @@ export class OrderFormComponent implements OnInit {
 
     effect(() => {
       const price = this.currentPrice();
-      if (!price || this.isModify()) return;
+      if (!price || this.isModify() || this.defaultSizeApplied) return;
       untracked(() => {
         this.sz.set((10 / price).toFixed(6));
+        this.defaultSizeApplied = true;
       });
     });
 
@@ -228,6 +232,8 @@ export class OrderFormComponent implements OnInit {
       const coin = this.selectedCoin();
       untracked(() => {
         this.fetchFn.set(this.buildFetchFn());
+        this.defaultSizeApplied = false;
+        this.activePosition.set(null);
         if (!coin) return;
         if (this.isSpot()) {
           this.hlMarket.getSpotMeta().subscribe((meta) => {
@@ -245,7 +251,7 @@ export class OrderFormComponent implements OnInit {
           });
         }
         if (this.orderKind() === 'trigger') {
-          this.prefillFromExistingPosition();
+          this.loadActivePosition();
         }
       });
     });
@@ -260,9 +266,10 @@ export class OrderFormComponent implements OnInit {
         this.reduceOnly.set(kind === 'trigger');
         if (kindChanged) {
           this.isBuy.set(!isBuy);
-          if (kind === 'trigger') {
-            this.prefillFromExistingPosition();
-          }
+          this.loadActivePosition();
+        }
+        if (kind !== 'trigger') {
+          this.activePosition.set(null);
         }
         if (kind === 'trigger') {
           const limit = parseFloat(this.limitPx());
@@ -355,26 +362,36 @@ export class OrderFormComponent implements OnInit {
     );
   }
 
-  private prefillFromExistingPosition(): void {
-    if (this.isModify()) return;
+  private loadActivePosition(): void {
     const coin = this.selectedCoin();
-    if (!coin) return;
+    if (!coin || this.isModify() || this.orderKind() !== 'trigger') {
+      this.activePosition.set(null);
+      return;
+    }
 
     const dex = this.hlMarket.extractDex(coin);
     this.hlInfo.getClearinghouseState(dex).subscribe({
       next: (state) => {
         const position = state.assetPositions.find((ap) => ap.position?.coin === coin)?.position;
-        if (!position) return;
+        if (!position) {
+          this.activePosition.set(null);
+          return;
+        }
 
         const szi = parseFloat(position.szi);
-        if (!szi) return;
+        if (!szi) {
+          this.activePosition.set(null);
+          return;
+        }
 
-        this.sz.set(roundSize(Math.abs(szi), this.szDecimals()));
-        this.isBuy.set(szi > 0 ? false : true);
+        const sz = roundSize(Math.abs(szi), this.szDecimals());
+        const isBuy = szi > 0; // szi > 0 = long, szi < 0 = short
+
+        this.activePosition.set({ isBuy, sz, entryPx: position.entryPx });
+        this.sz.set(sz);
+        this.isBuy.set(!isBuy); // side de clôture: long -> sell, short -> buy
       },
-      error: () => {
-        // pas de position ou erreur réseau : on garde le comportement par défaut (flip manuel)
-      },
+      error: () => this.activePosition.set(null),
     });
   }
 
@@ -446,11 +463,7 @@ export class OrderFormComponent implements OnInit {
     return roundSize((mainSz * p.sizePercent) / 100, this.szDecimals());
   }
 
-  private showOrderStatusToast(
-    status: HLPlaceOrderStatus | undefined,
-    label: string,
-    isModify = false,
-  ): void {
+  private showOrderStatusToast(status: HLPlaceOrderStatus | undefined, label: string): void {
     if (!status) {
       this.presentToast(`${label}: no response`, 'danger');
       return;
@@ -462,9 +475,7 @@ export class OrderFormComponent implements OnInit {
 
     const oid = status.resting?.oid ?? status.filled?.oid;
     let message: string;
-    if (isModify) {
-      message = oid ? `${label} updated · OID ${oid}` : `${label} updated`;
-    } else if (status.filled) {
+    if (status.filled) {
       const { totalSz, avgPx } = status.filled;
       message = oid
         ? `${label} filled · sz ${totalSz} @ ${avgPx} · OID ${oid}`
@@ -562,6 +573,19 @@ export class OrderFormComponent implements OnInit {
       next: (res: HLSuccessResponse<HLPlaceOrderResponse>) => {
         this.submitting.set(false);
 
+        if (this.isModify()) {
+          // La réponse de modifyOrder ne contient pas forcément data.statuses:
+          // status: 'ok' suffit à confirmer le succès de la modification.
+          if (res?.status === 'ok') {
+            this.presentToast('Order updated', 'success');
+            this.availableCapitalService.invalidate();
+            this.modalCtrl.dismiss(null, 'confirm');
+          } else {
+            this.error.set('Failed to update order.');
+          }
+          return;
+        }
+
         const statuses: HLPlaceOrderStatus[] = res?.response?.data?.statuses ?? [];
         const first = statuses[0];
 
@@ -570,13 +594,8 @@ export class OrderFormComponent implements OnInit {
           return;
         }
 
-        this.showOrderStatusToast(first, 'Order', this.isModify());
+        this.showOrderStatusToast(first, 'Order');
         this.availableCapitalService.invalidate();
-
-        if (this.isModify()) {
-          this.modalCtrl.dismiss(null, 'confirm');
-          return;
-        }
 
         const mainContext = {
           assetName: this.selectedCoin(),

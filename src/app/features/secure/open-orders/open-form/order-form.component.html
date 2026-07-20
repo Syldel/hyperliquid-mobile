@@ -92,6 +92,13 @@
                 </span>
               </div>
             }
+            @if (activePosition(); as pos) {
+              <div class="current-price-hint">
+                Active position:
+                {{ pos.isBuy ? (isSpot() ? 'Buy' : 'Long') : isSpot() ? 'Sell' : 'Short' }} ·
+                {{ pos.sz }}
+              </div>
+            }
           </ion-label>
           <ion-input
             type="number"
@@ -143,6 +150,9 @@
                   </span>
                 }
               </span>
+            }
+            @if (activePosition(); as pos) {
+              <span class="current-price-hint">· Entry: {{ pos.entryPx | number: '1.2-6' }}</span>
             }
           </ion-label>
           <ion-input
