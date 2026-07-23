@@ -31,7 +31,7 @@ import {
   HLOrderStatusResponse,
   Timestamp,
 } from '@syldel/hl-shared-types';
-import { extractErrorMessage } from 'app/core/utils/hl-error.utils';
+import { extractErrorMessage } from '@utils/hl-error.utils';
 import { addIcons } from 'ionicons';
 import { closeOutline, createOutline, trashOutline } from 'ionicons/icons';
 import { of, switchMap } from 'rxjs';

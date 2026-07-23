@@ -41,12 +41,12 @@ import {
   HLSuccessResponse,
   HLTif,
 } from '@syldel/hl-shared-types';
-import { extractErrorMessage } from 'app/core/utils/hl-error.utils';
-import { roundPrice, roundSize } from 'app/core/utils/hl-rounding.utils';
+import { extractErrorMessage } from '@utils/hl-error.utils';
+import { roundPrice, roundSize } from '@utils/hl-rounding.utils';
 import {
   buildProtectiveOrderDetails,
   computeProtectiveTriggerPx,
-} from 'app/core/utils/protective-order.utils';
+} from '@utils/protective-order.utils';
 import { addIcons } from 'ionicons';
 import {
   addOutline,

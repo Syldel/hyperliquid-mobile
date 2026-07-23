@@ -32,9 +32,9 @@
   <!-- ── Context chip ───────────────────────────────────────────── -->
   <div class="context-row">
     <ion-chip color="medium" class="strategy-chip">
-      {{ pair().strategy.name }}
-      @if (pair().strategy.shortname) {
-        <span class="chip-short">{{ pair().strategy.shortname }}</span>
+      {{ pair().strategy?.name }}
+      @if (pair().strategy?.shortname) {
+        <span class="chip-short">{{ pair().strategy?.shortname }}</span>
       }
     </ion-chip>
     <ion-chip color="medium" class="interval-chip">

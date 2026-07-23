@@ -22,6 +22,7 @@
       "@models/*": ["app/core/models/*"],
       "@services/*": ["app/core/services/*"],
       "@pipes/*": ["app/core/pipes/*"],
+      "@utils/*": ["app/core/utils/*"],
       "@shared/*": ["app/shared/*"],
       "@features/*": ["app/features/*"]
     }

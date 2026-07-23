@@ -27,11 +27,8 @@ import {
   ModalController,
   SegmentValue,
 } from '@ionic/angular/standalone';
-import { roundSize } from 'app/core/utils/hl-rounding.utils';
-import {
-  computeProtectiveTriggerPx,
-  ProtectiveOrderKind,
-} from 'app/core/utils/protective-order.utils';
+import { roundSize } from '@utils/hl-rounding.utils';
+import { computeProtectiveTriggerPx, ProtectiveOrderKind } from '@utils/protective-order.utils';
 import { addIcons } from 'ionicons';
 import { closeOutline } from 'ionicons/icons';
 

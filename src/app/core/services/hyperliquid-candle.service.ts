@@ -1,6 +1,11 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { CandleSnapshot, CandleSnapshotRequest } from '@syldel/hl-shared-types';
+import {
+  CANDLE_INTERVAL_MINUTES,
+  CandleInterval,
+  CandleSnapshot,
+  CandleSnapshotRequest,
+} from '@syldel/hl-shared-types';
 import { Observable, of } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { ConfigService } from './config.service';
@@ -10,27 +15,15 @@ interface CacheEntry {
   fetchedAt: number;
 }
 
-const INTERVAL_MS: Record<string, number> = {
-  '1m': 60_000,
-  '3m': 180_000,
-  '5m': 300_000,
-  '15m': 900_000,
-  '30m': 1_800_000,
-  '1h': 3_600_000,
-  '2h': 7_200_000,
-  '4h': 14_400_000,
-  '8h': 28_800_000,
-  '12h': 43_200_000,
-  '1d': 86_400_000,
-  '3d': 259_200_000,
-  '1w': 604_800_000,
-  '1M': 2_592_000_000,
-};
-
-/** TTL du cache = interval / 4, plancher à 15s. */
-const CACHE_TTL: Record<string, number> = Object.fromEntries(
-  Object.entries(INTERVAL_MS).map(([k, v]) => [k, Math.max(v / 4, 15_000)]),
-);
+/** TTL cache par interval = (durée de la bougie) / 4, plancher à 15s. Derived from
+ * CANDLE_INTERVAL_MINUTES (hl-shared-types) — single source of truth, mirrors the
+ * same computation used on the Nest side, no local duplicate of the raw ms table. */
+const CACHE_TTL: Record<CandleInterval, number> = Object.fromEntries(
+  Object.entries(CANDLE_INTERVAL_MINUTES).map(([interval, minutes]) => {
+    const intervalMs = minutes * 60 * 1000;
+    return [interval, Math.max(intervalMs / 4, 15_000)];
+  }),
+) as Record<CandleInterval, number>;
 
 @Injectable({ providedIn: 'root' })
 export class HyperliquidCandleService {
@@ -98,7 +91,7 @@ export class HyperliquidCandleService {
 
   // ── Utils ──────────────────────────────────────────────────────────────────
 
-  intervalToMs(interval: string): number {
-    return INTERVAL_MS[interval] ?? 3_600_000;
+  intervalToMs(interval: CandleInterval): number {
+    return (CANDLE_INTERVAL_MINUTES[interval] ?? 60) * 60 * 1000;
   }
 }

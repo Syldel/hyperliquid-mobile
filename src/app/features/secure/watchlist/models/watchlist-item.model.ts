@@ -1,27 +1,19 @@
 import { CandleInterval } from '@syldel/hl-shared-types';
+import { AnalysisStrategyRequest, IndicatorRequest } from '@syldel/trading-shared-types';
+
+export interface ActiveIndicator {
+  id: string; // uuid client, ex: "ema-9-a1b2" — distingue 2x EMA avec des périodes différentes
+  request: IndicatorRequest;
+  visible: boolean; // toggle sans supprimer la config
+}
 
 export interface WatchlistItem {
   coin: string;
   interval: CandleInterval;
   addedAt: number;
+  activeIndicators?: ActiveIndicator[];
+  activeStrategy?: AnalysisStrategyRequest | null;
 }
-
-export const CANDLE_INTERVALS: CandleInterval[] = [
-  '1m',
-  '3m',
-  '5m',
-  '15m',
-  '30m',
-  '1h',
-  '2h',
-  '4h',
-  '8h',
-  '12h',
-  '1d',
-  '3d',
-  '1w',
-  '1M',
-];
 
 export const INTERVAL_LABELS: Record<CandleInterval, string> = {
   '1m': '1m',

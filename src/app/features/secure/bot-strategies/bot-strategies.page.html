@@ -9,7 +9,7 @@
     @for (entry of botEntries(); track entry.key) {
     <ion-item-group>
       <ion-item-divider>
-        <ion-label color="dark">{{ entry.value.name | titlecase }}</ion-label>
+        <ion-label color="dark">{{ entry.key | titlecase }}</ion-label>
         <ion-toggle
           slot="end"
           [checked]="entry.value.enabled"
@@ -23,7 +23,7 @@
           <ion-label>
             <div class="pair-header">
               <strong>{{ pair.name }}</strong>
-              <ion-badge color="primary">{{ pair.strategy.name }}</ion-badge>
+              <ion-badge color="primary">{{ pair.strategy?.name }}</ion-badge>
             </div>
             <p>
               Ratio: {{ pair.ratio }}% · Interval: {{ pair.interval }} @if (pair.exitBehavior) { ·
@@ -34,8 +34,8 @@
               }
             </p>
             <div class="prot-summary">
-              @if (pair.strategy.protective?.entries?.length) { @for (group of
-              protGroups(pair.strategy.protective!.entries); track $index) {
+              @let entries = protectiveEntries(pair); @if (entries.length) { @for (group of
+              protGroups(entries); track $index) {
               <div class="prot-row">
                 @for (e of group; track $index) {
                 <ion-badge [color]="e.tpsl === 'tp' ? 'success' : 'danger'" class="prot-badge">

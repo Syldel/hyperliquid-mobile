@@ -14,16 +14,25 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { IonButton, IonChip, IonIcon, IonSkeletonText } from '@ionic/angular/standalone';
 import { AppLifecycleService } from '@services/app-lifecycle.service';
+import { BotService } from '@services/bot.service';
+import { ChartAnalysisService } from '@services/chart-analysis.service';
 import { HyperliquidCacheService } from '@services/hyperliquid-cache.service';
 import { HyperliquidCandleService } from '@services/hyperliquid-candle.service';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import {
+  CANDLE_INTERVALS,
   CandleInterval,
   CandleSnapshot,
   HLOrderStatusData,
   HLUserFill,
 } from '@syldel/hl-shared-types';
+import {
+  AnalysisRequest,
+  AnalysisStrategyRequest,
+  IndicatorRequest,
+} from '@syldel/trading-shared-types';
+import { toChartInterval } from '@utils/hl-interval.utils';
 import { addIcons } from 'ionicons';
 import { calendarOutline, receiptOutline, refreshOutline } from 'ionicons/icons';
 import {
@@ -38,12 +47,14 @@ import {
 } from 'lightweight-charts';
 import { firstValueFrom } from 'rxjs';
 import {
-  CANDLE_INTERVALS,
+  ActiveIndicator,
   DATE_PRESETS,
   DatePreset,
   INTERVAL_LABELS,
   WatchlistItem,
 } from '../../models/watchlist-item.model';
+import { IndicatorOverlayService } from '../../services/indicator-overlay.service';
+import { StrategySignalsOverlayService } from '../../services/strategy-signals-overlay.service';
 
 @Component({
   selector: 'app-watchlist-detail',
@@ -60,6 +71,10 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly lifecycle = inject(AppLifecycleService);
+  private readonly botService = inject(BotService);
+  private readonly chartAnalysis = inject(ChartAnalysisService);
+  private readonly indicatorOverlay = inject(IndicatorOverlayService);
+  private readonly strategySignals = inject(StrategySignalsOverlayService);
 
   // ── View refs ──────────────────────────────────────────────────────────────
   readonly chartEl = viewChild<ElementRef<HTMLDivElement>>('chartEl');
@@ -94,6 +109,10 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   private volumeSeries?: ISeriesApi<'Histogram'>;
   private resizeObserver?: ResizeObserver;
 
+  activeIndicators = signal<ActiveIndicator[]>([]);
+  activeStrategy = signal<AnalysisStrategyRequest | null>(null);
+  private lastCandles: CandleSnapshot[] | null = null;
+
   // ── Overlay internals ──────────────────────────────────────────────────────
   private overlayCtx?: CanvasRenderingContext2D;
   private animFrame?: number;
@@ -127,6 +146,17 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     effect(() => {
       this.hlCache.coinSnapshot();
       untracked(() => this.scheduleOverlayDraw());
+    });
+
+    // Recalcule les overlays quand les indicateurs/stratégie actifs changent,
+    // sans re-fetcher les candles (déjà en mémoire, pas besoin de loadData()).
+    effect(() => {
+      this.activeIndicators();
+      this.activeStrategy();
+      untracked(() => {
+        const candles = this.lastCandles;
+        if (candles) this.refreshAnalysisOverlays(candles);
+      });
     });
   }
 
@@ -167,6 +197,9 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     }
     this.resizeObserver?.disconnect();
     this.clearOverlay();
+    this.lastCandles = null;
+    this.strategySignals.reset();
+    this.indicatorOverlay.reset();
     this.chart?.remove();
     cancelAnimationFrame(this.animFrame!);
   }
@@ -200,8 +233,10 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
           return;
         }
 
+        this.lastCandles = candles;
         this.renderCandles(candles);
         this.computeStats(candles);
+        this.refreshAnalysisOverlays(candles);
 
         // Overlay dessiné après rendu des candles
         this.scheduleOverlayDraw();
@@ -254,6 +289,9 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       priceScaleId: 'volume',
     });
 
+    this.indicatorOverlay.attach(this.chart);
+    this.strategySignals.attach(this.candleSeries);
+
     this.chart.priceScale('volume').applyOptions({
       scaleMargins: { top: 0.8, bottom: 0 },
     });
@@ -268,6 +306,72 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     // Initialise le canvas overlay
     const canvas = this.overlayEl()?.nativeElement;
     if (canvas) this.initOverlay(canvas, el);
+  }
+
+  private refreshAnalysisOverlays(candles: CandleSnapshot[]): void {
+    const indicators = this.activeIndicators().filter((i) => i.visible);
+    const strategy = this.activeStrategy();
+
+    // Rien d'actif → on nettoie et on économise un appel réseau
+    if (indicators.length === 0 && !strategy) {
+      this.strategySignals.clear();
+      this.activeIndicators().forEach((i) => this.indicatorOverlay.remove(i.id));
+      return;
+    }
+
+    const item = this.item();
+    if (!item || candles.length === 0) return;
+
+    const request: AnalysisRequest = {
+      symbol: item.coin,
+      interval: toChartInterval(this.selectedInterval()),
+      startTime: Math.floor(candles[0].t),
+      endTime: Math.floor(candles[candles.length - 1].t),
+      indicators: indicators.map((i) => i.request),
+      strategies: strategy ? [strategy] : undefined,
+    };
+
+    this.chartAnalysis.analyze(request).subscribe({
+      next: (res) => {
+        indicators.forEach((active) => {
+          const key = this.buildIndicatorKey(active.request); // ex: "ema_20", "macd_12_26_9"
+          const points = res.indicators[key];
+          if (!points) return;
+
+          this.botService.getIndicatorMeta(active.request.name).subscribe((meta) => {
+            if (!meta) return;
+            this.indicatorOverlay.render(
+              active.id,
+              meta,
+              points as { time: number; value: number }[],
+            );
+          });
+        });
+
+        // Signaux de stratégie
+        if (res.strategies.length > 0) {
+          this.strategySignals.render(res.strategies[0].signals);
+        } else {
+          this.strategySignals.clear();
+        }
+      },
+      error: () => {
+        // Ne bloque pas l'affichage des candles si /analysis échoue — juste pas d'overlay
+      },
+    });
+  }
+
+  private buildIndicatorKey(req: IndicatorRequest): string {
+    switch (req.name) {
+      case 'macd':
+        return `macd_${req.fastPeriod ?? 12}_${req.slowPeriod ?? 26}_${req.signalPeriod ?? 9}`;
+      case 'ichimoku':
+        return `ichimoku_${req.conversionPeriod ?? 9}_${req.basePeriod ?? 26}_${req.spanPeriod ?? 52}_${req.displacement ?? 26}`;
+      case 'bb':
+        return `bb_${req.period ?? 20}_${req.stdDev ?? 2}`;
+      default:
+        return `${req.name}_${req.period ?? (req.name === 'rsi' || req.name === 'atr' || req.name === 'sd' ? 14 : 20)}`;
+    }
   }
 
   // ── Candle rendering ───────────────────────────────────────────────────────

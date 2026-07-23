@@ -16,11 +16,12 @@ import {
   IonToggle,
   ModalController,
 } from '@ionic/angular/standalone';
-import { BotSettings, ProtectiveOrderEntry, TradingPair, User } from '@models/user.interface';
+import { ExternalUser, TradingPair } from '@models/user.interface';
 import { BotService } from '@services/bot.service';
 import { UserService } from '@services/user.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
+import { IExchange, ProtectiveOrderEntry } from '@syldel/trading-shared-types';
 import { addIcons } from 'ionicons';
 import {
   addOutline,
@@ -69,14 +70,14 @@ export class BotStrategiesPage extends MenuBasePage {
   private readonly modalCtrl = inject(ModalController);
   private readonly botService = inject(BotService);
 
-  user = signal<User | null>(null);
+  user = signal<ExternalUser | null>(null);
   fetchFn = () => this.userService.getMe();
 
   botEntries = computed(() =>
     Object.entries(this.user()?.tradingSettings ?? {}).map(([key, value]) => ({ key, value })),
   );
 
-  private readonly save$ = new Subject<Record<string, BotSettings>>();
+  private readonly save$ = new Subject<Record<string, IExchange>>();
 
   readonly exitBehaviorLabels = this.botService.exitBehaviorLabels;
 
@@ -230,11 +231,19 @@ export class BotStrategiesPage extends MenuBasePage {
     return singleLine ? [tp.concat(sl)] : [tp, sl].filter((g) => g.length);
   }
 
+  protectiveEntries(pair: TradingPair): ProtectiveOrderEntry[] {
+    return pair.strategy?.protective?.entries ?? [];
+  }
+
   // ------------------------------------------------------------------ //
   //  Private helpers
   // ------------------------------------------------------------------ //
 
-  private patchExchange(user: User, exchangeKey: string, patch: Partial<BotSettings>): User {
+  private patchExchange(
+    user: ExternalUser,
+    exchangeKey: string,
+    patch: Partial<IExchange>,
+  ): ExternalUser {
     return {
       ...user,
       tradingSettings: {

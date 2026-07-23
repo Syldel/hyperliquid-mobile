@@ -129,7 +129,7 @@
                 labelPlacement="stacked"
                 interface="action-sheet"
               >
-                @for (opt of param.options ?? []; track opt.value) {
+                @for (opt of param.options; track opt.value) {
                   <ion-select-option [value]="opt.value">{{ opt.label }}</ion-select-option>
                 }
               </ion-select>

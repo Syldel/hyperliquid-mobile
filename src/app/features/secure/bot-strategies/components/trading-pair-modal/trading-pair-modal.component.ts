@@ -41,17 +41,19 @@ import {
   IonToolbar,
   ModalController,
 } from '@ionic/angular/standalone';
-import { ChartInterval, ExchangeStrategy, ExitBehaviorMeta } from '@models/bot.interfaces';
-import {
-  BotSettings,
-  ExitBehavior,
-  StrategyParameter,
-  TradingPair,
-  TradingStrategy,
-} from '@models/user.interface';
+import { TradingPair } from '@models/user.interface';
 import { AvailableCapitalService } from '@services/available-capital.service';
 import { BotService } from '@services/bot.service';
 import { MarketPickerModalComponent } from '@shared/components/market-picker-modal/market-picker-modal.component';
+import {
+  ChartInterval,
+  ExitBehavior,
+  ExitBehaviorMeta,
+  IExchange,
+  IExchangeStrategy,
+  StrategyMeta,
+  StrategyParameter,
+} from '@syldel/trading-shared-types';
 import { addIcons } from 'ionicons';
 import {
   addOutline,
@@ -66,7 +68,7 @@ import { combineLatest, debounceTime } from 'rxjs';
 interface TradingPairForm {
   exchangeKey: FormControl<string>;
   pairName: FormControl<string>;
-  strategy: FormControl<TradingStrategy>;
+  strategy: FormControl<IExchangeStrategy>;
   exitBehavior: FormControl<ExitBehavior>;
   ratio: FormControl<number>;
   interval: FormControl<ChartInterval>;
@@ -118,7 +120,7 @@ export class TradingPairModalComponent implements OnInit {
   //  Inputs
   // ------------------------------------------------------------------
 
-  readonly exchanges = input<{ key: string; value: BotSettings }[]>([]);
+  readonly exchanges = input<{ key: string; value: IExchange }[]>([]);
   readonly editPair = input<TradingPair | undefined>();
   readonly editExchangeKey = input<string | undefined>();
 
@@ -128,9 +130,9 @@ export class TradingPairModalComponent implements OnInit {
 
   isLoadingMetadata = signal(false);
   candleIntervals = signal<ChartInterval[]>([]);
-  strategies = signal<ExchangeStrategy[]>([]);
+  strategies = signal<StrategyMeta[]>([]);
   availableExchanges = signal<string[]>([]);
-  strategiesByExchange = signal<Record<string, ExchangeStrategy[]>>({});
+  strategiesByExchange = signal<Record<string, StrategyMeta[]>>({});
   metadataError = signal(false);
   exitBehaviors = signal<ExitBehaviorMeta[]>([]);
 
@@ -187,7 +189,7 @@ export class TradingPairModalComponent implements OnInit {
       Validators.required,
       this.pairNameExistsValidator(),
     ]),
-    strategy: this.fb.nonNullable.control<TradingStrategy>(null as any, Validators.required),
+    strategy: this.fb.nonNullable.control<IExchangeStrategy>(null as any, Validators.required),
     exitBehavior: this.fb.nonNullable.control<ExitBehavior>('STRATEGY_SIGNAL', Validators.required),
     ratio: this.fb.nonNullable.control(0, [
       Validators.required,
@@ -351,7 +353,7 @@ export class TradingPairModalComponent implements OnInit {
 
     // Reconstruction du form dynamique à chaque changement de strategy
     effect(() => {
-      const strategy = this.formValue().strategy as TradingStrategy | null;
+      const strategy = this.formValue().strategy as IExchangeStrategy | null;
       const params = strategy?.parameters ?? [];
       this.buildStrategyParamsForm(params);
     });
@@ -399,7 +401,7 @@ export class TradingPairModalComponent implements OnInit {
     }
   }
 
-  compareStrategies = (s1: TradingStrategy, s2: TradingStrategy): boolean =>
+  compareStrategies = (s1: IExchangeStrategy, s2: IExchangeStrategy): boolean =>
     s1 && s2 ? s1.shortname === s2.shortname : s1 === s2;
 
   readonly pinFormatter = (value: number) => `${value}%`;

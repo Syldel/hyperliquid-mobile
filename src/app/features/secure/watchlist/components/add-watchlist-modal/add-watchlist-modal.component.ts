@@ -16,14 +16,10 @@ import {
   IonToolbar,
   ModalController,
 } from '@ionic/angular/standalone';
-import { CandleInterval } from '@syldel/hl-shared-types';
+import { CANDLE_INTERVALS, CandleInterval } from '@syldel/hl-shared-types';
 import { addIcons } from 'ionicons';
 import { chevronForwardOutline } from 'ionicons/icons';
-import {
-  CANDLE_INTERVALS,
-  INTERVAL_LABELS,
-  WatchlistItem,
-} from '../../models/watchlist-item.model';
+import { INTERVAL_LABELS, WatchlistItem } from '../../models/watchlist-item.model';
 
 /** Open this modal to add a pair to the watchlist. */
 @Component({

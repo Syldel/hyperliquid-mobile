@@ -42,12 +42,12 @@ import {
   warningOutline,
 } from 'ionicons/icons';
 
+import { TradingPair } from '@models/user.interface';
 import {
   ProtectiveOrderEntry,
   ProtectiveOrderStrategy,
   TpslType,
-  TradingPair,
-} from '@models/user.interface';
+} from '@syldel/trading-shared-types';
 
 // ─── Result type ──────────────────────────────────────────────────────────────
 
@@ -138,7 +138,7 @@ export class ProtectiveModalComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    const existing = this.pair().strategy.protective;
+    const existing = this.pair().strategy?.protective;
 
     this.form = this.fb.group({
       entries: this.fb.array(
@@ -215,7 +215,7 @@ export class ProtectiveModalComponent implements OnInit {
   }
 
   hasExistingStrategy(): boolean {
-    return !!this.pair().strategy.protective;
+    return !!this.pair().strategy?.protective;
   }
 
   // ── Actions ───────────────────────────────────────────────────────────────
@@ -227,20 +227,26 @@ export class ProtectiveModalComponent implements OnInit {
   save(): void {
     if (this.form.invalid) return;
 
+    const currentStrategy = this.pair().strategy;
+    if (!currentStrategy) return;
+
     const strategy: ProtectiveOrderStrategy = {
       entries: this.form.value.entries as ProtectiveOrderEntry[],
     };
 
     const updatedPair: TradingPair = {
       ...this.pair(),
-      strategy: { ...this.pair().strategy, protective: strategy },
+      strategy: { ...currentStrategy, protective: strategy },
     };
 
     this.modalCtrl.dismiss({ pair: updatedPair } satisfies ProtectiveModalResult, 'confirm');
   }
 
   clearStrategy(): void {
-    const { protective: _removed, ...strategyWithout } = this.pair().strategy;
+    const currentStrategy = this.pair().strategy;
+    if (!currentStrategy) return;
+
+    const { protective: _removed, ...strategyWithout } = currentStrategy;
     const updatedPair: TradingPair = {
       ...this.pair(),
       strategy: strategyWithout,
