@@ -1,7 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { ExternalUser } from '@models/user.interface';
-import { IExchange } from '@syldel/trading-shared-types';
+import { ExternalUser, IExchange } from '@syldel/trading-shared-types';
 import { ConfigService } from './config.service';
 
 @Injectable({ providedIn: 'root' })

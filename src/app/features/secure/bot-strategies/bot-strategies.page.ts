@@ -16,12 +16,12 @@ import {
   IonToggle,
   ModalController,
 } from '@ionic/angular/standalone';
-import { ExternalUser, TradingPair } from '@models/user.interface';
+import { TradingPair } from '@models/user.interface';
 import { BotService } from '@services/bot.service';
 import { UserService } from '@services/user.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
-import { IExchange, ProtectiveOrderEntry } from '@syldel/trading-shared-types';
+import { ExternalUser, IExchange, ProtectiveOrderEntry } from '@syldel/trading-shared-types';
 import { addIcons } from 'ionicons';
 import {
   addOutline,

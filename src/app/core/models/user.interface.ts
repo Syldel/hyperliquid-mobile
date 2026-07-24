@@ -1,18 +1,4 @@
-import { IExchange, IExchangePair } from '@syldel/trading-shared-types';
-
-// TODO: Nest has a similar External User model (src/interfaces/external-user.interface.ts).
-// Not yet shared via @syldel/trading-shared-types — worth comparing shapes and migrating
-// this to the shared package once confirmed they represent the same concept (or splitting
-// into a shared "core" User + an Angular-only extension, similar to how TradingPair extends
-// IExchangePair).
-export interface ExternalUser {
-  _id: string;
-  username: string;
-  walletAddress: string;
-  tradingSettings?: Record<string, IExchange>;
-  updatedAt: string;
-  createdAt: string;
-}
+import { IExchangePair } from '@syldel/trading-shared-types';
 
 /**
  * Frontend-only extension of IExchangePair: strategyParameters holds the concrete
