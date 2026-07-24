@@ -560,7 +560,18 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     }
 
     for (const chain of groups.values()) {
-      chain.sort((a, b) => a.statusTimestamp - b.statusTimestamp);
+      chain.sort((a, b) => {
+        if (a.statusTimestamp !== b.statusTimestamp) {
+          return a.statusTimestamp - b.statusTimestamp;
+        }
+        // À timestamp égal (ex: ordre IOC rempli instantanément), l'état
+        // terminal représente toujours l'état final réel : on le place
+        // après l'état non-terminal ("open") pour ne pas le traiter
+        // comme actif.
+        const aTerminal = this.isTerminal(a.status.toLowerCase());
+        const bTerminal = this.isTerminal(b.status.toLowerCase());
+        return (aTerminal ? 1 : 0) - (bTerminal ? 1 : 0);
+      });
       this.drawOrderChain(ctx, chain);
     }
   }
