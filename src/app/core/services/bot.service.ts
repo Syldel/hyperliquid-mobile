@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { ExchangesMetaResponse, IndicatorMetadata } from '@syldel/trading-shared-types';
-import { map, Observable, of, tap } from 'rxjs';
+import { map, Observable, of, shareReplay, tap } from 'rxjs';
 import { ConfigService } from './config.service';
 
 @Injectable({ providedIn: 'root' })
@@ -13,6 +13,8 @@ export class BotService {
   private metadataCachedAt: number | null = null;
   private readonly CACHE_TTL = 24 * 60 * 60 * 1000;
 
+  private inFlight$: Observable<ExchangesMetaResponse> | null = null;
+
   getExchangeFormMetadata(): Observable<ExchangesMetaResponse> {
     const now = Date.now();
     const cached = this.metadataCache();
@@ -21,12 +23,20 @@ export class BotService {
       return of(cached);
     }
 
-    return this.http.get<ExchangesMetaResponse>(`${this.config.botServiceUrl}/exchanges/meta`).pipe(
-      tap((meta) => {
-        this.metadataCache.set(meta);
-        this.metadataCachedAt = Date.now();
-      }),
-    );
+    if (this.inFlight$) return this.inFlight$;
+
+    this.inFlight$ = this.http
+      .get<ExchangesMetaResponse>(`${this.config.botServiceUrl}/exchanges/meta`)
+      .pipe(
+        tap((meta) => {
+          this.metadataCache.set(meta);
+          this.metadataCachedAt = Date.now();
+        }),
+        shareReplay(1),
+        tap({ finalize: () => (this.inFlight$ = null) } as any),
+      );
+
+    return this.inFlight$;
   }
 
   invalidateMetadataCache(): void {
@@ -49,4 +59,6 @@ export class BotService {
       map((m) => m.indicators.find((i) => i.name === name)),
     );
   }
+
+  readonly indicators = computed(() => this.metadataCache()?.indicators ?? []);
 }

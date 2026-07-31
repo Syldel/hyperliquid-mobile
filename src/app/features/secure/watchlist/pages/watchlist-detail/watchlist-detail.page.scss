@@ -4,6 +4,21 @@
   --padding-top: 0;
 }
 
+.open-orders-badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  font-size: 11px;
+  min-width: 18px;
+  --background: var(--ion-color-danger, #eb445a);
+  z-index: 8000;
+  opacity: 1;
+  border-radius: 10px;
+  display: flex;
+  justify-content: center;
+  vertical-align: middle;
+}
+
 /* ── Stats header ─────────────────────────────────── */
 .stats-header {
   padding: 16px 20px 8px;
@@ -146,4 +161,47 @@
   justify-content: center;
   color: var(--ion-color-medium);
   gap: 8px;
+}
+
+/* ── Indicators strip ─────────────────────────────── */
+.indicators-strip {
+  display: flex;
+  flex-wrap: nowrap;
+  padding: 4px 16px 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch; // scroll fluide sur iOS
+  scroll-snap-type: x proximity; // léger magnétisme au scroll, sans forcer
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  ion-chip {
+    flex: 0 0 auto;
+    font-size: 12px;
+    font-weight: 600;
+    height: 28px;
+    gap: 6px;
+
+    ion-icon {
+      cursor: pointer;
+      font-size: 14px;
+
+      &:not(:first-child) {
+        margin-left: 0;
+      }
+      &:not(:last-child) {
+        margin-right: 0;
+      }
+    }
+
+    .indicator-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      cursor: pointer;
+    }
+  }
 }

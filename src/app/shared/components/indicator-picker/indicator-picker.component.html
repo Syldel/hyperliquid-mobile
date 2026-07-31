@@ -1,0 +1,79 @@
+<ion-header>
+  <ion-toolbar>
+    @if (selected()) {
+      <ion-button slot="start" fill="clear" (click)="back()">
+        <ion-icon slot="icon-only" name="arrow-back-outline" />
+      </ion-button>
+      <ion-title>{{ selected()!.label }}</ion-title>
+    } @else {
+      <ion-title>Add indicator</ion-title>
+    }
+    <ion-button slot="end" fill="clear" (click)="dismiss()">
+      <ion-icon slot="icon-only" name="close-outline" />
+    </ion-button>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  @if (loading()) {
+    <div class="picker-loading"><ion-spinner name="dots" /></div>
+  } @else if (!selected()) {
+    <ion-list>
+      @for (meta of indicators(); track meta.name) {
+        <ion-item button (click)="pick(meta)">
+          <ion-label>
+            <h3>{{ meta.label }}</h3>
+            <p>{{ meta.overlay ? 'On chart' : 'Dedicated pane' }}</p>
+          </ion-label>
+        </ion-item>
+      }
+    </ion-list>
+  } @else if (form()) {
+    <form [formGroup]="form()!" class="param-form">
+      @for (p of selected()!.parameters; track p.name) {
+        <ion-item>
+          <ion-label position="stacked">{{ p.label }}</ion-label>
+          <ion-input type="number" [formControlName]="p.name" />
+        </ion-item>
+      }
+    </form>
+
+    @if (selected()!.subFields?.length) {
+      <div class="subfield-list">
+        @for (sf of subFieldControls(); track sf.name) {
+          <ion-item lines="none" class="color-row">
+            <ion-label>{{ sf.label }}</ion-label>
+            <input type="color" class="color-swatch" [formControl]="sf.color" />
+            <ion-select [formControl]="sf.lineStyle" interface="popover" slot="end">
+              <ion-select-option value="solid">Solid</ion-select-option>
+              <ion-select-option value="dashed">Dashed</ion-select-option>
+              <ion-select-option value="dotted">Dotted</ion-select-option>
+            </ion-select>
+          </ion-item>
+        }
+      </div>
+    } @else {
+      <ion-item lines="none" class="color-row">
+        <ion-label>Color</ion-label>
+        <input
+          type="color"
+          class="color-swatch"
+          [formControl]="colorControl"
+          (input)="onColorInput()"
+        />
+        <ion-button slot="end" fill="clear" (click)="randomizeColor()">
+          <ion-icon slot="icon-only" name="dice-outline" />
+        </ion-button>
+      </ion-item>
+    }
+
+    <ion-button
+      expand="block"
+      class="ion-margin-top ion-padding"
+      [disabled]="form()!.invalid"
+      (click)="confirm()"
+    >
+      Add
+    </ion-button>
+  }
+</ion-content>

@@ -1,13 +1,4 @@
-import {
-  computed,
-  effect,
-  inject,
-  Injectable,
-  linkedSignal,
-  resource,
-  signal,
-  untracked,
-} from '@angular/core';
+import { computed, inject, Injectable, linkedSignal, resource, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 import {
@@ -60,26 +51,15 @@ export class HyperliquidCacheService {
     computation: (_cfg, prev) => prev?.value ?? null,
   });
 
-  constructor() {
-    // Dès que le coin change, met à jour config.dex automatiquement
-    effect(() => {
-      const coin = this.selectedCoin();
-      if (!coin) return;
-      const { dex } = parseCoin(coin);
-      // untracked pour ne pas créer de cycle config → selectedCoin → config
-      untracked(() => {
-        this.config.update((c) => ({ ...c, dex }));
-      });
-    });
-  }
-
   // ── Resources (= fetches réactifs) ────────────────────────────────────────
 
   /**
    * Open orders — se re-fetche automatiquement si config.dex change.
    */
   readonly openOrdersResource = resource({
-    params: computed(() => ({ dex: this.config().dex, _refresh: this.refreshTick() })),
+    params: computed(() => ({ dex: this.config().dex, _refresh: this.refreshTick() }), {
+      equal: (a, b) => a.dex === b.dex && a._refresh === b._refresh,
+    }),
     loader: ({ params }) => firstValueFrom(this.hlInfo.getFrontendOpenOrders(params.dex)),
   });
 
@@ -95,10 +75,13 @@ export class HyperliquidCacheService {
    * Fills — se re-fetche si le lookback change.
    */
   readonly fillsResource = resource({
-    params: computed(() => ({
-      lookback: this.config().fillsLookbackDays,
-      _refresh: this.refreshTick(),
-    })),
+    params: computed(
+      () => ({
+        lookback: this.config().fillsLookbackDays,
+        _refresh: this.refreshTick(),
+      }),
+      { equal: (a, b) => a.lookback === b.lookback && a._refresh === b._refresh },
+    ),
     loader: ({ params }): Promise<HLUserFill[]> => {
       const req: HLUserFillsByTimeRequest = {
         startTime: Date.now() - params.lookback * 24 * 60 * 60 * 1000,
@@ -141,11 +124,19 @@ export class HyperliquidCacheService {
   // ── API publique ──────────────────────────────────────────────────────────
 
   selectCoin(coin: string): void {
+    const { dex } = parseCoin(coin);
     this.selectedCoin.set(coin);
+    this.config.update((c) => (c.dex === dex ? c : { ...c, dex }));
   }
 
   updateConfig(partial: Partial<HLCacheConfig>): void {
     this.config.update((c) => ({ ...c, ...partial }));
+  }
+
+  selectCoinWithConfig(coin: string, partial: Partial<HLCacheConfig>): void {
+    const { dex } = parseCoin(coin);
+    this.selectedCoin.set(coin);
+    this.config.update((c) => ({ ...c, ...partial, dex })); // écriture unique, dex + lookback ensemble
   }
 
   reloadAll(force = false): void {

@@ -1,11 +1,6 @@
+import { ActiveIndicator } from '@shared/components/indicator-picker/models/indicator.model';
 import { CandleInterval } from '@syldel/hl-shared-types';
-import { AnalysisStrategyRequest, IndicatorRequest } from '@syldel/trading-shared-types';
-
-export interface ActiveIndicator {
-  id: string; // uuid client, ex: "ema-9-a1b2" — distingue 2x EMA avec des périodes différentes
-  request: IndicatorRequest;
-  visible: boolean; // toggle sans supprimer la config
-}
+import { AnalysisStrategyRequest } from '@syldel/trading-shared-types';
 
 export interface WatchlistItem {
   coin: string;

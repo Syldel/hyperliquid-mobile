@@ -12,13 +12,22 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { IonButton, IonChip, IonIcon, IonSkeletonText } from '@ionic/angular/standalone';
+import {
+  IonBadge,
+  IonButton,
+  IonChip,
+  IonIcon,
+  IonSkeletonText,
+  ModalController,
+} from '@ionic/angular/standalone';
 import { AppLifecycleService } from '@services/app-lifecycle.service';
 import { BotService } from '@services/bot.service';
 import { ChartAnalysisService } from '@services/chart-analysis.service';
 import { HyperliquidCacheService } from '@services/hyperliquid-cache.service';
 import { HyperliquidCandleService } from '@services/hyperliquid-candle.service';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
+import { IndicatorPickerComponent } from '@shared/components/indicator-picker/indicator-picker.component';
+import { ActiveIndicator } from '@shared/components/indicator-picker/models/indicator.model';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import {
   CANDLE_INTERVALS,
@@ -28,13 +37,21 @@ import {
   HLUserFill,
 } from '@syldel/hl-shared-types';
 import {
+  AnalysisCandle,
   AnalysisRequest,
+  AnalysisResponse,
   AnalysisStrategyRequest,
-  IndicatorRequest,
+  IndicatorMetadata,
 } from '@syldel/trading-shared-types';
 import { toChartInterval } from '@utils/hl-interval.utils';
 import { addIcons } from 'ionicons';
-import { calendarOutline, receiptOutline, refreshOutline } from 'ionicons/icons';
+import {
+  addOutline,
+  calendarOutline,
+  closeCircle,
+  receiptOutline,
+  refreshOutline,
+} from 'ionicons/icons';
 import {
   CandlestickSeries,
   ColorType,
@@ -46,21 +63,33 @@ import {
   createChart,
 } from 'lightweight-charts';
 import { firstValueFrom } from 'rxjs';
+
+import { computeLookbackCandles } from '@shared/components/indicator-picker/models/indicator-lookback.util';
+import { IndicatorOverlayService } from '@shared/components/indicator-picker/services/indicator-overlay.service';
+import { formatIndicatorLabel } from '@shared/components/indicator-picker/utils/indicator-label.util';
 import {
-  ActiveIndicator,
   DATE_PRESETS,
   DatePreset,
   INTERVAL_LABELS,
   WatchlistItem,
 } from '../../models/watchlist-item.model';
-import { IndicatorOverlayService } from '../../services/indicator-overlay.service';
 import { StrategySignalsOverlayService } from '../../services/strategy-signals-overlay.service';
+import { WatchlistService } from '../../services/watchlist.service';
 
 @Component({
   selector: 'app-watchlist-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, IonButton, IonSkeletonText, IonIcon, IonChip, RefreshableLayoutComponent],
+  imports: [
+    FormsModule,
+    IonButton,
+    IonSkeletonText,
+    IonIcon,
+    IonChip,
+    IonBadge,
+    RefreshableLayoutComponent,
+  ],
+  providers: [IndicatorOverlayService, StrategySignalsOverlayService],
   templateUrl: './watchlist-detail.page.html',
   styleUrls: ['./watchlist-detail.page.scss'],
 })
@@ -75,6 +104,8 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   private readonly chartAnalysis = inject(ChartAnalysisService);
   private readonly indicatorOverlay = inject(IndicatorOverlayService);
   private readonly strategySignals = inject(StrategySignalsOverlayService);
+  private readonly modalCtrl = inject(ModalController);
+  private readonly watchlistService = inject(WatchlistService);
 
   // ── View refs ──────────────────────────────────────────────────────────────
   readonly chartEl = viewChild<ElementRef<HTMLDivElement>>('chartEl');
@@ -98,20 +129,26 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   readonly intervals = CANDLE_INTERVALS;
   readonly intervalLabels = INTERVAL_LABELS;
 
-  fetchFn = signal(this.buildFetchFn());
+  fetchFn = signal<() => Promise<void>>(async () => {});
 
   private readonly onMouseUp = () => this.scheduleOverlayDraw();
   private readonly onTouchEnd = () => this.scheduleOverlayDraw();
+
+  private appReady = false;
 
   // ── Chart internals ────────────────────────────────────────────────────────
   private chart?: IChartApi;
   private candleSeries?: ISeriesApi<'Candlestick'>;
   private volumeSeries?: ISeriesApi<'Histogram'>;
   private resizeObserver?: ResizeObserver;
+  private lastCandles: CandleSnapshot[] = [];
+  private displayRangeStart = 0;
 
+  // ── Indicators ────────────────────────────────────────────────────────
   activeIndicators = signal<ActiveIndicator[]>([]);
   activeStrategy = signal<AnalysisStrategyRequest | null>(null);
-  private lastCandles: CandleSnapshot[] | null = null;
+  indicatorsMeta = signal<IndicatorMetadata[]>([]);
+  private indicatorSeriesCache = new Map<string, { time: number; value: number }[]>();
 
   // ── Overlay internals ──────────────────────────────────────────────────────
   private overlayCtx?: CanvasRenderingContext2D;
@@ -124,7 +161,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   private readonly COLOR_TPSL = '#f4a261';
 
   constructor() {
-    addIcons({ calendarOutline, refreshOutline, receiptOutline });
+    addIcons({ calendarOutline, refreshOutline, receiptOutline, addOutline, closeCircle });
 
     const state = window.history.state as { backHref?: string };
     if (state?.backHref) this.backHref.set(state.backHref);
@@ -139,7 +176,10 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     // Recharge les candles au retour en foreground
     effect(() => {
       this.lifecycle.foregroundCount();
-      untracked(() => this.fetchFn.set(this.buildFetchFn()));
+      untracked(() => {
+        if (!this.appReady) return;
+        this.fetchFn.set(this.buildFetchFn());
+      });
     });
 
     // Redessine l'overlay quand le snapshot change (nouvel ordre, fill exécuté…)
@@ -147,22 +187,11 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       this.hlCache.coinSnapshot();
       untracked(() => this.scheduleOverlayDraw());
     });
-
-    // Recalcule les overlays quand les indicateurs/stratégie actifs changent,
-    // sans re-fetcher les candles (déjà en mémoire, pas besoin de loadData()).
-    effect(() => {
-      this.activeIndicators();
-      this.activeStrategy();
-      untracked(() => {
-        const candles = this.lastCandles;
-        if (candles) this.refreshAnalysisOverlays(candles);
-      });
-    });
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
-  ngOnInit(): void {
+  async ngOnInit(): Promise<void> {
     const coin = this.route.snapshot.paramMap.get('coin');
     if (!coin) {
       this.router.navigate(['/secure/watchlist']);
@@ -179,12 +208,20 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     this.item.set({ coin, interval, addedAt: Date.now() });
     this.selectedInterval.set(interval);
 
-    // Déclare le coin actif dans le cache et déclenche le chargement
-    this.hlCache.selectCoin(coin);
-    this.hlCache.updateConfig({ fillsLookbackDays: this.selectedPreset().days });
+    await this.watchlistService.load();
+    const existing = this.watchlistService.getByCoin(coin);
+    if (existing) {
+      this.item.set(existing);
+      this.selectedInterval.set(existing.interval);
+      this.activeIndicators.set(existing.activeIndicators ?? []);
+      this.activeStrategy.set(existing.activeStrategy ?? null);
+    }
+
+    this.hlCache.selectCoinWithConfig(coin, { fillsLookbackDays: this.selectedPreset().days });
     this.hlCache.reloadAll();
 
     this.fetchFn.set(this.buildFetchFn());
+    this.appReady = true;
 
     this.hlMarket.resolveCoin(coin).subscribe((name) => this.coinTitle.set(name));
   }
@@ -196,11 +233,12 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       el.removeEventListener('touchend', this.onTouchEnd);
     }
     this.resizeObserver?.disconnect();
-    this.clearOverlay();
-    this.lastCandles = null;
-    this.strategySignals.reset();
-    this.indicatorOverlay.reset();
     this.chart?.remove();
+    this.clearOverlay();
+    this.indicatorOverlay.reset();
+    this.strategySignals.reset();
+    this.indicatorSeriesCache.clear();
+    this.lastCandles = [];
     cancelAnimationFrame(this.animFrame!);
   }
 
@@ -214,38 +252,153 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       this.loading.set(true);
       this.hasError.set(false);
 
+      const preset = this.selectedPreset();
+      const endTime = Date.now();
+      const startTime = endTime - preset.days * 86_400_000;
+      const hasOverlayData =
+        this.activeIndicators().some((i) => i.visible) || !!this.activeStrategy();
+
       try {
-        const preset = this.selectedPreset();
-        const endTime = Date.now();
-        const startTime = endTime - preset.days * 86_400_000;
-
-        const candles = await firstValueFrom(
-          this.hlCandle.getCandles({
-            coin: item.coin,
-            interval: this.selectedInterval(),
-            startTime,
-            endTime,
-          }),
-        );
-
-        if (!candles.length) {
-          this.hasError.set(true);
-          return;
+        if (hasOverlayData) {
+          await this.fetchViaAnalysis(item, startTime, endTime);
+        } else {
+          await this.fetchViaCandles(item, startTime, endTime);
         }
-
-        this.lastCandles = candles;
-        this.renderCandles(candles);
-        this.computeStats(candles);
-        this.refreshAnalysisOverlays(candles);
-
-        // Overlay dessiné après rendu des candles
-        this.scheduleOverlayDraw();
       } catch {
         this.hasError.set(true);
       } finally {
         this.loading.set(false);
       }
     };
+  }
+
+  private async fetchViaAnalysis(
+    item: WatchlistItem,
+    displayStartTime: number,
+    endTime: number,
+  ): Promise<void> {
+    const active = this.activeIndicators();
+    const strategy = this.activeStrategy();
+
+    const intervalMs = this.getIntervalSeconds() * 1000;
+    const lookbackCandles = computeLookbackCandles(active);
+    const fetchStartTime = displayStartTime - lookbackCandles * intervalMs;
+
+    const request: AnalysisRequest = {
+      symbol: item.coin,
+      interval: toChartInterval(this.selectedInterval()),
+      startTime: fetchStartTime,
+      endTime,
+      indicators: active.map((i) => i.request),
+      strategies: strategy ? [strategy] : undefined,
+    };
+
+    try {
+      const res = await firstValueFrom(this.chartAnalysis.analyze(request));
+      if (!res.candles.length) {
+        this.hasError.set(true);
+        return;
+      }
+
+      const candles = this.toCandleSnapshots(res.candles);
+      this.lastCandles = candles;
+      this.displayRangeStart = displayStartTime;
+
+      this.renderCandles(candles);
+      this.computeStats(candles.filter((c) => c.t >= displayStartTime));
+      this.cacheIndicatorSeries(res, active);
+      this.applyIndicatorVisibility();
+      this.applyStrategySignals(res);
+      this.scheduleOverlayDraw();
+
+      this.chart?.timeScale().setVisibleRange({
+        from: Math.floor(displayStartTime / 1000) as Time,
+        to: Math.floor(endTime / 1000) as Time,
+      });
+    } catch {
+      await this.fetchViaCandles(item, displayStartTime, endTime);
+    }
+  }
+
+  private toCandleSnapshots(candles: AnalysisCandle[]): CandleSnapshot[] {
+    return candles.map((c) => ({
+      t: c.time,
+      o: String(c.open),
+      h: String(c.high),
+      l: String(c.low),
+      c: String(c.close),
+      v: String(c.volume),
+    })) as CandleSnapshot[];
+  }
+
+  /** Stocke les points bruts par id d'indicateur actif, sans les rendre — le rendu se fait via applyIndicatorVisibility(). */
+  private cacheIndicatorSeries(res: AnalysisResponse, active: ActiveIndicator[]): void {
+    const seriesList = Object.values(res.indicators);
+    this.indicatorSeriesCache.clear();
+    active.forEach((ind, idx) => {
+      const points = seriesList[idx];
+      if (points)
+        this.indicatorSeriesCache.set(ind.id, points as { time: number; value: number }[]);
+    });
+  }
+
+  private applyStrategySignals(res: AnalysisResponse): void {
+    if (res.strategies.length > 0) {
+      this.strategySignals.render(res.strategies[0].signals);
+    } else {
+      this.strategySignals.clear();
+    }
+  }
+
+  /** Affiche/masque chaque indicateur actif depuis le cache — AUCUN appel réseau.
+   *  Appelé après un fetch (pour le rendu initial) ET à chaque toggle de visibilité. */
+  private applyIndicatorVisibility(): void {
+    this.activeIndicators().forEach((active) => {
+      if (!active.visible) {
+        this.indicatorOverlay.remove(active.id);
+        return;
+      }
+
+      const points = this.indicatorSeriesCache.get(active.id);
+      if (!points) return;
+
+      this.botService.getIndicatorMeta(active.request.name).subscribe((meta) => {
+        if (!meta) return;
+        // Re-vérifie la visibilité au retour (garde contre race condition toggle rapide)
+        const stillVisible = this.activeIndicators().find((i) => i.id === active.id)?.visible;
+        if (!stillVisible) return;
+        this.indicatorOverlay.render(active.id, meta, points, active.color, active.subFieldStyles);
+      });
+    });
+  }
+
+  private async fetchViaCandles(
+    item: WatchlistItem,
+    startTime: number,
+    endTime: number,
+  ): Promise<void> {
+    const candles = await firstValueFrom(
+      this.hlCandle.getCandles({
+        coin: item.coin,
+        interval: this.selectedInterval(),
+        startTime,
+        endTime,
+      }),
+    );
+
+    if (!candles.length) {
+      this.hasError.set(true);
+      return;
+    }
+
+    this.lastCandles = candles;
+    this.displayRangeStart = startTime;
+    this.renderCandles(candles);
+    this.computeStats(candles);
+    this.strategySignals.clear();
+    this.indicatorSeriesCache.clear();
+    this.activeIndicators().forEach((i) => this.indicatorOverlay.remove(i.id));
+    this.scheduleOverlayDraw();
   }
 
   loadData(): void {
@@ -306,72 +459,6 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     // Initialise le canvas overlay
     const canvas = this.overlayEl()?.nativeElement;
     if (canvas) this.initOverlay(canvas, el);
-  }
-
-  private refreshAnalysisOverlays(candles: CandleSnapshot[]): void {
-    const indicators = this.activeIndicators().filter((i) => i.visible);
-    const strategy = this.activeStrategy();
-
-    // Rien d'actif → on nettoie et on économise un appel réseau
-    if (indicators.length === 0 && !strategy) {
-      this.strategySignals.clear();
-      this.activeIndicators().forEach((i) => this.indicatorOverlay.remove(i.id));
-      return;
-    }
-
-    const item = this.item();
-    if (!item || candles.length === 0) return;
-
-    const request: AnalysisRequest = {
-      symbol: item.coin,
-      interval: toChartInterval(this.selectedInterval()),
-      startTime: Math.floor(candles[0].t),
-      endTime: Math.floor(candles[candles.length - 1].t),
-      indicators: indicators.map((i) => i.request),
-      strategies: strategy ? [strategy] : undefined,
-    };
-
-    this.chartAnalysis.analyze(request).subscribe({
-      next: (res) => {
-        indicators.forEach((active) => {
-          const key = this.buildIndicatorKey(active.request); // ex: "ema_20", "macd_12_26_9"
-          const points = res.indicators[key];
-          if (!points) return;
-
-          this.botService.getIndicatorMeta(active.request.name).subscribe((meta) => {
-            if (!meta) return;
-            this.indicatorOverlay.render(
-              active.id,
-              meta,
-              points as { time: number; value: number }[],
-            );
-          });
-        });
-
-        // Signaux de stratégie
-        if (res.strategies.length > 0) {
-          this.strategySignals.render(res.strategies[0].signals);
-        } else {
-          this.strategySignals.clear();
-        }
-      },
-      error: () => {
-        // Ne bloque pas l'affichage des candles si /analysis échoue — juste pas d'overlay
-      },
-    });
-  }
-
-  private buildIndicatorKey(req: IndicatorRequest): string {
-    switch (req.name) {
-      case 'macd':
-        return `macd_${req.fastPeriod ?? 12}_${req.slowPeriod ?? 26}_${req.signalPeriod ?? 9}`;
-      case 'ichimoku':
-        return `ichimoku_${req.conversionPeriod ?? 9}_${req.basePeriod ?? 26}_${req.spanPeriod ?? 52}_${req.displacement ?? 26}`;
-      case 'bb':
-        return `bb_${req.period ?? 20}_${req.stdDev ?? 2}`;
-      default:
-        return `${req.name}_${req.period ?? (req.name === 'rsi' || req.name === 'atr' || req.name === 'sd' ? 14 : 20)}`;
-    }
   }
 
   // ── Candle rendering ───────────────────────────────────────────────────────
@@ -690,6 +777,59 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   navigateToOpenOrders(): void {
     this.router.navigate(['/secure/open-orders'], {
       queryParams: { coin: this.item()?.coin },
+    });
+  }
+
+  // ── Indicators ────────────────────────────────────────────────────────────
+
+  async openIndicatorPicker(): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: IndicatorPickerComponent,
+      breakpoints: [0, 0.6, 1],
+      initialBreakpoint: 0.6,
+    });
+    await modal.present();
+    const { data, role } = await modal.onWillDismiss();
+    if (role === 'confirm' && data) {
+      this.activeIndicators.update((list) => [...list, data]);
+      this.persistIndicators();
+      this.loadData();
+    }
+  }
+
+  toggleIndicatorVisibility(id: string): void {
+    this.activeIndicators.update((list) =>
+      list.map((i) => (i.id === id ? { ...i, visible: !i.visible } : i)),
+    );
+    this.applyIndicatorVisibility();
+    this.persistIndicators();
+  }
+
+  removeIndicator(id: string): void {
+    this.indicatorOverlay.remove(id);
+    this.indicatorSeriesCache.delete(id);
+    this.activeIndicators.update((list) => list.filter((i) => i.id !== id));
+    this.persistIndicators();
+  }
+
+  indicatorLabel(active: ActiveIndicator): string {
+    return formatIndicatorLabel(active.request);
+  }
+
+  dotColor(active: ActiveIndicator): string {
+    if (active.subFieldStyles) {
+      const first = Object.values(active.subFieldStyles)[0];
+      return first?.color ?? '#888';
+    }
+    return active.color || '#888';
+  }
+
+  private persistIndicators(): void {
+    const item = this.item();
+    if (!item || !this.watchlistService.getByCoin(item.coin)) return;
+    this.watchlistService.update(item.coin, {
+      activeIndicators: this.activeIndicators(),
+      activeStrategy: this.activeStrategy(),
     });
   }
 }

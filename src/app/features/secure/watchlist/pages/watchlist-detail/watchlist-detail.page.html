@@ -4,6 +4,14 @@
   [pageHeaderParams]="{ startButton: 'back', defaultHref: backHref() }"
 >
   <ng-template #endButtons>
+    <ion-button (click)="navigateToOpenOrders()">
+      <ion-icon slot="icon-only" name="receipt-outline" />
+      @if ((coinSnapshot()?.openOrders || []).length > 0) {
+      <ion-badge class="open-orders-badge">
+        {{ (coinSnapshot()?.openOrders || []).length }}
+      </ion-badge>
+      }
+    </ion-button>
     <ion-button (click)="loadData()">
       <ion-icon slot="icon-only" name="refresh-outline" />
     </ion-button>
@@ -50,6 +58,20 @@
     }
   </div>
 
+  <div class="indicators-strip">
+    @for (ind of activeIndicators(); track ind.id) {
+    <ion-chip [outline]="!ind.visible" (click)="toggleIndicatorVisibility(ind.id)">
+      <span class="indicator-dot" [style.background]="dotColor(ind)"></span>
+      <span>{{ indicatorLabel(ind) }}</span>
+      <ion-icon name="close-circle" (click)="removeIndicator(ind.id); $event.stopPropagation()" />
+    </ion-chip>
+    }
+    <ion-chip color="primary" outline (click)="openIndicatorPicker()">
+      <ion-icon name="add-outline" />
+      <span>Indicator</span>
+    </ion-chip>
+  </div>
+
   <div class="chart-wrapper">
     <div #chartEl class="chart-container">
       <canvas #overlayEl class="chart-overlay"></canvas>
@@ -66,14 +88,4 @@
     </div>
     }
   </div>
-
-  <ion-button
-    fill="outline"
-    expand="block"
-    class="ion-margin-horizontal"
-    (click)="navigateToOpenOrders()"
-  >
-    <ion-icon slot="start" name="receipt-outline" />
-    Open Orders ({{ (coinSnapshot()?.openOrders || []).length }})
-  </ion-button>
 </app-refreshable-layout>
