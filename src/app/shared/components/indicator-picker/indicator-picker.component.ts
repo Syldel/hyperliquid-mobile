@@ -19,7 +19,12 @@ import {
 import { BotService } from '@services/bot.service';
 import { IndicatorColorService } from '@shared/components/indicator-picker/services/indicator-color.service';
 import { buildIndicatorKey } from '@shared/components/indicator-picker/utils/indicator-key.util';
-import { IndicatorMetadata, IndicatorRequest } from '@syldel/trading-shared-types';
+import {
+  IndicatorMetadata,
+  IndicatorParameter,
+  IndicatorRequest,
+  NumberIndicatorParameter,
+} from '@syldel/trading-shared-types';
 import { addIcons } from 'ionicons';
 import { arrowBackOutline, closeOutline, diceOutline } from 'ionicons/icons';
 import { ActiveIndicator, SubFieldStyle } from './models/indicator.model';
@@ -88,12 +93,23 @@ export class IndicatorPickerComponent {
     });
   }
 
+  private validatorsFor(p: IndicatorParameter) {
+    if (p.type === 'number') {
+      const numeric = p as NumberIndicatorParameter;
+      const validators = [Validators.required];
+      if (numeric.min !== undefined) validators.push(Validators.min(numeric.min));
+      if (numeric.max !== undefined) validators.push(Validators.max(numeric.max));
+      return validators;
+    }
+    return [Validators.required];
+  }
+
   pick(meta: IndicatorMetadata): void {
-    const group: Record<string, FormControl<number>> = {};
+    const group: Record<string, FormControl<number | string>> = {};
     for (const p of meta.parameters) {
-      group[p.name] = new FormControl(p.default, {
+      group[p.name] = new FormControl(p.defaultValue, {
         nonNullable: true,
-        validators: [Validators.required],
+        validators: this.validatorsFor(p),
       });
     }
     const form = new FormGroup(group);
@@ -118,7 +134,7 @@ export class IndicatorPickerComponent {
   /** Résout couleur/style par sous-champ : stocké précédemment > défaut TradingView > aléatoire. */
   private async buildSubFieldControls(
     meta: IndicatorMetadata,
-    values: Record<string, number>,
+    values: Record<string, number | string>,
   ): Promise<void> {
     const key = buildIndicatorKey({ name: meta.name, ...values } as IndicatorRequest);
     if (key === this.lastKey) return;
@@ -127,12 +143,7 @@ export class IndicatorPickerComponent {
     const controls = await Promise.all(
       (meta.subFields ?? []).map(async (sf) => {
         const fallback = defaultStyleFor(meta.name, sf.name, this.colorService.randomColor());
-        const resolved = await this.colorService.getOrCreateSubField(
-          meta.name,
-          key,
-          sf.name,
-          fallback,
-        );
+        const resolved = await this.colorService.getOrCreateSubField(key, sf.name, fallback);
         return {
           name: sf.name,
           label: sf.label,
@@ -148,7 +159,7 @@ export class IndicatorPickerComponent {
 
   private async suggestColor(
     meta: IndicatorMetadata,
-    values: Record<string, number>,
+    values: Record<string, number | string>,
   ): Promise<void> {
     const key = buildIndicatorKey({ name: meta.name, ...values } as IndicatorRequest);
     if (key === this.lastKey) return;

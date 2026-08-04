@@ -25,6 +25,31 @@ export const INDICATOR_DEFAULT_STYLES: Record<string, Record<string, SubFieldSty
     pdi: { color: '#26a69a', lineStyle: 'solid' },
     mdi: { color: '#ef5350', lineStyle: 'solid' },
   },
+  supertrend: {
+    supertrend: { color: '#26a69a', lineStyle: 'solid' },
+    direction: { color: '#ef5350', lineStyle: 'solid' },
+  },
+  keltner: {
+    upper: { color: '#ff6d00', lineStyle: 'dashed' },
+    middle: { color: '#ff6d00', lineStyle: 'solid' },
+    lower: { color: '#ff6d00', lineStyle: 'dashed' },
+  },
+  stochrsi: {
+    k: { color: '#2196f3', lineStyle: 'solid' },
+    d: { color: '#ff6d00', lineStyle: 'solid' },
+    stochRSI: { color: '#7e57c2', lineStyle: 'dotted' },
+  },
+  pivotpoints: {
+    pivot: { color: '#9e9e9e', lineStyle: 'solid' },
+    r1: { color: '#ef5350', lineStyle: 'dashed' },
+    r2: { color: '#ef5350', lineStyle: 'dashed' },
+    r3: { color: '#ef5350', lineStyle: 'dashed' },
+    r4: { color: '#ef5350', lineStyle: 'dashed' },
+    s1: { color: '#26a69a', lineStyle: 'dashed' },
+    s2: { color: '#26a69a', lineStyle: 'dashed' },
+    s3: { color: '#26a69a', lineStyle: 'dashed' },
+    s4: { color: '#26a69a', lineStyle: 'dashed' },
+  },
 };
 
 export const SIMPLE_INDICATOR_DEFAULT_COLORS: Record<string, string> = {

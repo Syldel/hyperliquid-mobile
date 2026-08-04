@@ -1,7 +1,4 @@
-import {
-  buildIndicatorKeyFromOperand,
-  IndicatorRequest,
-} from '@syldel/trading-shared-types';
+import { buildIndicatorKeyFromOperand, IndicatorRequest } from '@syldel/trading-shared-types';
 
 /** Clé stable par type+params (ex: "ema_9", "hma_9", "macd_12_26_9").
  *  Sert à indexer la réponse /analysis ET à partager une couleur entre tous les charts.

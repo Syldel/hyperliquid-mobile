@@ -53,7 +53,6 @@ export class IndicatorColorService {
   /** Renvoie le style stocké s'il existe, sinon le défaut TradingView pour cet indicateur/champ,
    *  sinon une couleur aléatoire (hors plage rouge/vert) en dernier recours. */
   async getOrCreateSubField(
-    indicatorName: string,
     indicatorKey: string,
     field: string,
     fallbackDefault: SubFieldStyle,
