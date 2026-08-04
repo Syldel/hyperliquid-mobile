@@ -49,6 +49,7 @@ import {
   addOutline,
   calendarOutline,
   closeCircle,
+  createOutline,
   receiptOutline,
   refreshOutline,
 } from 'ionicons/icons';
@@ -161,7 +162,14 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   private readonly COLOR_TPSL = '#f4a261';
 
   constructor() {
-    addIcons({ calendarOutline, refreshOutline, receiptOutline, addOutline, closeCircle });
+    addIcons({
+      calendarOutline,
+      refreshOutline,
+      receiptOutline,
+      addOutline,
+      closeCircle,
+      createOutline,
+    });
 
     const state = window.history.state as { backHref?: string };
     if (state?.backHref) this.backHref.set(state.backHref);
@@ -782,19 +790,33 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
 
   // ── Indicators ────────────────────────────────────────────────────────────
 
-  async openIndicatorPicker(): Promise<void> {
+  async openIndicatorPicker(existing?: ActiveIndicator): Promise<void> {
     const modal = await this.modalCtrl.create({
       component: IndicatorPickerComponent,
+      componentProps: {
+        editingIndicator: () => existing,
+      },
       breakpoints: [0, 0.6, 1],
       initialBreakpoint: 0.6,
     });
     await modal.present();
     const { data, role } = await modal.onWillDismiss();
     if (role === 'confirm' && data) {
-      this.activeIndicators.update((list) => [...list, data]);
+      const updated = data as ActiveIndicator;
+      this.activeIndicators.update((list) => {
+        const idx = list.findIndex((i) => i.id === updated.id);
+        if (idx === -1) return [...list, updated];
+        const next = [...list];
+        next[idx] = updated;
+        return next;
+      });
       this.persistIndicators();
       this.loadData();
     }
+  }
+
+  editIndicator(indicator: ActiveIndicator): void {
+    this.openIndicatorPicker(indicator);
   }
 
   toggleIndicatorVisibility(id: string): void {

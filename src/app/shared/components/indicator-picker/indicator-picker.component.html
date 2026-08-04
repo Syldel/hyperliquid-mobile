@@ -1,10 +1,12 @@
 <ion-header>
   <ion-toolbar>
-    @if (selected()) {
+    @if (selected() && !isEditMode()) {
       <ion-button slot="start" fill="clear" (click)="back()">
         <ion-icon slot="icon-only" name="arrow-back-outline" />
       </ion-button>
-      <ion-title>{{ selected()!.label }}</ion-title>
+    }
+    @if (selected()) {
+      <ion-title>{{ isEditMode() ? 'Edit ' + selected()!.label : selected()!.label }}</ion-title>
     } @else {
       <ion-title>Add indicator</ion-title>
     }
@@ -69,18 +71,8 @@
           <ion-item lines="none" class="color-row">
             <ion-checkbox slot="start" [formControl]="sf.visible" />
             <ion-label [class.dimmed]="!sf.visible.value">{{ sf.label }}</ion-label>
-            <input
-              type="color"
-              class="color-swatch"
-              [formControl]="sf.color"
-              [disabled]="!sf.visible.value"
-            />
-            <ion-select
-              [formControl]="sf.lineStyle"
-              interface="popover"
-              slot="end"
-              [disabled]="!sf.visible.value"
-            >
+            <input type="color" class="color-swatch" [formControl]="sf.color" />
+            <ion-select [formControl]="sf.lineStyle" interface="popover" slot="end">
               <ion-select-option value="solid">Solid</ion-select-option>
               <ion-select-option value="dashed">Dashed</ion-select-option>
               <ion-select-option value="dotted">Dotted</ion-select-option>
@@ -109,7 +101,7 @@
       [disabled]="form()!.invalid || !anySubFieldVisible()"
       (click)="confirm()"
     >
-      Add
+      {{ isEditMode() ? 'Save' : 'Add' }}
     </ion-button>
   }
 </ion-content>

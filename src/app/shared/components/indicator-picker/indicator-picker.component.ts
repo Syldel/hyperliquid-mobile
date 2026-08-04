@@ -1,5 +1,14 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  effect,
+  inject,
+  input,
+  signal,
+} from '@angular/core';
+import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
   IonButton,
@@ -64,6 +73,7 @@ export class IndicatorPickerComponent {
   private readonly modalCtrl = inject(ModalController);
   private readonly botService = inject(BotService);
   private readonly colorService = inject(IndicatorColorService);
+  private readonly destroyRef = inject(DestroyRef);
 
   loading = signal(true);
   indicators = signal<IndicatorMetadata[]>([]);
@@ -97,6 +107,9 @@ export class IndicatorPickerComponent {
     { initialValue: true },
   );
 
+  readonly editingIndicator = input<ActiveIndicator | null>(null);
+  readonly isEditMode = computed(() => this.editingIndicator() !== null);
+
   private userPickedColor = false;
   private lastKey = '';
 
@@ -108,6 +121,20 @@ export class IndicatorPickerComponent {
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
+    });
+
+    effect(() => {
+      const indicator = this.editingIndicator();
+      const meta = this.indicators();
+
+      if (!indicator || meta.length === 0) {
+        return;
+      }
+
+      const targetMeta = meta.find((m) => m.name === indicator.request.name);
+      if (targetMeta) {
+        this.pick(targetMeta, indicator.request);
+      }
     });
   }
 
@@ -122,10 +149,14 @@ export class IndicatorPickerComponent {
     return [Validators.required];
   }
 
-  pick(meta: IndicatorMetadata): void {
+  pick(meta: IndicatorMetadata, initialValues?: IndicatorRequest): void {
     const group: Record<string, FormControl<number | string>> = {};
     for (const p of meta.parameters) {
-      group[p.name] = new FormControl(p.defaultValue, {
+      const initial =
+        initialValues && p.name in initialValues
+          ? (initialValues as Record<string, number | string>)[p.name]
+          : p.defaultValue;
+      group[p.name] = new FormControl<number | string>(initial, {
         nonNullable: true,
         validators: this.validatorsFor(p),
       });
@@ -162,17 +193,45 @@ export class IndicatorPickerComponent {
       (meta.subFields ?? []).map(async (sf) => {
         const fallback = defaultStyleFor(meta.name, sf.name, this.colorService.randomColor());
         const resolved = await this.colorService.getOrCreateSubField(key, sf.name, fallback);
+
+        const color = new FormControl(resolved.color, {
+          nonNullable: true,
+        });
+
+        const lineStyle = new FormControl<'solid' | 'dashed' | 'dotted'>(resolved.lineStyle, {
+          nonNullable: true,
+        });
+
+        const visible = new FormControl<boolean>(resolved.visible ?? true, {
+          nonNullable: true,
+        });
+
+        const updateDisabled = (isVisible: boolean) => {
+          if (isVisible) {
+            color.enable({ emitEvent: false });
+            lineStyle.enable({ emitEvent: false });
+          } else {
+            color.disable({ emitEvent: false });
+            lineStyle.disable({ emitEvent: false });
+          }
+        };
+
+        // Etat initial
+        updateDisabled(visible.value);
+
+        // Synchronisation
+        visible.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(updateDisabled);
+
         return {
           name: sf.name,
           label: sf.label,
-          color: new FormControl(resolved.color, { nonNullable: true }),
-          lineStyle: new FormControl<'solid' | 'dashed' | 'dotted'>(resolved.lineStyle, {
-            nonNullable: true,
-          }),
-          visible: new FormControl<boolean>(resolved.visible ?? true, { nonNullable: true }),
+          color,
+          lineStyle,
+          visible,
         };
       }),
     );
+
     this.subFieldControls.set(controls);
   }
 
@@ -216,11 +275,12 @@ export class IndicatorPickerComponent {
 
     const request = { name: meta.name, ...form.getRawValue() } as IndicatorRequest;
     const key = buildIndicatorKey(request);
+    const editing = this.editingIndicator();
 
     const active: ActiveIndicator = {
-      id: `${meta.name}-${Math.random().toString(36).slice(2, 6)}`,
+      id: editing?.id ?? `${meta.name}-${Math.random().toString(36).slice(2, 6)}`,
       request,
-      visible: true,
+      visible: editing?.visible ?? true,
       color: this.colorControl.value,
     };
 

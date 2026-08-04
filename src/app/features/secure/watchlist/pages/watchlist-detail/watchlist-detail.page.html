@@ -63,6 +63,7 @@
     <ion-chip [outline]="!ind.visible" (click)="toggleIndicatorVisibility(ind.id)">
       <span class="indicator-dot" [style.background]="dotColor(ind)"></span>
       <span>{{ indicatorLabel(ind) }}</span>
+      <ion-icon name="create-outline" (click)="editIndicator(ind); $event.stopPropagation()" />
       <ion-icon name="close-circle" (click)="removeIndicator(ind.id); $event.stopPropagation()" />
     </ion-chip>
     }
