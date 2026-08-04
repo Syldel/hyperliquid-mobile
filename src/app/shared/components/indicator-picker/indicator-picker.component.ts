@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
   IonButton,
+  IonCheckbox,
   IonContent,
   IonHeader,
   IonIcon,
@@ -27,6 +29,7 @@ import {
 } from '@syldel/trading-shared-types';
 import { addIcons } from 'ionicons';
 import { arrowBackOutline, closeOutline, diceOutline } from 'ionicons/icons';
+import { combineLatest, map, of, startWith, switchMap } from 'rxjs';
 import { ActiveIndicator, SubFieldStyle } from './models/indicator.model';
 import {
   defaultStyleFor,
@@ -52,6 +55,7 @@ import {
     IonSpinner,
     IonSelect,
     IonSelectOption,
+    IonCheckbox,
   ],
   templateUrl: './indicator-picker.component.html',
   styleUrls: ['./indicator-picker.component.scss'],
@@ -76,8 +80,22 @@ export class IndicatorPickerComponent {
       label: string;
       color: FormControl<string>;
       lineStyle: FormControl<'solid' | 'dashed' | 'dotted'>;
+      visible: FormControl<boolean>;
     }[]
   >([]);
+
+  anySubFieldVisible = toSignal(
+    toObservable(this.subFieldControls).pipe(
+      switchMap((controls) =>
+        controls.length === 0
+          ? of(true)
+          : combineLatest(
+              controls.map((c) => c.visible.valueChanges.pipe(startWith(c.visible.value))),
+            ).pipe(map((values) => values.some(Boolean))),
+      ),
+    ),
+    { initialValue: true },
+  );
 
   private userPickedColor = false;
   private lastKey = '';
@@ -151,6 +169,7 @@ export class IndicatorPickerComponent {
           lineStyle: new FormControl<'solid' | 'dashed' | 'dotted'>(resolved.lineStyle, {
             nonNullable: true,
           }),
+          visible: new FormControl<boolean>(resolved.visible ?? true, { nonNullable: true }),
         };
       }),
     );
@@ -208,7 +227,11 @@ export class IndicatorPickerComponent {
     if (meta.subFields?.length) {
       const subFieldStyles: Record<string, SubFieldStyle> = {};
       this.subFieldControls().forEach((c) => {
-        const style: SubFieldStyle = { color: c.color.value, lineStyle: c.lineStyle.value };
+        const style: SubFieldStyle = {
+          color: c.color.value,
+          lineStyle: c.lineStyle.value,
+          visible: c.visible.value,
+        };
         subFieldStyles[c.name] = style;
         this.colorService.setSubField(key, c.name, style);
       });

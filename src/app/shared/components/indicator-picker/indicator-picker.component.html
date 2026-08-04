@@ -67,9 +67,20 @@
       <div class="subfield-list">
         @for (sf of subFieldControls(); track sf.name) {
           <ion-item lines="none" class="color-row">
-            <ion-label>{{ sf.label }}</ion-label>
-            <input type="color" class="color-swatch" [formControl]="sf.color" />
-            <ion-select [formControl]="sf.lineStyle" interface="popover" slot="end">
+            <ion-checkbox slot="start" [formControl]="sf.visible" />
+            <ion-label [class.dimmed]="!sf.visible.value">{{ sf.label }}</ion-label>
+            <input
+              type="color"
+              class="color-swatch"
+              [formControl]="sf.color"
+              [disabled]="!sf.visible.value"
+            />
+            <ion-select
+              [formControl]="sf.lineStyle"
+              interface="popover"
+              slot="end"
+              [disabled]="!sf.visible.value"
+            >
               <ion-select-option value="solid">Solid</ion-select-option>
               <ion-select-option value="dashed">Dashed</ion-select-option>
               <ion-select-option value="dotted">Dotted</ion-select-option>
@@ -95,7 +106,7 @@
     <ion-button
       expand="block"
       class="ion-margin-top ion-padding"
-      [disabled]="form()!.invalid"
+      [disabled]="form()!.invalid || !anySubFieldVisible()"
       (click)="confirm()"
     >
       Add

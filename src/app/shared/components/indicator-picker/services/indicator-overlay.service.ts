@@ -37,11 +37,21 @@ export class IndicatorOverlayService {
     const fields = meta.subFields?.length ? meta.subFields.map((f) => f.name) : ['value'];
 
     fields.forEach((field) => {
+      const style = subFieldStyles?.[field] ?? {
+        color: defaultColor,
+        lineStyle: 'solid' as const,
+        visible: true,
+      };
+
+      if (style.visible === false) {
+        this.removeField(id, field);
+        return;
+      }
+
       const fieldPoints = points
         .filter((p) => typeof p[field] === 'number')
         .map((p) => ({ time: p.time, value: p[field] as number }));
 
-      const style = subFieldStyles?.[field] ?? { color: defaultColor, lineStyle: 'solid' as const };
       const lineStyle = this.toLightweightLineStyle(style.lineStyle);
 
       if (meta.overlay) {
@@ -50,6 +60,23 @@ export class IndicatorOverlayService {
         this.renderOnDedicatedPane(id, field, fieldPoints, style.color, lineStyle);
       }
     });
+  }
+
+  /** Retire la série d'un seul champ (contrairement à `remove()` qui retire tout l'indicateur). */
+  private removeField(id: string, field: string): void {
+    const overlayFields = this.overlaySeries.get(id);
+    const overlaySerie = overlayFields?.get(field);
+    if (overlaySerie) {
+      this.chart?.removeSeries(overlaySerie);
+      overlayFields!.delete(field);
+    }
+
+    const paned = this.paneSeries.get(id);
+    const panedSerie = paned?.seriesByField.get(field);
+    if (panedSerie) {
+      this.chart?.removeSeries(panedSerie);
+      paned!.seriesByField.delete(field);
+    }
   }
 
   private toLightweightLineStyle(style: SubFieldStyle['lineStyle']): LineStyle {
