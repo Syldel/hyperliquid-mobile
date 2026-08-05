@@ -1,8 +1,23 @@
+import { INDICATOR_SUBFIELDS, MultiLineIndicatorName } from '@syldel/trading-shared-types';
 import { SubFieldStyle } from '../models/indicator.model';
 
-/** Couleurs/styles par défaut par indicateur+sous-champ, alignés sur les conventions TradingView.
- *  ⚠️ Les clés de sous-champ (upper/middle/lower...) doivent matcher EXACTEMENT `subField.name` du backend. */
-export const INDICATOR_DEFAULT_STYLES: Record<string, Record<string, SubFieldStyle>> = {
+/** Noms de subField valides pour un indicateur, dérivés du registre partagé —
+ *  source unique de vérité, jamais recopiée ici. */
+type SubFieldNameOf<N extends MultiLineIndicatorName> =
+  (typeof INDICATOR_SUBFIELDS)[N][number]['name'];
+
+/**
+ * Couleurs/styles par défaut par indicateur+sous-champ.
+ *
+ * Le type est dérivé de `INDICATOR_SUBFIELDS` : toute ligne ajoutée, renommée
+ * ou retirée côté shared-types casse la compilation ici tant que ce fichier
+ * n'est pas mis à jour. Impossible d'oublier un indicateur multi-lignes ou de
+ * mal orthographier une clé de subField — l'erreur remontée pour Keltner plus
+ * tôt dans le projet aurait été détectée à la compilation avec ce typage.
+ */
+export const INDICATOR_DEFAULT_STYLES: {
+  [N in MultiLineIndicatorName]: Record<SubFieldNameOf<N>, SubFieldStyle>;
+} = {
   bb: {
     upper: { color: '#2196f3', lineStyle: 'dashed', visible: true },
     middle: { color: '#2196f3', lineStyle: 'solid', visible: true },
@@ -58,16 +73,16 @@ export const SIMPLE_INDICATOR_DEFAULT_COLORS: Record<string, string> = {
   sd: '#089981',
 };
 
+/** `field` reste `string` : il vient de `IndicatorMetadata.subFields` (données
+ *  backend, non typées côté front). La cohérence avec le registre partagé est
+ *  vérifiée à l'exécution par `assertSubFieldsMatchRegistry` dans le picker. */
 export function defaultStyleFor(
   indicatorName: string,
   field: string,
   fallbackColor: string,
 ): SubFieldStyle {
-  return (
-    INDICATOR_DEFAULT_STYLES[indicatorName]?.[field] ?? {
-      color: fallbackColor,
-      lineStyle: 'solid',
-      visible: true,
-    }
-  );
+  const styles = (INDICATOR_DEFAULT_STYLES as Record<string, Record<string, SubFieldStyle>>)[
+    indicatorName
+  ];
+  return styles?.[field] ?? { color: fallbackColor, lineStyle: 'solid', visible: true };
 }

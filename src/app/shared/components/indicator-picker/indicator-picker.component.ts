@@ -31,9 +31,12 @@ import { BotService } from '@services/bot.service';
 import { IndicatorColorService } from '@shared/components/indicator-picker/services/indicator-color.service';
 import { buildIndicatorKey } from '@shared/components/indicator-picker/utils/indicator-key.util';
 import {
+  getIndicatorSubFieldNames,
   IndicatorMetadata,
   IndicatorParameter,
   IndicatorRequest,
+  isIndicatorName,
+  isMultiLineIndicator,
   NumberIndicatorParameter,
 } from '@syldel/trading-shared-types';
 import { addIcons } from 'ionicons';
@@ -189,6 +192,8 @@ export class IndicatorPickerComponent {
     if (key === this.lastKey) return;
     this.lastKey = key;
 
+    this.assertSubFieldsMatchRegistry(meta);
+
     const controls = await Promise.all(
       (meta.subFields ?? []).map(async (sf) => {
         const fallback = defaultStyleFor(meta.name, sf.name, this.colorService.randomColor());
@@ -296,6 +301,15 @@ export class IndicatorPickerComponent {
         this.colorService.setSubField(key, c.name, style);
       });
       active.subFieldStyles = subFieldStyles;
+
+      if (isIndicatorName(meta.name) && isMultiLineIndicator(meta.name)) {
+        const missing = getIndicatorSubFieldNames(meta.name).filter((f) => !(f in subFieldStyles));
+        if (missing.length) {
+          console.warn(
+            `[indicator-picker] "${meta.name}" is missing a style for line(s): ${missing.join(', ')}.`,
+          );
+        }
+      }
     } else {
       this.colorService.set(key, active.color);
     }
@@ -305,5 +319,27 @@ export class IndicatorPickerComponent {
 
   dismiss(): void {
     this.modalCtrl.dismiss(null, 'cancel');
+  }
+
+  /** Garde-fou dev : les subFields renvoyés par le backend (meta.subFields)
+   *  doivent matcher exactement le registre partagé INDICATOR_SUBFIELDS. Un
+   *  écart (déploiement backend/front désynchronisé, typo) était auparavant un
+   *  bug silencieux — couleur aléatoire sans avertissement. */
+  private assertSubFieldsMatchRegistry(meta: IndicatorMetadata): void {
+    if (!isIndicatorName(meta.name) || !isMultiLineIndicator(meta.name)) return;
+
+    const expected = new Set(getIndicatorSubFieldNames(meta.name));
+    const received = new Set((meta.subFields ?? []).map((f) => f.name));
+
+    const missing = [...expected].filter((f) => !received.has(f));
+    const unexpected = [...received].filter((f) => !expected.has(f));
+
+    if (missing.length || unexpected.length) {
+      console.warn(
+        `[indicator-picker] "${meta.name}": subFields mismatch between backend metadata and ` +
+          `trading-shared-types registry. Missing: [${missing.join(', ')}]. ` +
+          `Unexpected: [${unexpected.join(', ')}].`,
+      );
+    }
   }
 }
