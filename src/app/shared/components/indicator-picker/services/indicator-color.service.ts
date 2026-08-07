@@ -1,18 +1,21 @@
 import { inject, Injectable } from '@angular/core';
 import { StorageService } from '@storage/storage.service';
-import { SubFieldStyle } from '../models/indicator.model';
+import { IndicatorHlineStyles, SubFieldStyle } from '../models/indicator.model';
 
 type ColorMap = Record<string, string>;
 type SubFieldStyleMap = Record<string, SubFieldStyle>;
+type HlineStyleMap = Record<string, IndicatorHlineStyles>;
 
 @Injectable({ providedIn: 'root' })
 export class IndicatorColorService {
   private readonly storage = inject(StorageService);
   private readonly STORAGE_KEY = 'indicator_colors';
   private readonly SUBFIELD_STORAGE_KEY = 'indicator_subfield_styles';
+  private readonly HLINE_STORAGE_KEY = 'indicator_hline_styles';
 
   private cache: ColorMap | null = null;
   private subFieldCache: SubFieldStyleMap | null = null;
+  private hlineCache: HlineStyleMap | null = null;
 
   // ── API existante (indicateurs simples) ───────────────────────────────────
   async peek(indicatorKey: string): Promise<string | undefined> {
@@ -34,7 +37,7 @@ export class IndicatorColorService {
     await this.storage.set(this.STORAGE_KEY, all);
   }
 
-  // ── Nouvelle API : styles par sous-champ ──────────────────────────────────
+  // ── API : styles par sous-champ (indicateurs multi-lignes) ────────────────
   private subFieldKey(indicatorKey: string, field: string): string {
     return `${indicatorKey}:${field}`;
   }
@@ -61,6 +64,30 @@ export class IndicatorColorService {
     if (stored) return stored;
     await this.setSubField(indicatorKey, field, fallbackDefault);
     return fallbackDefault;
+  }
+
+  // ── API : Levels/Zones (RSI, Stoch RSI, CHOP) ─────────────────────────────
+  async peekHlines(indicatorKey: string): Promise<IndicatorHlineStyles | undefined> {
+    return (await this.loadHlineAll())[indicatorKey];
+  }
+
+  /** Renvoie le jeu de Levels/Zones stocké pour cette clé d'indicateur, sinon
+   *  persiste et renvoie `fallback` (un jeu de départ, cf. buildDefaultHlineStyles). */
+  async getOrCreateHlines(
+    indicatorKey: string,
+    fallback: IndicatorHlineStyles,
+  ): Promise<IndicatorHlineStyles> {
+    const stored = await this.peekHlines(indicatorKey);
+    if (stored) return stored;
+    await this.setHlines(indicatorKey, fallback);
+    return fallback;
+  }
+
+  async setHlines(indicatorKey: string, styles: IndicatorHlineStyles): Promise<void> {
+    const all = await this.loadHlineAll();
+    all[indicatorKey] = styles;
+    this.hlineCache = all;
+    await this.storage.set(this.HLINE_STORAGE_KEY, all);
   }
 
   randomColor(): string {
@@ -106,5 +133,11 @@ export class IndicatorColorService {
     this.subFieldCache =
       (await this.storage.get<SubFieldStyleMap>(this.SUBFIELD_STORAGE_KEY)) ?? {};
     return this.subFieldCache;
+  }
+
+  private async loadHlineAll(): Promise<HlineStyleMap> {
+    if (this.hlineCache) return this.hlineCache;
+    this.hlineCache = (await this.storage.get<HlineStyleMap>(this.HLINE_STORAGE_KEY)) ?? {};
+    return this.hlineCache;
   }
 }

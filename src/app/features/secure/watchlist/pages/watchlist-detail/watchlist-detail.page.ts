@@ -377,7 +377,14 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
         // Re-vérifie la visibilité au retour (garde contre race condition toggle rapide)
         const stillVisible = this.activeIndicators().find((i) => i.id === active.id)?.visible;
         if (!stillVisible) return;
-        this.indicatorOverlay.render(active.id, meta, points, active.color, active.subFieldStyles);
+        this.indicatorOverlay.render(
+          active.id,
+          meta,
+          points,
+          active.color,
+          active.subFieldStyles,
+          active.hlines,
+        );
       });
     });
   }
@@ -798,8 +805,8 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       componentProps: {
         editingIndicator: () => existing,
       },
-      breakpoints: [0, 0.6, 1],
-      initialBreakpoint: 0.6,
+      breakpoints: [0, 1],
+      initialBreakpoint: 1,
     });
     await modal.present();
     const { data, role } = await modal.onWillDismiss();

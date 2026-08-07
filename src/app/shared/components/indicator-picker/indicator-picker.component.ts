@@ -20,12 +20,16 @@ import {
   IonItem,
   IonLabel,
   IonList,
+  IonRange,
+  IonSegment,
+  IonSegmentButton,
   IonSelect,
   IonSelectOption,
   IonSpinner,
   IonTitle,
   IonToolbar,
   ModalController,
+  SegmentCustomEvent,
 } from '@ionic/angular/standalone';
 import { BotService } from '@services/bot.service';
 import { IndicatorColorService } from '@shared/components/indicator-picker/services/indicator-color.service';
@@ -40,13 +44,46 @@ import {
   NumberIndicatorParameter,
 } from '@syldel/trading-shared-types';
 import { addIcons } from 'ionicons';
-import { arrowBackOutline, closeOutline, diceOutline } from 'ionicons/icons';
+import {
+  addOutline,
+  arrowBackOutline,
+  closeOutline,
+  diceOutline,
+  trashOutline,
+} from 'ionicons/icons';
 import { combineLatest, map, of, startWith, switchMap } from 'rxjs';
-import { ActiveIndicator, SubFieldStyle } from './models/indicator.model';
+import {
+  ActiveIndicator,
+  IndicatorHlineStyles,
+  LineStyleType,
+  SubFieldStyle,
+} from './models/indicator.model';
 import {
   defaultStyleFor,
   SIMPLE_INDICATOR_DEFAULT_COLORS,
 } from './utils/indicator-default-styles.util';
+import {
+  buildDefaultHlineStyles,
+  generateHlineId,
+  isHlineIndicatorName,
+} from './utils/indicator-hline-defaults.util';
+
+type HlineRowControls = {
+  id: string;
+  visible: FormControl<boolean>;
+  value: FormControl<number>;
+  color: FormControl<string>;
+  lineStyle: FormControl<LineStyleType>;
+};
+
+type HlineZoneRowControls = {
+  id: string;
+  visible: FormControl<boolean>;
+  upperValue: FormControl<number>;
+  lowerValue: FormControl<number>;
+  color: FormControl<string>;
+  opacity: FormControl<number>;
+};
 
 @Component({
   selector: 'app-indicator-picker',
@@ -68,6 +105,9 @@ import {
     IonSelect,
     IonSelectOption,
     IonCheckbox,
+    IonSegment,
+    IonSegmentButton,
+    IonRange,
   ],
   templateUrl: './indicator-picker.component.html',
   styleUrls: ['./indicator-picker.component.scss'],
@@ -110,14 +150,29 @@ export class IndicatorPickerComponent {
     { initialValue: true },
   );
 
+  activeTab = signal<'inputs' | 'style'>('inputs');
+
+  /** Vrai uniquement pour RSI / Stoch RSI / CHOP / etc. : ces indicateurs affichent en
+   *  plus, dans l'onglet "Style", les sections Levels et Zones. */
+  hasHlineSection = computed(() => {
+    const name = this.selected()?.name;
+    return !!name && isHlineIndicatorName(name);
+  });
+
+  // Levels : liste dynamique de lignes de niveau (Upper/Lower/... à la TradingView)
+  hlineControls = signal<HlineRowControls[]>([]);
+  // Zones : liste dynamique de bandes colorées entre deux valeurs
+  hlineZoneControls = signal<HlineZoneRowControls[]>([]);
+
   readonly editingIndicator = input<ActiveIndicator | null>(null);
   readonly isEditMode = computed(() => this.editingIndicator() !== null);
 
   private userPickedColor = false;
   private lastKey = '';
+  private lastHlineKey = '';
 
   constructor() {
-    addIcons({ arrowBackOutline, closeOutline, diceOutline });
+    addIcons({ arrowBackOutline, closeOutline, diceOutline, addOutline, trashOutline });
     this.botService.getExchangeFormMetadata().subscribe({
       next: (meta) => {
         this.indicators.set(meta.indicators);
@@ -169,6 +224,8 @@ export class IndicatorPickerComponent {
     this.form.set(form);
     this.userPickedColor = false;
     this.lastKey = '';
+    this.lastHlineKey = '';
+    this.activeTab.set('inputs');
 
     if (meta.subFields?.length) {
       this.buildSubFieldControls(meta, form.getRawValue());
@@ -180,6 +237,16 @@ export class IndicatorPickerComponent {
       form.valueChanges.subscribe((values) =>
         this.suggestColor(meta, values as Record<string, number>),
       );
+    }
+
+    if (isHlineIndicatorName(meta.name)) {
+      this.buildHlineControls(meta, form.getRawValue());
+      form.valueChanges.subscribe((values) =>
+        this.buildHlineControls(meta, values as Record<string, number | string>),
+      );
+    } else {
+      this.hlineControls.set([]);
+      this.hlineZoneControls.set([]);
     }
   }
 
@@ -258,6 +325,84 @@ export class IndicatorPickerComponent {
     }
   }
 
+  /** Charge (ou initialise) les Levels/Zones pour la clé d'indicateur courante.
+   *  Un jeu de départ (buildDefaultHlineStyles) n'est utilisé QUE si rien n'est
+   *  encore persisté pour cette clé — l'utilisateur reste libre d'ajouter,
+   *  modifier ou supprimer n'importe quelle ligne/zone par la suite. */
+  private async buildHlineControls(
+    meta: IndicatorMetadata,
+    values: Record<string, number | string>,
+  ): Promise<void> {
+    const name = meta.name;
+    if (!isHlineIndicatorName(name)) return;
+
+    const key = buildIndicatorKey({ name, ...values } as IndicatorRequest);
+    if (key === this.lastHlineKey) return;
+    this.lastHlineKey = key;
+
+    const defaults = buildDefaultHlineStyles(name);
+    const stored = await this.colorService.getOrCreateHlines(key, defaults);
+
+    this.hlineControls.set(
+      stored.lines.map((l) => ({
+        id: l.id,
+        visible: new FormControl<boolean>(l.visible, { nonNullable: true }),
+        value: new FormControl<number>(l.value, { nonNullable: true }),
+        color: new FormControl<string>(l.color, { nonNullable: true }),
+        lineStyle: new FormControl<LineStyleType>(l.lineStyle, { nonNullable: true }),
+      })),
+    );
+
+    this.hlineZoneControls.set(
+      stored.zones.map((z) => ({
+        id: z.id,
+        visible: new FormControl<boolean>(z.visible, { nonNullable: true }),
+        upperValue: new FormControl<number>(z.upperValue, { nonNullable: true }),
+        lowerValue: new FormControl<number>(z.lowerValue, { nonNullable: true }),
+        color: new FormControl<string>(z.color, { nonNullable: true }),
+        opacity: new FormControl<number>(z.opacity, { nonNullable: true }),
+      })),
+    );
+  }
+
+  onTabChange(event: SegmentCustomEvent): void {
+    const value = event.detail.value;
+    if (value === 'inputs' || value === 'style') {
+      this.activeTab.set(value);
+    }
+  }
+
+  addHline(): void {
+    const newRow: HlineRowControls = {
+      id: generateHlineId(),
+      visible: new FormControl<boolean>(true, { nonNullable: true }),
+      value: new FormControl<number>(50, { nonNullable: true }),
+      color: new FormControl<string>(this.colorService.randomColor(), { nonNullable: true }),
+      lineStyle: new FormControl<LineStyleType>('solid', { nonNullable: true }),
+    };
+    this.hlineControls.update((rows) => [...rows, newRow]);
+  }
+
+  removeHline(id: string): void {
+    this.hlineControls.update((rows) => rows.filter((r) => r.id !== id));
+  }
+
+  addZone(): void {
+    const newRow: HlineZoneRowControls = {
+      id: generateHlineId(),
+      visible: new FormControl<boolean>(true, { nonNullable: true }),
+      upperValue: new FormControl<number>(70, { nonNullable: true }),
+      lowerValue: new FormControl<number>(30, { nonNullable: true }),
+      color: new FormControl<string>(this.colorService.randomColor(), { nonNullable: true }),
+      opacity: new FormControl<number>(10, { nonNullable: true }),
+    };
+    this.hlineZoneControls.update((rows) => [...rows, newRow]);
+  }
+
+  removeZone(id: string): void {
+    this.hlineZoneControls.update((rows) => rows.filter((r) => r.id !== id));
+  }
+
   onColorInput(): void {
     this.userPickedColor = true;
   }
@@ -271,6 +416,9 @@ export class IndicatorPickerComponent {
     this.selected.set(null);
     this.form.set(null);
     this.subFieldControls.set([]);
+    this.hlineControls.set([]);
+    this.hlineZoneControls.set([]);
+    this.activeTab.set('inputs');
   }
 
   confirm(): void {
@@ -312,6 +460,28 @@ export class IndicatorPickerComponent {
       }
     } else {
       this.colorService.set(key, active.color);
+    }
+
+    if (isHlineIndicatorName(meta.name)) {
+      const hlines: IndicatorHlineStyles = {
+        lines: this.hlineControls().map((h) => ({
+          id: h.id,
+          visible: h.visible.value,
+          value: h.value.value,
+          color: h.color.value,
+          lineStyle: h.lineStyle.value,
+        })),
+        zones: this.hlineZoneControls().map((z) => ({
+          id: z.id,
+          visible: z.visible.value,
+          upperValue: z.upperValue.value,
+          lowerValue: z.lowerValue.value,
+          color: z.color.value,
+          opacity: z.opacity.value,
+        })),
+      };
+      active.hlines = hlines;
+      this.colorService.setHlines(key, hlines);
     }
 
     this.modalCtrl.dismiss(active, 'confirm');

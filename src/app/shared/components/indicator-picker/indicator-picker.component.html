@@ -31,68 +31,152 @@
       }
     </ion-list>
   } @else if (form()) {
-    <form [formGroup]="form()!" class="param-form">
-      @for (p of selected()!.parameters; track p.name) {
-        <ion-item>
-          <ion-label position="stacked">{{ p.label }}</ion-label>
+    <ion-segment [value]="activeTab()" (ionChange)="onTabChange($event)" class="picker-tabs">
+      <ion-segment-button value="inputs">
+        <ion-label>Inputs</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="style">
+        <ion-label>Style</ion-label>
+      </ion-segment-button>
+    </ion-segment>
 
-          @switch (p.type) {
-            @case ('select') {
-              <ion-select [formControlName]="p.name" interface="popover">
-                @for (opt of p.options; track opt.value) {
-                  <ion-select-option [value]="opt.value">{{ opt.label }}</ion-select-option>
-                }
-              </ion-select>
-            }
-            @case ('string') {
-              <ion-input
-                type="text"
-                [formControlName]="p.name"
-                [placeholder]="p.placeholder ?? ''"
-              />
-            }
-            @default {
-              <ion-input
-                type="number"
-                [formControlName]="p.name"
-                [min]="p.min ?? null"
-                [max]="p.max ?? null"
-                [step]="p.step ?? 1"
-              />
-            }
-          }
-        </ion-item>
-      }
-    </form>
+    @if (activeTab() === 'inputs') {
+      <form [formGroup]="form()!" class="param-form">
+        @for (p of selected()!.parameters; track p.name) {
+          <ion-item>
+            <ion-label position="stacked">{{ p.label }}</ion-label>
 
-    @if (selected()!.subFields?.length) {
-      <div class="subfield-list">
-        @for (sf of subFieldControls(); track sf.name) {
-          <ion-item lines="none" class="color-row">
-            <ion-checkbox slot="start" [formControl]="sf.visible" />
-            <ion-label [class.dimmed]="!sf.visible.value">{{ sf.label }}</ion-label>
-            <input type="color" class="color-swatch" [formControl]="sf.color" />
-            <ion-select [formControl]="sf.lineStyle" interface="popover" slot="end">
-              <ion-select-option value="solid">Solid</ion-select-option>
-              <ion-select-option value="dashed">Dashed</ion-select-option>
-              <ion-select-option value="dotted">Dotted</ion-select-option>
-            </ion-select>
+            @switch (p.type) {
+              @case ('select') {
+                <ion-select [formControlName]="p.name" interface="popover">
+                  @for (opt of p.options; track opt.value) {
+                    <ion-select-option [value]="opt.value">{{ opt.label }}</ion-select-option>
+                  }
+                </ion-select>
+              }
+              @case ('string') {
+                <ion-input
+                  type="text"
+                  [formControlName]="p.name"
+                  [placeholder]="p.placeholder ?? ''"
+                />
+              }
+              @default {
+                <ion-input
+                  type="number"
+                  [formControlName]="p.name"
+                  [min]="p.min ?? null"
+                  [max]="p.max ?? null"
+                  [step]="p.step ?? 1"
+                />
+              }
+            }
           </ion-item>
         }
-      </div>
-    } @else {
-      <ion-item lines="none" class="color-row">
-        <ion-label>Color</ion-label>
-        <input
-          type="color"
-          class="color-swatch"
-          [formControl]="colorControl"
-          (input)="onColorInput()"
-        />
-        <ion-button slot="end" fill="clear" (click)="randomizeColor()">
-          <ion-icon slot="icon-only" name="dice-outline" />
-        </ion-button>
-      </ion-item>
+      </form>
+    }
+
+    @if (activeTab() === 'style') {
+      @if (selected()!.subFields?.length) {
+        <div class="subfield-list">
+          @for (sf of subFieldControls(); track sf.name) {
+            <ion-item lines="none" class="color-row">
+              <ion-checkbox slot="start" [formControl]="sf.visible" />
+              <ion-label [class.dimmed]="!sf.visible.value">{{ sf.label }}</ion-label>
+              <input type="color" class="color-swatch" [formControl]="sf.color" />
+              <ion-select [formControl]="sf.lineStyle" interface="popover" slot="end">
+                <ion-select-option value="solid">Solid</ion-select-option>
+                <ion-select-option value="dashed">Dashed</ion-select-option>
+                <ion-select-option value="dotted">Dotted</ion-select-option>
+              </ion-select>
+            </ion-item>
+          }
+        </div>
+      } @else {
+        <ion-item lines="none" class="color-row">
+          <ion-label>Color</ion-label>
+          <input
+            type="color"
+            class="color-swatch"
+            [formControl]="colorControl"
+            (input)="onColorInput()"
+          />
+          <ion-button slot="end" fill="clear" (click)="randomizeColor()">
+            <ion-icon slot="icon-only" name="dice-outline" />
+          </ion-button>
+        </ion-item>
+      }
+
+      @if (hasHlineSection()) {
+        <div class="hline-section">
+          <div class="section-header">
+            <h4 class="section-title">Levels</h4>
+            <ion-button size="small" fill="clear" (click)="addHline()">
+              <ion-icon slot="icon-only" name="add-outline" />
+            </ion-button>
+          </div>
+
+          @for (h of hlineControls(); track h.id) {
+            <ion-item lines="none" class="hline-row">
+              <ion-checkbox slot="start" [formControl]="h.visible" />
+              <ion-input type="number" class="hline-value" [formControl]="h.value" step="0.1" />
+              <input type="color" class="color-swatch" [formControl]="h.color" />
+              <ion-select [formControl]="h.lineStyle" interface="popover">
+                <ion-select-option value="solid">Solid</ion-select-option>
+                <ion-select-option value="dashed">Dashed</ion-select-option>
+                <ion-select-option value="dotted">Dotted</ion-select-option>
+              </ion-select>
+              <ion-button slot="end" fill="clear" (click)="removeHline(h.id)">
+                <ion-icon slot="icon-only" name="trash-outline" />
+              </ion-button>
+            </ion-item>
+          } @empty {
+            <p class="hline-empty">No level line. Add one with the + button above.</p>
+          }
+
+          <div class="section-header">
+            <h4 class="section-title">Zones</h4>
+            <ion-button size="small" fill="clear" (click)="addZone()">
+              <ion-icon slot="icon-only" name="add-outline" />
+            </ion-button>
+          </div>
+
+          @for (z of hlineZoneControls(); track z.id) {
+            <ion-item lines="none" class="hline-row zone-row">
+              <ion-checkbox slot="start" [formControl]="z.visible" />
+              <ion-input
+                type="number"
+                class="hline-value"
+                [formControl]="z.upperValue"
+                step="0.1"
+                placeholder="Upper"
+              />
+              <ion-input
+                type="number"
+                class="hline-value"
+                [formControl]="z.lowerValue"
+                step="0.1"
+                placeholder="Lower"
+              />
+              <input type="color" class="color-swatch" [formControl]="z.color" />
+              <ion-range
+                class="zone-opacity"
+                [formControl]="z.opacity"
+                min="0"
+                max="100"
+                [pin]="true"
+              >
+                <ion-label slot="end">{{ z.opacity.value }}%</ion-label>
+              </ion-range>
+              <ion-button slot="end" fill="clear" (click)="removeZone(z.id)">
+                <ion-icon slot="icon-only" name="trash-outline" />
+              </ion-button>
+            </ion-item>
+          } @empty {
+            <p class="hline-empty">No zone. Add one with the + button above.</p>
+          }
+        </div>
+      }
     }
 
     <ion-button
