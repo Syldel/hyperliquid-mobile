@@ -28,7 +28,7 @@ export const INDICATOR_DEFAULT_STYLES: {
     base: { color: '#801922', lineStyle: 'solid', visible: true },
     spanA: { color: '#A5D6A7', lineStyle: 'solid', visible: true },
     spanB: { color: '#FAA1A4', lineStyle: 'solid', visible: true },
-    chikou: { color: '#43A047', lineStyle: 'solid', visible: true },
+    // chikou: { color: '#43A047', lineStyle: 'solid', visible: true },
   },
   macd: {
     macd: { color: '#2196f3', lineStyle: 'solid', visible: true },
@@ -71,6 +71,7 @@ export const SIMPLE_INDICATOR_DEFAULT_COLORS: Record<string, string> = {
   rsi: '#7e57c2',
   atr: '#801922',
   sd: '#089981',
+  chop: '#ff9800',
 };
 
 /** `field` reste `string` : il vient de `IndicatorMetadata.subFields` (données
