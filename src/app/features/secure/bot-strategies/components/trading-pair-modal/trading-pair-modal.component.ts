@@ -50,7 +50,6 @@ import {
   ExitBehavior,
   ExitBehaviorMeta,
   IExchange,
-  IExchangeStrategy,
   StrategyMeta,
   StrategyParameter,
 } from '@syldel/trading-shared-types';
@@ -68,7 +67,7 @@ import { combineLatest, debounceTime } from 'rxjs';
 interface TradingPairForm {
   exchangeKey: FormControl<string>;
   pairName: FormControl<string>;
-  strategy: FormControl<IExchangeStrategy>;
+  strategy: FormControl<StrategyMeta>;
   exitBehavior: FormControl<ExitBehavior>;
   ratio: FormControl<number>;
   interval: FormControl<ChartInterval>;
@@ -189,7 +188,7 @@ export class TradingPairModalComponent implements OnInit {
       Validators.required,
       this.pairNameExistsValidator(),
     ]),
-    strategy: this.fb.nonNullable.control<IExchangeStrategy>(null as any, Validators.required),
+    strategy: this.fb.nonNullable.control<StrategyMeta>(null as any, Validators.required),
     exitBehavior: this.fb.nonNullable.control<ExitBehavior>('STRATEGY_SIGNAL', Validators.required),
     ratio: this.fb.nonNullable.control(0, [
       Validators.required,
@@ -301,7 +300,7 @@ export class TradingPairModalComponent implements OnInit {
 
     for (const param of params) {
       const savedValue = existingValues?.[param.id];
-      const initialValue = savedValue !== undefined ? savedValue : param.default;
+      const initialValue = savedValue !== undefined ? savedValue : param.defaultValue;
 
       const validators = [];
       if (param.type === 'number') {
@@ -345,15 +344,21 @@ export class TradingPairModalComponent implements OnInit {
         exitBehavior: pair.exitBehavior ?? 'STRATEGY_SIGNAL',
       });
 
-      // Reconstruit les params avec les valeurs sauvegardées
-      if (pair.strategy?.parameters?.length) {
-        this.buildStrategyParamsForm(pair.strategy.parameters, pair.strategyParameters);
-      }
+      // TODO(advanced-rules): le préremplissage des paramètres rule-builder en
+      // édition est désactivé depuis le passage à StrategyRules côté backend.
+      // `pair.strategy` (IExchangeStrategy) ne porte plus le schéma des champs
+      // — celui-ci vient désormais uniquement du catalogue (`StrategyMeta`,
+      // `GET /exchanges/meta`). Le formulaire dynamique reste fonctionnel pour
+      // les stratégies sans paramètres (ex: tol-langit-atr-v7-pro) via l'effet
+      // ci-dessous, qui se redéclenche déjà à l'ouverture (patchValue émet un
+      // valueChanges). À reprendre avec le reste du système de construction
+      // dynamique de stratégies (advanced-rules), volontairement laissé de
+      // côté pour l'instant.
     });
 
     // Reconstruction du form dynamique à chaque changement de strategy
     effect(() => {
-      const strategy = this.formValue().strategy as IExchangeStrategy | null;
+      const strategy = this.formValue().strategy;
       const params = strategy?.parameters ?? [];
       this.buildStrategyParamsForm(params);
     });
@@ -401,7 +406,7 @@ export class TradingPairModalComponent implements OnInit {
     }
   }
 
-  compareStrategies = (s1: IExchangeStrategy, s2: IExchangeStrategy): boolean =>
+  compareStrategies = (s1: StrategyMeta, s2: StrategyMeta): boolean =>
     s1 && s2 ? s1.shortname === s2.shortname : s1 === s2;
 
   readonly pinFormatter = (value: number) => `${value}%`;
