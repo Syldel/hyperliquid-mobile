@@ -66,6 +66,18 @@ export class IndicatorOverlayService {
         return;
       }
 
+      // Ce filtre exclut silencieusement tout point où `field` n'est pas un
+      // nombre — aujourd'hui sans conséquence : un indicateur mono/multi-ligne
+      // classique (EMA/RSI/BB/...) ne produit jamais `null` une fois amorcé, sa
+      // période d'amorçage est simplement absente de la série. Mais
+      // `AnalysisResponse.expressions` (transformations glissantes ZScore/
+      // Percentile/... — voir `SimpleValue` dans @syldel/trading-shared-types
+      // >= v0.16.0) PEUT redevenir `null` en plein milieu d'une série déjà
+      // amorcée (fenêtre dégénérée), pas seulement à son tout début. Le jour où
+      // ce composant affichera une `expression`, ce filtre transformerait un
+      // "valeur indéterminée à cet instant" en trou silencieux dans le tracé
+      // plutôt que de le signaler — à revoir explicitement à ce moment-là, pas
+      // à laisser drifter en silence jusque-là.
       const fieldPoints = points
         .filter((p) => typeof p[field] === 'number')
         .map((p) => ({ time: p.time, value: p[field] as number }));
