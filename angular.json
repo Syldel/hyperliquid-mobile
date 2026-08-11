@@ -75,7 +75,13 @@
           "defaultConfiguration": "development"
         },
         "test": {
-          "builder": "@angular/build:unit-test"
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "setupFiles": [
+              "src/app/shared/testing/ionic-mock.setup.ts",
+              "src/app/shared/testing/jsdom-polyfills.setup.ts"
+            ]
+          }
         }
       }
     }
