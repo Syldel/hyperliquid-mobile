@@ -58,10 +58,24 @@ npx cap add android
 #### 1. Build + sync
 
 ```bash
-npm run android:build --configuration=production
+npm run android:build
 ```
 
-This command runs the Angular build and `cap sync android` in sequence.
+This command runs the Angular build (`production` configuration) and `cap sync android` in sequence.
+
+#### 1bis. Generate an APK (release or debug)
+
+```bash
+npm run android:build:apk
+npm run android:build:apk:debug
+```
+
+Both default to the `production` Angular configuration (set inside `scripts/android/build-android.sh`). To build with a different configuration, pass it as an extra argument — it is forwarded as the script's `$2` positional argument:
+
+```bash
+npm run android:build:apk -- development
+npm run android:build:apk:debug -- development
+```
 
 #### 2. Open in Android Studio
 
@@ -80,7 +94,7 @@ npx cap run android
 ### Android Live Reload – Development Workflow
 
 This project supports **Android live reload** using the Angular dev server and Capacitor.
-Multiple build configurations are available (`dev`, `prod`) via npm arguments.
+Multiple build configurations are available (`development`, `production`) as a positional argument, defaulting to `development`.
 
 The following command starts:
 
@@ -89,10 +103,12 @@ The following command starts:
 - Android app installation and launch on the connected device
 
 ```bash
-npm run android:live --configuration=dev
-npm run android:live --configuration=prod
+npm run android:live
+npm run android:live -- development
+npm run android:live -- production
 ```
 
+> This script relies on macOS/Linux tools (`lsof`, `ifconfig`, `nc`, `perl`) — run it from a Mac or a Linux/WSL/Git Bash environment with those tools available, not from a plain Windows shell.
 > The device must be on the same Wi-Fi network as the development machine.
 
 ---

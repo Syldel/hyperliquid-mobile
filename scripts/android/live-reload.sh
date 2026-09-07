@@ -1,7 +1,17 @@
 #!/bin/bash
 
+# -----------------------------
+# Usage:
+#   ./live-reload.sh [development|production]
+#
+# Exemples:
+#   ./live-reload.sh              → live reload avec la config 'development' (défaut)
+#   ./live-reload.sh production   → live reload avec la config 'production'
+# -----------------------------
+
 PORT=8200
 CAP_CONFIG="capacitor.config.ts"
+CONFIGURATION=${1:-development} # default 'development'
 
 # Kill le port si déjà utilisé
 echo "🔫 Killing port $PORT if already in use..."
@@ -33,8 +43,8 @@ fi
 
 echo "✅ URL injectée : http://$LOCAL_IP:$PORT"
 
-echo "🚀 Starting ng serve..."
-npx ng serve --host 0.0.0.0 --port $PORT &
+echo "🚀 Starting ng serve (configuration: $CONFIGURATION)..."
+npx ng serve --configuration=$CONFIGURATION --host 0.0.0.0 --port $PORT &
 NG_PID=$!
 
 echo "⏳ Waiting for ng serve to be ready on port $PORT..."
