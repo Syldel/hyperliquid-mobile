@@ -1,6 +1,10 @@
 import { HttpClient } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { ExchangesMetaResponse, IndicatorMetadata } from '@syldel/trading-shared-types';
+import {
+  ExchangesMetaResponse,
+  IndicatorMetadata,
+  PACKAGE_VERSION,
+} from '@syldel/trading-shared-types';
 import { map, Observable, of, shareReplay, tap } from 'rxjs';
 import { ConfigService } from './config.service';
 
@@ -61,4 +65,28 @@ export class BotService {
   }
 
   readonly indicators = computed(() => this.metadataCache()?.indicators ?? []);
+
+  /**
+   * Version de `@syldel/trading-shared-types` compilée dans CE build mobile —
+   * fixe pour toute la durée de vie de l'app, contrairement à `metadataCache`.
+   */
+  readonly localPackageVersion = PACKAGE_VERSION;
+
+  /** Version du même paquet réellement exécutée par le bot, telle que renvoyée par `/exchanges/meta`. */
+  readonly serverPackageVersion = computed(() => this.metadataCache()?.packageVersion ?? null);
+
+  /**
+   * `true` uniquement une fois `serverPackageVersion` connu et différent du
+   * build local — jamais avant le premier `getExchangeFormMetadata()` réussi,
+   * pour ne pas afficher une fausse alerte pendant le chargement initial.
+   *
+   * Une dérive ici signifie que le catalogue (indicateurs, transforms,
+   * grammaire du rule-builder) que ce build sait interpréter n'est plus
+   * exactement celui que le bot exécute — voir mobile-app-integration.md
+   * (nest-trading-bot) pour l'incident qui a motivé ce garde-fou.
+   */
+  readonly hasPackageVersionMismatch = computed(() => {
+    const server = this.serverPackageVersion();
+    return server !== null && server !== this.localPackageVersion;
+  });
 }

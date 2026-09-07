@@ -1,0 +1,30 @@
+.version-warning {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  background: var(--ion-color-warning, #ffc409);
+  color: var(--ion-color-warning-contrast, #000000);
+  font-size: 0.8rem;
+  line-height: 1.3;
+
+  ion-icon[name='warning-outline'] {
+    flex-shrink: 0;
+    font-size: 1.1rem;
+  }
+
+  span {
+    flex: 1;
+  }
+
+  ion-button {
+    flex-shrink: 0;
+    margin: 0;
+    --color: var(--ion-color-warning-contrast, #000000);
+  }
+}

@@ -1,0 +1,13 @@
+@if (showWarning()) {
+  <div class="version-warning" role="alert">
+    <ion-icon aria-hidden="true" name="warning-outline"></ion-icon>
+    <span>
+      App out of sync with the bot (local {{ localPackageVersion }}, server
+      {{ serverPackageVersion() }}). Some indicators or strategies may not display
+      correctly — update the app.
+    </span>
+    <ion-button fill="clear" size="small" (click)="dismiss()">
+      <ion-icon aria-hidden="true" name="close-outline" slot="icon-only"></ion-icon>
+    </ion-button>
+  </div>
+}

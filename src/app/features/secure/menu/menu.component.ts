@@ -15,6 +15,7 @@ import {
 } from '@ionic/angular/standalone';
 import { PageHeaderComponent } from '@shared/components/page-header/page-header.component';
 import { UserAvatarBtnComponent } from '@shared/components/user-avatar-btn/user-avatar-btn.component';
+import { VersionMismatchBannerComponent } from '@shared/components/version-mismatch-banner/version-mismatch-banner.component';
 import { addIcons } from 'ionicons';
 import {
   analyticsOutline,
@@ -45,6 +46,7 @@ import {
     IonButton,
     UserAvatarBtnComponent,
     PageHeaderComponent,
+    VersionMismatchBannerComponent,
   ],
   templateUrl: './menu.component.html',
   styleUrls: ['./menu.component.scss'],
