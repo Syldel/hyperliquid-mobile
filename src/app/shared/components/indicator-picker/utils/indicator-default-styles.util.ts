@@ -1,8 +1,11 @@
-import { INDICATOR_SUBFIELDS, MultiLineIndicatorName } from '@syldel/trading-shared-types';
+import type { INDICATOR_SUBFIELDS, MultiLineIndicatorName } from '@syldel/trading-shared-types';
 import { SubFieldStyle } from '../models/indicator.model';
 
 /** Noms de subField valides pour un indicateur, dérivés du registre partagé —
- *  source unique de vérité, jamais recopiée ici. */
+ *  source unique de vérité, jamais recopiée ici. `import type` : uniquement
+ *  une position de type (`typeof INDICATOR_SUBFIELDS`), aucune valeur du
+ *  registre n'est exécutée ici — voir no-catalog-imports.spec.ts, qui n'a
+ *  donc rien à interdire sur cette ligne. */
 type SubFieldNameOf<N extends MultiLineIndicatorName> =
   (typeof INDICATOR_SUBFIELDS)[N][number]['name'];
 

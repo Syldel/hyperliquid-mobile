@@ -67,6 +67,21 @@ export class BotService {
   readonly indicators = computed(() => this.metadataCache()?.indicators ?? []);
 
   /**
+   * Ordre canonique des lignes d'un indicateur multi-sorties, tel que renvoyé
+   * par le bot (`IndicatorMetadata.subFields`) — jamais dérivé d'un registre
+   * compilé localement, pour ne jamais diverger d'un catalogue backend plus
+   * récent que ce build (voir no-catalog-imports.spec.ts). `[]` pour un
+   * indicateur mono-ligne ou absent du catalogue actuellement chargé.
+   */
+  getIndicatorSubFieldNames(name: string): string[] {
+    return (
+      this.indicators()
+        .find((i) => i.name === name)
+        ?.subFields?.map((sf) => sf.name) ?? []
+    );
+  }
+
+  /**
    * Version de `@syldel/trading-shared-types` compilée dans CE build mobile —
    * fixe pour toute la durée de vie de l'app, contrairement à `metadataCache`.
    */

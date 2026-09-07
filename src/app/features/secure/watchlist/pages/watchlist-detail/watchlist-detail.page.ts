@@ -42,8 +42,6 @@ import {
   AnalysisResponse,
   AnalysisStrategyRequest,
   IndicatorMetadata,
-  getIndicatorSubFieldNames,
-  isIndicatorName,
 } from '@syldel/trading-shared-types';
 import { toChartInterval } from '@utils/hl-interval.utils';
 import { addIcons } from 'ionicons';
@@ -852,11 +850,11 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     if (!styles) return active.color || '#888';
 
     const name = active.request.name;
-    const canonicalOrder = isIndicatorName(name) ? getIndicatorSubFieldNames(name) : [];
+    const canonicalOrder = this.botService.getIndicatorSubFieldNames(name);
 
     // Le point du chip ne peut représenter qu'une seule couleur : on prend la
-    // première ligne VISIBLE dans l'ordre canonique du registre partagé
-    // (INDICATOR_SUBFIELDS), pas l'ordre — non garanti — des clés de l'objet.
+    // première ligne VISIBLE dans l'ordre canonique renvoyé par le bot
+    // (IndicatorMetadata.subFields), pas l'ordre — non garanti — des clés de l'objet.
     const preferred =
       canonicalOrder.find((field) => styles[field]?.visible !== false) ??
       canonicalOrder.find((field) => styles[field]) ??
