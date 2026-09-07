@@ -45,6 +45,12 @@ export const INDICATOR_DEFAULT_STYLES: {
     middle: { color: '#ff6d00', lineStyle: 'solid', visible: true },
     lower: { color: '#ff6d00', lineStyle: 'dashed', visible: true },
   },
+  donchian: {
+    upper: { color: '#7cb342', lineStyle: 'dashed', visible: true },
+    middle: { color: '#7cb342', lineStyle: 'solid', visible: true },
+    lower: { color: '#7cb342', lineStyle: 'dashed', visible: true },
+    width: { color: '#7cb342', lineStyle: 'dotted', visible: false },
+  },
   supertrend: {
     supertrend: { color: '#26a69a', lineStyle: 'solid', visible: true },
     direction: { color: '#ef5350', lineStyle: 'solid', visible: false },
