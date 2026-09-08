@@ -49,6 +49,17 @@ ion-badge {
   opacity: 0.75;
 }
 
+/* `ion-padding` pose 16px en haut du contenu, et une liste `inset` ajoute sa
+   propre marge de 16px : le premier bloc se retrouvait donc à 32px du bord,
+   deux fois plus bas que voulu. Seule la marge haute de la PREMIÈRE liste est
+   neutralisée — les suivantes gardent la leur, qui sépare les groupes entre
+   eux. Règle globale plutôt que recopiée : le même empilement se produit dans
+   toutes les modales de formulaire (add-watchlist, trading-pair, order-form,
+   protective-order-form, builder de stratégie). */
+ion-content.ion-padding ion-list.list-inset:first-of-type {
+  margin-top: 0;
+}
+
 .tv-attr-logo,
 a[href*='tradingview.com'] {
   display: none !important;
