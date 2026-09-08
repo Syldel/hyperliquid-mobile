@@ -2,10 +2,10 @@ import { Component, EventEmitter, forwardRef, Injectable, Input, Output } from '
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
 /**
- * Remplaçants minimalistes des composants/services Ionic, à mocker dans les
- * specs via `vi.mock('@ionic/angular/standalone', () => ({ IonItem: IonItemStub, ... }))`
- * (composants) ou `vi.mock('@ionic/angular', () => ({ Platform: PlatformStub }))`
- * (services du module classique — voir `PlatformStub` plus bas).
+ * Remplaçants minimalistes des composants/services Ionic. Un spec n'a rien à
+ * déclarer pour en bénéficier : `vitest.config.ts` fait pointer
+ * `@ionic/angular/standalone` et `@ionic/angular` sur ce fichier, dont les
+ * ré-exports en bas portent les noms réels d'Ionic.
  *
  * Nécessaires tant que
  * https://github.com/ionic-team/ionic-framework/issues/30982 (import ESM
@@ -15,9 +15,8 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
  * respectif, y compris la ligne d'import cassée — au moment même où le
  * fichier du composant testé est chargé, avant même que TestBed n'entre en
  * jeu. Aucun schéma Angular (`CUSTOM_ELEMENTS_SCHEMA`) ni
- * `TestBed.overrideComponent` ne peut intercepter ça après coup : seul un
- * mock au niveau du module (Vitest) empêche le vrai bundle Ionic d'être
- * chargé.
+ * `TestBed.overrideComponent` ne peut intercepter ça après coup : seule une
+ * substitution au niveau du module empêche le vrai bundle Ionic d'être chargé.
  *
  * Volontairement minimalistes (sélecteur + projection de contenu pour les
  * conteneurs) : ces specs testent la logique du composant sous test, pas le
@@ -273,3 +272,51 @@ export class IonSegmentStub {
 export class IonSegmentButtonStub {
   @Input() value: unknown;
 }
+
+/**
+ * ============================================================================
+ * Ré-exports sous les noms réels d'Ionic.
+ *
+ * C'est la cible de l'alias déclaré dans `vitest.config.ts` : sous test,
+ * `@ionic/angular/standalone` et `@ionic/angular` résolvent vers ce fichier.
+ * Un alias est résolu au moment où le module est chargé, contrairement à
+ * `vi.mock`, qui passe par un registre de mocks propre à chaque worker Vitest —
+ * registre dont la résolution casse au-delà d'un certain nombre de fichiers de
+ * spec en mode watch (voir l'historique de ce fichier et le README d'équipe).
+ *
+ * Conséquence pratique inchangée : un symbole importé par un composant testé
+ * mais absent d'ici provoque une erreur de compilation. La liste s'enrichit
+ * donc au besoin réel, exactement comme avant.
+ * ============================================================================
+ */
+export {
+  IonBadgeStub as IonBadge,
+  IonButtonStub as IonButton,
+  IonButtonsStub as IonButtons,
+  IonChipStub as IonChip,
+  IonContentStub as IonContent,
+  IonFabStub as IonFab,
+  IonFabButtonStub as IonFabButton,
+  IonHeaderStub as IonHeader,
+  IonIconStub as IonIcon,
+  IonInputStub as IonInput,
+  IonItemStub as IonItem,
+  IonItemOptionStub as IonItemOption,
+  IonItemOptionsStub as IonItemOptions,
+  IonItemSlidingStub as IonItemSliding,
+  IonLabelStub as IonLabel,
+  IonListStub as IonList,
+  IonNoteStub as IonNote,
+  IonSegmentStub as IonSegment,
+  IonSegmentButtonStub as IonSegmentButton,
+  IonSelectStub as IonSelect,
+  IonSelectOptionStub as IonSelectOption,
+  IonSpinnerStub as IonSpinner,
+  IonTextStub as IonText,
+  IonTitleStub as IonTitle,
+  IonToolbarStub as IonToolbar,
+  ActionSheetControllerStub as ActionSheetController,
+  ModalControllerStub as ModalController,
+  ToastControllerStub as ToastController,
+  PlatformStub as Platform,
+};

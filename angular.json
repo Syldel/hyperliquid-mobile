@@ -30,7 +30,9 @@
                 "input": "public"
               }
             ],
-            "styles": ["src/styles.scss"]
+            "styles": [
+              "src/styles.scss"
+            ]
           },
           "configurations": {
             "production": {
@@ -78,9 +80,9 @@
           "builder": "@angular/build:unit-test",
           "options": {
             "setupFiles": [
-              "src/app/shared/testing/ionic-mock.setup.ts",
               "src/app/shared/testing/jsdom-polyfills.setup.ts"
-            ]
+            ],
+            "runnerConfig": "vitest.config.ts"
           }
         }
       }

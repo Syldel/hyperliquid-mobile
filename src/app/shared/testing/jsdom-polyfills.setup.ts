@@ -1,7 +1,7 @@
 /**
  * jsdom (l'environnement DOM simulé utilisé par Vitest) n'implémente pas
  * `window.matchMedia` — une lacune de jsdom, sans rapport avec le bug Ionic
- * traité dans ionic-mock.setup.ts. Nécessaire pour tout service/composant
+ * traité par l'alias de vitest.config.ts. Nécessaire pour tout service/composant
  * qui la lit (ex: `ThemeService.prefersDarkQuery`).
  *
  * Renvoie toujours `matches: false` et n'émet jamais d'évènement `change` :
