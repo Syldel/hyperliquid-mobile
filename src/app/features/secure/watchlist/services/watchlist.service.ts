@@ -2,6 +2,8 @@ import { inject, Injectable, signal } from '@angular/core';
 import { AuthService } from '@auth/auth.service';
 import { StorageService } from '@storage/storage.service';
 import { CandleInterval } from '@syldel/hl-shared-types';
+import { migrateLegacyWatchlistStrategies } from '../../strategies/domain/legacy-strategy-migration.util';
+import { StrategyLibraryService } from '../../strategies/services/strategy-library.service';
 import { WatchlistItem } from '../models/watchlist-item.model';
 
 type WatchlistStorage = Record<string, WatchlistItem[]>;
@@ -10,6 +12,7 @@ type WatchlistStorage = Record<string, WatchlistItem[]>;
 export class WatchlistService {
   private readonly storage = inject(StorageService);
   private readonly auth = inject(AuthService);
+  private readonly library = inject(StrategyLibraryService);
 
   private _items = signal<WatchlistItem[]>([]);
   readonly items = this._items.asReadonly();
@@ -20,9 +23,23 @@ export class WatchlistService {
     const all = (await this.storage.get<WatchlistStorage>(this.STORAGE_KEY)) ?? {};
     const address = this.auth.currentAddress();
     if (!address) return [];
-    const items = all[address] ?? [];
-    this._items.set(items);
-    return items;
+    const stored = all[address] ?? [];
+
+    // Reprise ponctuelle des charts qui portaient encore une copie complète de
+    // leur stratégie. Sans effet une fois faite (le champ a disparu), donc sans
+    // inconvénient à la retenter à chaque chargement. Les documents récupérés
+    // sont écrits AVANT les éléments migrés : une référence ne doit jamais
+    // pointer, même brièvement, sur une stratégie absente de la bibliothèque.
+    const migration = migrateLegacyWatchlistStrategies(stored);
+    if (migration.changed) {
+      await this.library.load();
+      await this.library.importMissing(migration.recovered);
+      await this.persist(migration.items);
+      return migration.items;
+    }
+
+    this._items.set(stored);
+    return stored;
   }
 
   async add(coin: string, interval: CandleInterval = '1h'): Promise<void> {

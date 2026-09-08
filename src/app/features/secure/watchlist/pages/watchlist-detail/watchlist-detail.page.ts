@@ -40,7 +40,6 @@ import {
   AnalysisCandle,
   AnalysisRequest,
   AnalysisResponse,
-  AnalysisStrategyRequest,
   IndicatorMetadata,
 } from '@syldel/trading-shared-types';
 import { toChartInterval } from '@utils/hl-interval.utils';
@@ -68,10 +67,13 @@ import { firstValueFrom } from 'rxjs';
 import { computeLookbackCandles } from '@shared/components/indicator-picker/models/indicator-lookback.util';
 import { IndicatorOverlayService } from '@shared/components/indicator-picker/services/indicator-overlay.service';
 import { formatIndicatorLabel } from '@shared/components/indicator-picker/utils/indicator-label.util';
+import { toAnalysisRequest } from '../../../strategies/models/strategy-document.model';
+import { StrategyLibraryService } from '../../../strategies/services/strategy-library.service';
 import {
   DATE_PRESETS,
   DatePreset,
   INTERVAL_LABELS,
+  StrategyRef,
   WatchlistItem,
 } from '../../models/watchlist-item.model';
 import { StrategySignalsOverlayService } from '../../services/strategy-signals-overlay.service';
@@ -107,6 +109,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   private readonly strategySignals = inject(StrategySignalsOverlayService);
   private readonly modalCtrl = inject(ModalController);
   private readonly watchlistService = inject(WatchlistService);
+  private readonly strategyLibrary = inject(StrategyLibraryService);
 
   // ── View refs ──────────────────────────────────────────────────────────────
   readonly chartEl = viewChild<ElementRef<HTMLDivElement>>('chartEl');
@@ -147,7 +150,8 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
 
   // ── Indicators ────────────────────────────────────────────────────────
   activeIndicators = signal<ActiveIndicator[]>([]);
-  activeStrategy = signal<AnalysisStrategyRequest | null>(null);
+  /** Références vers la bibliothèque, jamais des copies — voir `StrategyRef`. */
+  strategyRefs = signal<StrategyRef[]>([]);
   indicatorsMeta = signal<IndicatorMetadata[]>([]);
   private indicatorSeriesCache = new Map<string, { time: number; value: number }[]>();
 
@@ -222,8 +226,12 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       this.item.set(existing);
       this.selectedInterval.set(existing.interval);
       this.activeIndicators.set(existing.activeIndicators ?? []);
-      this.activeStrategy.set(existing.activeStrategy ?? null);
+      this.strategyRefs.set(existing.strategyRefs ?? []);
     }
+
+    // Les références ci-dessus ne veulent rien dire tant que la bibliothèque
+    // n'est pas chargée : c'est elle qui porte les règles à backtester.
+    await this.strategyLibrary.load();
 
     this.hlCache.selectCoinWithConfig(coin, { fillsLookbackDays: this.selectedPreset().days });
     this.hlCache.reloadAll();
@@ -264,7 +272,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       const endTime = Date.now();
       const startTime = endTime - preset.days * 86_400_000;
       const hasOverlayData =
-        this.activeIndicators().some((i) => i.visible) || !!this.activeStrategy();
+        this.activeIndicators().some((i) => i.visible) || this.visibleStrategies().length > 0;
 
       try {
         if (hasOverlayData) {
@@ -286,7 +294,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     endTime: number,
   ): Promise<void> {
     const active = this.activeIndicators();
-    const strategy = this.activeStrategy();
+    const strategies = this.visibleStrategies().map(toAnalysisRequest);
 
     const intervalMs = this.getIntervalSeconds() * 1000;
     const lookbackCandles = computeLookbackCandles(active);
@@ -298,7 +306,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       startTime: fetchStartTime,
       endTime,
       indicators: active.map((i) => i.request),
-      strategies: strategy ? [strategy] : undefined,
+      strategies: strategies.length > 0 ? strategies : undefined,
     };
 
     try {
@@ -868,7 +876,20 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     if (!item || !this.watchlistService.getByCoin(item.coin)) return;
     this.watchlistService.update(item.coin, {
       activeIndicators: this.activeIndicators(),
-      activeStrategy: this.activeStrategy(),
+      strategyRefs: this.strategyRefs(),
     });
+  }
+
+  /**
+   * Documents de la bibliothèque désignés par les références visibles, dans
+   * l'ordre d'attachement. Une référence orpheline (stratégie supprimée de la
+   * bibliothèque alors qu'un chart la pointait encore) est simplement ignorée
+   * ici — le nettoyage des références mortes viendra avec l'UI de l'étape 3.
+   */
+  private visibleStrategies() {
+    return this.strategyRefs()
+      .filter((ref) => ref.visible)
+      .map((ref) => this.strategyLibrary.getById(ref.strategyId))
+      .filter((document) => document !== undefined);
   }
 }

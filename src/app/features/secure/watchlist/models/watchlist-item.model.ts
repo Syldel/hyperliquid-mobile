@@ -1,13 +1,30 @@
 import { ActiveIndicator } from '@shared/components/indicator-picker/models/indicator.model';
 import { CandleInterval } from '@syldel/hl-shared-types';
-import { AnalysisStrategyRequest } from '@syldel/trading-shared-types';
+
+/**
+ * Stratégie attachée à un chart, par **référence** à la bibliothèque
+ * (`StrategyLibraryService`) et jamais par copie.
+ *
+ * Un tableau, comme `activeIndicators` : plusieurs stratégies peuvent être
+ * attachées et visibles en même temps, et `visible` se pilote indépendamment
+ * de l'attachement — masquer une stratégie ne la détache pas.
+ *
+ * Remplace l'ancien `activeStrategy?: AnalysisStrategyRequest | null`, qui
+ * dupliquait les règles dans chaque élément de watchlist : deux copies de la
+ * même stratégie pouvaient diverger sans que rien ne le signale. Voir
+ * `migrateLegacyWatchlistStrategies` pour la reprise des données existantes.
+ */
+export interface StrategyRef {
+  strategyId: string;
+  visible: boolean;
+}
 
 export interface WatchlistItem {
   coin: string;
   interval: CandleInterval;
   addedAt: number;
   activeIndicators?: ActiveIndicator[];
-  activeStrategy?: AnalysisStrategyRequest | null;
+  strategyRefs?: StrategyRef[];
 }
 
 export const INTERVAL_LABELS: Record<CandleInterval, string> = {
