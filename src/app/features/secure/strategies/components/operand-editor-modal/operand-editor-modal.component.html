@@ -1,0 +1,148 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>{{ slotLabel() }}</ion-title>
+    <ion-buttons slot="start">
+      <ion-button (click)="cancel()">Cancel</ion-button>
+    </ion-buttons>
+    <ion-buttons slot="end">
+      <ion-button strong [disabled]="!canConfirm()" (click)="confirm()">Done</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <ion-segment [value]="type()" (ionChange)="onTypeChange($event.detail.value)">
+    <ion-segment-button value="price">
+      <ion-label>Price</ion-label>
+    </ion-segment-button>
+    <ion-segment-button value="number">
+      <ion-label>Value</ion-label>
+    </ion-segment-button>
+    <ion-segment-button value="indicator">
+      <ion-label>Indicator</ion-label>
+    </ion-segment-button>
+  </ion-segment>
+
+  @switch (type()) {
+    @case ('price') {
+      <ion-list inset>
+        <ion-item>
+          <ion-label>Field</ion-label>
+          <ion-select
+            interface="action-sheet"
+            [value]="priceField()"
+            (ionChange)="priceField.set($event.detail.value)"
+          >
+            @for (field of priceFields(); track field.value) {
+              <ion-select-option [value]="field.value">{{ field.label }}</ion-select-option>
+            }
+          </ion-select>
+        </ion-item>
+      </ion-list>
+    }
+
+    @case ('number') {
+      <ion-list inset>
+        <ion-item>
+          <ion-input
+            label="Value"
+            labelPlacement="stacked"
+            type="number"
+            [value]="numberValue()"
+            (ionInput)="numberValue.set(+$event.detail.value!)"
+          />
+        </ion-item>
+      </ion-list>
+    }
+
+    @case ('indicator') {
+      <ion-list inset>
+        <ion-item>
+          <ion-label>Indicator</ion-label>
+          <ion-select
+            interface="action-sheet"
+            placeholder="Select"
+            [value]="indicatorName()"
+            (ionChange)="onIndicatorChange($event.detail.value)"
+          >
+            @for (indicator of indicators(); track indicator.name) {
+              <ion-select-option [value]="indicator.name">{{ indicator.label }}</ion-select-option>
+            }
+          </ion-select>
+        </ion-item>
+      </ion-list>
+
+      @if (selectedMeta(); as meta) {
+        @if (meta.parameters.length > 0) {
+          <ion-list inset>
+            @for (parameter of meta.parameters; track parameter.name) {
+              <ion-item>
+                @if (parameter.type === 'select') {
+                  <ion-label>{{ parameter.label }}</ion-label>
+                  <ion-select
+                    interface="action-sheet"
+                    [value]="parameterValue(parameter.name)"
+                    (ionChange)="onParameterChange(parameter.name, $event.detail.value)"
+                  >
+                    @for (option of parameter.options; track option.value) {
+                      <ion-select-option [value]="option.value">
+                        {{ option.label }}
+                      </ion-select-option>
+                    }
+                  </ion-select>
+                } @else {
+                  <ion-input
+                    [label]="parameter.label"
+                    labelPlacement="stacked"
+                    [type]="parameter.type === 'number' ? 'number' : 'text'"
+                    [value]="parameterValue(parameter.name)"
+                    (ionInput)="onParameterChange(parameter.name, $event.detail.value)"
+                  />
+                }
+              </ion-item>
+            }
+          </ion-list>
+        }
+
+        @if (requiresSubField()) {
+          <ion-list inset>
+            <ion-item>
+              <ion-label>Line</ion-label>
+              <ion-select
+                interface="action-sheet"
+                placeholder="Required"
+                [value]="subField()"
+                (ionChange)="subField.set($event.detail.value)"
+              >
+                @for (line of subFields(); track line.name) {
+                  <ion-select-option [value]="line.name">{{ line.label }}</ion-select-option>
+                }
+              </ion-select>
+            </ion-item>
+            <ion-item lines="none">
+              <ion-note>This indicator produces several lines — pick the one to compare.</ion-note>
+            </ion-item>
+          </ion-list>
+        }
+      }
+    }
+  }
+
+  @if (type() !== 'number') {
+    <ion-list inset>
+      <ion-item>
+        <ion-input
+          label="Candles back"
+          labelPlacement="stacked"
+          type="number"
+          min="0"
+          [value]="offset()"
+          (ionInput)="offset.set(+$event.detail.value!)"
+        />
+      </ion-item>
+      <ion-item lines="none">
+        <ion-note>0 reads the current candle, 1 the previous one, and so on.</ion-note>
+      </ion-item>
+    </ion-list>
+  }
+</ion-content>

@@ -19,6 +19,7 @@ import { VersionMismatchBannerComponent } from '@shared/components/version-misma
 import { addIcons } from 'ionicons';
 import {
   analyticsOutline,
+  gitBranchOutline,
   hardwareChipOutline,
   homeOutline,
   listOutline,
@@ -60,6 +61,7 @@ export class MenuComponent implements OnInit {
 
   constructor() {
     addIcons({
+      gitBranchOutline,
       homeOutline,
       logOutOutline,
       statsChartOutline,

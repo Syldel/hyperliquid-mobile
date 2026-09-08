@@ -1,0 +1,174 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Edit condition</ion-title>
+    <ion-buttons slot="start">
+      <ion-button (click)="cancel()">Cancel</ion-button>
+    </ion-buttons>
+    <ion-buttons slot="end">
+      <ion-button strong (click)="confirm()">Done</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  @if (node(); as current) {
+    @switch (current.type) {
+      @case ('logical') {
+        <ion-list inset>
+          <ion-item>
+            <ion-label>Combine with</ion-label>
+            <ion-select
+              interface="action-sheet"
+              [value]="current.operator"
+              (ionChange)="patch({ operator: $event.detail.value })"
+            >
+              @for (option of grammar()?.logicalOperators ?? []; track option.value) {
+                <ion-select-option [value]="option.value">{{ option.label }}</ion-select-option>
+              }
+            </ion-select>
+          </ion-item>
+        </ion-list>
+      }
+
+      @case ('comparison') {
+        <ion-list inset>
+          <ion-item button (click)="editOperand('left', 'Left side')">
+            <ion-label>
+              <p>Left side</p>
+              <h3>{{ operandLabel('left') }}</h3>
+            </ion-label>
+          </ion-item>
+          <ion-item>
+            <ion-label>Operator</ion-label>
+            <ion-select
+              interface="action-sheet"
+              [value]="current.operator"
+              (ionChange)="patch({ operator: $event.detail.value })"
+            >
+              @for (option of grammar()?.comparisonOperators ?? []; track option.value) {
+                <ion-select-option [value]="option.value">{{ option.label }}</ion-select-option>
+              }
+            </ion-select>
+          </ion-item>
+          <ion-item button (click)="editOperand('right', 'Right side')">
+            <ion-label>
+              <p>Right side</p>
+              <h3>{{ operandLabel('right') }}</h3>
+            </ion-label>
+          </ion-item>
+        </ion-list>
+      }
+
+      @case ('cross') {
+        <ion-list inset>
+          <ion-item button (click)="editOperand('left', 'Crossing line')">
+            <ion-label>
+              <p>Crossing line</p>
+              <h3>{{ operandLabel('left') }}</h3>
+            </ion-label>
+          </ion-item>
+          <ion-item>
+            <ion-label>Direction</ion-label>
+            <ion-select
+              interface="action-sheet"
+              [value]="current.direction"
+              (ionChange)="patch({ direction: $event.detail.value })"
+            >
+              @for (option of grammar()?.crossDirections ?? []; track option.value) {
+                <ion-select-option [value]="option.value">{{ option.label }}</ion-select-option>
+              }
+            </ion-select>
+          </ion-item>
+          <ion-item button (click)="editOperand('right', 'Reference line')">
+            <ion-label>
+              <p>Reference line</p>
+              <h3>{{ operandLabel('right') }}</h3>
+            </ion-label>
+          </ion-item>
+        </ion-list>
+      }
+
+      @case ('trend') {
+        <ion-list inset>
+          <ion-item button (click)="editOperand('target', 'Target')">
+            <ion-label>
+              <p>Target</p>
+              <h3>{{ operandLabel('target') }}</h3>
+            </ion-label>
+          </ion-item>
+          <ion-item>
+            <ion-label>Direction</ion-label>
+            <ion-select
+              interface="action-sheet"
+              [value]="current.direction"
+              (ionChange)="patch({ direction: $event.detail.value })"
+            >
+              @for (option of grammar()?.trendDirections ?? []; track option.value) {
+                <ion-select-option [value]="option.value">{{ option.label }}</ion-select-option>
+              }
+            </ion-select>
+          </ion-item>
+          <ion-item>
+            <ion-input
+              label="Over how many candles"
+              labelPlacement="stacked"
+              type="number"
+              min="1"
+              [value]="current.period"
+              (ionInput)="patch({ period: +$event.detail.value! })"
+            />
+          </ion-item>
+          <ion-item>
+            <ion-label>Mode</ion-label>
+            <ion-select
+              interface="action-sheet"
+              [value]="current.mode ?? ''"
+              (ionChange)="onTrendModeChange($event.detail.value)"
+            >
+              @for (option of trendModes(); track option.value) {
+                <ion-select-option [value]="option.value">{{ option.label }}</ion-select-option>
+              }
+            </ion-select>
+          </ion-item>
+        </ion-list>
+      }
+
+      @case ('constant') {
+        <ion-list inset>
+          <ion-item>
+            <ion-label>Always</ion-label>
+            <ion-select
+              interface="action-sheet"
+              [value]="current.value"
+              (ionChange)="patch({ value: $event.detail.value })"
+            >
+              <ion-select-option [value]="true">True</ion-select-option>
+              <ion-select-option [value]="false">False</ion-select-option>
+            </ion-select>
+          </ion-item>
+        </ion-list>
+      }
+
+      @case ('not') {
+        <ion-list inset>
+          <ion-item lines="none">
+            <ion-note>
+              A negation has nothing of its own to edit — change the condition it wraps directly in
+              the tree.
+            </ion-note>
+          </ion-item>
+        </ion-list>
+      }
+
+      @default {
+        <ion-list inset>
+          <ion-item lines="none">
+            <ion-note>
+              This condition was built with a newer version of the app and cannot be edited here.
+            </ion-note>
+          </ion-item>
+        </ion-list>
+      }
+    }
+  }
+</ion-content>

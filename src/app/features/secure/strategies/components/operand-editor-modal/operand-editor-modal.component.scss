@@ -1,0 +1,9 @@
+// Même remise à zéro que add-watchlist-modal et trading-pair-modal : dans une
+// liste `inset`, le padding interne d'`ion-item` s'ajoute à la marge de la
+// liste et au `ion-padding` du contenu, ce qui décale les champs bien plus que
+// dans le reste de l'app.
+ion-item {
+  --inner-padding-start: 0;
+  --inner-padding-end: 0;
+  --padding-start: 0;
+}

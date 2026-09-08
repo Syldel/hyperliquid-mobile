@@ -1,0 +1,7 @@
+// Voir operand-editor-modal.component.scss : même remise à zéro que les
+// modales de formulaire existantes de l'app.
+ion-item {
+  --inner-padding-start: 0;
+  --inner-padding-end: 0;
+  --padding-start: 0;
+}

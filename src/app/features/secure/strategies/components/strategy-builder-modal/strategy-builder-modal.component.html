@@ -1,0 +1,112 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>{{ store.focusedPath() ? 'Condition group' : 'Edit strategy' }}</ion-title>
+    <ion-buttons slot="start">
+      <ion-button (click)="cancel()">
+        @if (store.focusedPath()) {
+          <ion-icon slot="icon-only" name="arrow-back-outline" />
+        } @else {
+          Cancel
+        }
+      </ion-button>
+    </ion-buttons>
+    <ion-buttons slot="end">
+      @if (store.canUndo()) {
+        <ion-button (click)="store.undo()">
+          <ion-icon slot="icon-only" name="arrow-undo-outline" />
+        </ion-button>
+      }
+      @if (!store.focusedPath()) {
+        <ion-button strong [disabled]="!store.canSave() || saving()" (click)="save()">
+          @if (saving()) {
+            <ion-spinner name="dots" />
+          } @else {
+            Save
+          }
+        </ion-button>
+      }
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  @if (metaLoading()) {
+    <div class="centered"><ion-spinner /></div>
+  } @else if (metaFailed()) {
+    <ion-list inset>
+      <ion-item lines="none">
+        <ion-note>
+          The bot could not be reached, so indicators and operators are unavailable. Close and try
+          again once it responds.
+        </ion-note>
+      </ion-item>
+    </ion-list>
+  } @else if (store.focusedPath(); as focused) {
+    <!-- Vue dédiée à un sous-arbre trop profond pour rester lisible en ligne -->
+    <app-rule-tree [path]="focused" [depth]="0" />
+  } @else {
+    <ion-list inset>
+      <ion-item>
+        <ion-input
+          label="Name"
+          labelPlacement="stacked"
+          placeholder="Breakout on rising volume"
+          [value]="store.name()"
+          (ionInput)="store.setName($event.detail.value ?? '')"
+        />
+      </ion-item>
+    </ion-list>
+
+    @for (branch of branches(); track branch.id) {
+      <div class="branch">
+        <div class="branch-head">
+          <h2>{{ branch.label }}</h2>
+          @if (branchGroup(branch)) {
+            <ion-button fill="clear" size="small" color="medium" (click)="disableBranch(branch)">
+              Remove
+            </ion-button>
+          } @else {
+            <ion-button fill="clear" size="small" (click)="enableBranch(branch)">Add</ion-button>
+          }
+        </div>
+
+        @if (branchGroup(branch)) {
+          <app-rule-tree [path]="branchPath(branch)" [depth]="0" />
+        } @else {
+          <p class="empty">Not used by this strategy.</p>
+        }
+      </div>
+    }
+
+    @if (store.deferredIssues().length > 0) {
+      <ion-list inset>
+        <ion-item lines="none">
+          <ion-note>
+            Some conditions were built with a newer version of the app. They are shown read-only and
+            kept exactly as they are when you save.
+          </ion-note>
+        </ion-item>
+      </ion-list>
+    }
+
+    @if (serverIssues().length > 0) {
+      <ion-list inset>
+        <ion-item lines="none">
+          <ion-label>
+            <h3>The bot rejected these rules</h3>
+          </ion-label>
+        </ion-item>
+        @for (issue of serverIssues(); track issue.path + issue.code) {
+          <ion-item>
+            <ion-label class="ion-text-wrap">
+              <ion-text color="danger">
+                <p>{{ issue.path }}</p>
+              </ion-text>
+              <p>{{ issue.message }}</p>
+            </ion-label>
+          </ion-item>
+        }
+      </ion-list>
+    }
+  }
+</ion-content>

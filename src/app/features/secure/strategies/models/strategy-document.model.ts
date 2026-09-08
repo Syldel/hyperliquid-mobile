@@ -77,3 +77,27 @@ export function toExchangeStrategy(document: StrategyDocument): IExchangeStrateg
     rules: document.rules,
   };
 }
+
+/** Une branche éditable de l'arbre : son chemin relatif et son libellé. */
+export interface StrategyBranch {
+  /** Suffixe de chemin sous `rules` (`long.entry`), tel que déclaré par `StrategyParameter.id`. */
+  id: string;
+  label: string;
+}
+
+/**
+ * Les quatre branches d'une stratégie pilotée par règles.
+ *
+ * Écrites ici, et non lues depuis `/exchanges/meta`, parce qu'elles ne sont pas
+ * un catalogue : `SideRules` est un type fermé du paquet partagé, `long`/`short`
+ * × `entry`/`exit` en est la forme exacte. Le serveur les déclare de son côté
+ * (`AdvancedRulesStrategyDefinition`) pour piloter un formulaire générique ;
+ * l'éditeur les reçoit en entrée, ce qui lui permettra plus tard d'afficher
+ * celles qu'une `StrategyMeta` particulière déclare, sans changer de composant.
+ */
+export const DEFAULT_STRATEGY_BRANCHES: readonly StrategyBranch[] = [
+  { id: 'long.entry', label: 'Long entry' },
+  { id: 'long.exit', label: 'Long exit' },
+  { id: 'short.entry', label: 'Short entry' },
+  { id: 'short.exit', label: 'Short exit' },
+];

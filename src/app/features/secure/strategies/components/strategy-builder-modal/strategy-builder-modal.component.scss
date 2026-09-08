@@ -1,0 +1,38 @@
+// Voir operand-editor-modal.component.scss : même remise à zéro que les
+// modales de formulaire existantes de l'app.
+ion-item {
+  --inner-padding-start: 0;
+  --inner-padding-end: 0;
+  --padding-start: 0;
+}
+
+.centered {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 0;
+}
+
+// Les branches ne sont pas des `ion-list` : elles s'alignent donc à la main
+// sur le retrait horizontal d'une liste `inset` (16px), pour que les titres
+// tombent sur la même verticale que les champs au-dessus.
+.branch {
+  margin: 1rem 1rem 0;
+}
+
+.branch-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  h2 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+}
+
+.empty {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: var(--ion-color-medium);
+}

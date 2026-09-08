@@ -1,0 +1,64 @@
+@if (node(); as current) {
+  @if (group() && !collapsed()) {
+    <!-- Groupe logique déplié : opérateur, puis ses conditions -->
+    <div class="group" [class.nested]="depth() > 0">
+      <div class="group-head">
+        <ion-chip outline (click)="editNode()">
+          <ion-label>{{ group()!.operator }}</ion-label>
+        </ion-chip>
+        @if (depth() > 0) {
+          <ion-button fill="clear" size="small" color="medium" (click)="removeNode()">
+            <ion-icon slot="icon-only" name="trash-outline" />
+          </ion-button>
+        }
+      </div>
+
+      @for (child of group()!.conditions; track $index) {
+        <app-rule-tree
+          [path]="conditionPath($index)"
+          [depth]="depth() + 1"
+          [maxInlineDepth]="maxInlineDepth()"
+        />
+      } @empty {
+        <p class="empty">No condition yet.</p>
+      }
+
+      <ion-button fill="clear" size="small" (click)="addCondition()">
+        <ion-icon slot="start" name="add-outline" />
+        Add condition
+      </ion-button>
+    </div>
+  } @else if (collapsed()) {
+    <!-- Trop profond pour rester lisible en ligne : résumé cliquable -->
+    <div class="row" (click)="focusHere()">
+      <span class="label">{{ group()!.operator }} · {{ summaryLabel() }}</span>
+      <ion-icon name="chevron-forward-outline" color="medium" />
+    </div>
+  } @else {
+    <!-- Condition terminale -->
+    <div class="row" [class.unsupported]="unsupported()">
+      <span class="label">{{ label() }}</span>
+
+      @if (unsupported()) {
+        <ion-badge color="warning">newer version</ion-badge>
+      } @else {
+        <ion-button fill="clear" size="small" color="medium" (click)="editNode()">
+          <ion-icon slot="icon-only" name="create-outline" />
+        </ion-button>
+      }
+      <ion-button fill="clear" size="small" color="medium" (click)="removeNode()">
+        <ion-icon slot="icon-only" name="trash-outline" />
+      </ion-button>
+    </div>
+
+    @if (isNegation()) {
+      <div class="negation-child">
+        <app-rule-tree
+          [path]="negationChildPath"
+          [depth]="depth() + 1"
+          [maxInlineDepth]="maxInlineDepth()"
+        />
+      </div>
+    }
+  }
+}

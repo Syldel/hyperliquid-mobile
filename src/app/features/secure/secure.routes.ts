@@ -68,6 +68,12 @@ export const SECURE_ROUTES: Routes = [
         title: 'Order History',
       },
       {
+        path: 'strategies',
+        loadComponent: () =>
+          import('./strategies/pages/strategies/strategies.page').then((m) => m.StrategiesPage),
+        title: 'Strategies',
+      },
+      {
         path: 'bot-strategies',
         loadComponent: () =>
           import('./bot-strategies/bot-strategies.page').then((m) => m.BotStrategiesPage),

@@ -113,3 +113,13 @@ export function createRuleNode(type: CreatableNodeType): RuleNode {
       return createConstant();
   }
 }
+
+/** Ordre d'affichage des types proposés à l'ajout d'une condition. */
+export const CREATABLE_NODE_TYPES: readonly CreatableNodeType[] = [
+  'comparison',
+  'cross',
+  'trend',
+  'logical',
+  'not',
+  'constant',
+];

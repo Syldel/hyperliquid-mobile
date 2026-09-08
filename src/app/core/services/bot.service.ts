@@ -2,8 +2,10 @@ import { HttpClient } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import {
   ExchangesMetaResponse,
+  IExchangeStrategy,
   IndicatorMetadata,
   PACKAGE_VERSION,
+  StrategyValidationResult,
 } from '@syldel/trading-shared-types';
 import { map, Observable, of, shareReplay, tap } from 'rxjs';
 import { ConfigService } from './config.service';
@@ -43,6 +45,27 @@ export class BotService {
     return this.inFlight$;
   }
 
+  /**
+   * Verdict autoritaire sur une stratégie, avant de l'attacher à un chart ou de
+   * l'envoyer au bot.
+   *
+   * Complète — sans la remplacer — la validation locale
+   * (`collectStrategyRulesIssues`) : celle-ci est instantanée mais s'appuie sur
+   * une copie compilée des catalogues, potentiellement en retard sur ceux que
+   * le serveur exécute. Un client ne doit jamais traiter son propre verdict
+   * comme final (voir `CATALOG_DEPENDENT_ISSUE_CODES` et
+   * `docs/trading/mobile-app-integration.md` côté bot).
+   *
+   * Répond `200` même pour une stratégie invalide : le rapport d'anomalies
+   * *est* la réponse attendue, pas une erreur HTTP.
+   */
+  validateStrategy(strategy: IExchangeStrategy): Observable<StrategyValidationResult> {
+    return this.http.post<StrategyValidationResult>(
+      `${this.config.botServiceUrl}/exchanges/strategies/validate`,
+      { strategy },
+    );
+  }
+
   invalidateMetadataCache(): void {
     this.metadataCache.set(null);
     this.metadataCachedAt = null;
@@ -65,6 +88,17 @@ export class BotService {
   }
 
   readonly indicators = computed(() => this.metadataCache()?.indicators ?? []);
+
+  /**
+   * Libellés des énumérations du rule-builder, tels que servis par
+   * `/exchanges/meta` — jamais la copie compilée `RULE_BUILDER_GRAMMAR`, dont
+   * l'import comme valeur est interdit côté mobile (no-catalog-imports.spec.ts).
+   * `null` tant que les métadonnées ne sont pas chargées : le builder doit
+   * attendre plutôt que d'afficher des sélecteurs vides.
+   */
+  readonly ruleBuilderGrammar = computed(
+    () => this.metadataCache()?.strategyFormSchema.ruleBuilderGrammar ?? null,
+  );
 
   /**
    * Ordre canonique des lignes d'un indicateur multi-sorties, tel que renvoyé

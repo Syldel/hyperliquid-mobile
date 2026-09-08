@@ -1,0 +1,29 @@
+<app-refreshable-layout
+  title="Strategies"
+  [fetchFn]="fetchFn()"
+  emptyMessage="No strategy yet. Tap + to build one."
+  (dataLoaded)="onDataLoaded($event)"
+>
+  <ion-list>
+    @for (document of documents(); track document.id) {
+    <ion-item button (click)="openBuilder(document)">
+      <ion-label>
+        <h2>{{ document.name }}</h2>
+        <ion-note>{{ branchSummary(document) }}</ion-note>
+      </ion-label>
+      <ion-icon
+        name="ellipsis-horizontal"
+        slot="end"
+        color="medium"
+        (click)="openActions(document, $event)"
+      />
+    </ion-item>
+    }
+  </ion-list>
+</app-refreshable-layout>
+
+<ion-fab slot="fixed" vertical="bottom" horizontal="end">
+  <ion-fab-button (click)="create()">
+    <ion-icon name="add-outline" />
+  </ion-fab-button>
+</ion-fab>
