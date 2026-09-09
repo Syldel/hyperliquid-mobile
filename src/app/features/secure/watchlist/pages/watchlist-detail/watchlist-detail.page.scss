@@ -205,3 +205,101 @@
     }
   }
 }
+
+// Même bande défilante que `.indicators-strip` : une stratégie s'attache et se
+// masque exactement comme un indicateur, l'interface ne doit pas laisser croire
+// le contraire.
+.strategies-strip {
+  display: flex;
+  flex-wrap: nowrap;
+  padding: 0 16px 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  ion-chip {
+    flex: 0 0 auto;
+    font-size: 12px;
+    font-weight: 600;
+    height: 28px;
+    gap: 10px;
+
+    ion-icon {
+      cursor: pointer;
+      font-size: 14px;
+
+      &:not(:first-child) {
+        margin-left: 0;
+      }
+      &:not(:last-child) {
+        margin-right: 0;
+      }
+    }
+  }
+}
+
+.strategy-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+// Bilan de backtest, sous le chart : une ligne par stratégie visible, avec la
+// pastille qui la relie à ses marqueurs.
+.backtest-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 16px 0;
+}
+
+.backtest-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--ion-color-step-100, #1c1c1c);
+
+  &__name {
+    font-weight: 600;
+  }
+
+  &__stat {
+    color: var(--ion-color-medium);
+  }
+
+  &__pnl {
+    margin-left: auto;
+    font-weight: 600;
+
+    &--up {
+      color: var(--ion-color-success, #2dd36f);
+    }
+    &--down {
+      color: var(--ion-color-danger, #eb445a);
+    }
+  }
+}
+
+.backtest-toggle {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 8px 0;
+
+  ion-button {
+    --padding-start: 8px;
+    --padding-end: 8px;
+    font-size: 11px;
+    text-transform: none;
+  }
+}

@@ -1,0 +1,36 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Strategies</ion-title>
+    <ion-buttons slot="start">
+      <ion-button (click)="cancel()">Cancel</ion-button>
+    </ion-buttons>
+    <ion-buttons slot="end">
+      <ion-button strong (click)="confirm()">Done</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  @if (documents().length === 0) {
+    <ion-list inset>
+      <ion-item lines="none">
+        <ion-note>
+          No strategy in your library yet. Build one from the Strategies page, then attach it here.
+        </ion-note>
+      </ion-item>
+    </ion-list>
+  } @else {
+    <ion-list inset>
+      @for (document of documents(); track document.id) {
+        <ion-item button (click)="toggle(document.id)">
+          <span class="strategy-dot" slot="start" [style.background]="colorOf(document.id)"></span>
+          <ion-label>
+            <h2>{{ document.name }}</h2>
+            <ion-note>{{ branchSummary(document) }}</ion-note>
+          </ion-label>
+          <ion-checkbox slot="end" [checked]="isSelected(document.id)" />
+        </ion-item>
+      }
+    </ion-list>
+  }
+</ion-content>

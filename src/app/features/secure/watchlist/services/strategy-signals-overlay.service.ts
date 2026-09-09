@@ -1,13 +1,14 @@
 import { Injectable } from '@angular/core';
-import { TimelineSignal } from '@syldel/trading-shared-types';
-import {
-  ISeriesApi,
-  ISeriesMarkersPluginApi,
-  SeriesMarker,
-  Time,
-  createSeriesMarkers,
-} from 'lightweight-charts';
+import { ISeriesApi, ISeriesMarkersPluginApi, Time, createSeriesMarkers } from 'lightweight-charts';
+import { buildStrategyMarkers, type StrategySignalLayer } from '../utils/strategy-markers.util';
 
+/**
+ * Marqueurs d'entrée/sortie des stratégies affichées sur le chart.
+ *
+ * Le chart ne possède qu'un jeu de marqueurs pour la série de bougies : les
+ * couches sont donc fusionnées avant d'être posées (voir `buildStrategyMarkers`,
+ * qui porte la fusion et le tri, testables sans chart).
+ */
 @Injectable({ providedIn: 'root' })
 export class StrategySignalsOverlayService {
   private markersPlugin?: ISeriesMarkersPluginApi<Time>;
@@ -17,18 +18,11 @@ export class StrategySignalsOverlayService {
     this.markersPlugin = createSeriesMarkers(candleSeries, []);
   }
 
-  render(signals: TimelineSignal[]): void {
+  /** Remplace l'intégralité des marqueurs par ceux des couches fournies. */
+  render(layers: readonly StrategySignalLayer[]): void {
     if (!this.markersPlugin) return; // pas encore attaché — appelant doit attendre buildChart()
 
-    const markers: SeriesMarker<Time>[] = signals.map((s) => ({
-      time: Math.floor(s.time / 1000) as Time,
-      position: s.signal === 'ENTER' ? 'belowBar' : 'aboveBar',
-      color: s.metadata?.['side'] === 'SHORT' ? '#eb445a' : '#2dd36f',
-      shape: s.signal === 'ENTER' ? 'arrowUp' : 'arrowDown',
-      text: `${s.signal} ${s.metadata?.['side'] ?? ''}`,
-    }));
-
-    this.markersPlugin.setMarkers(markers);
+    this.markersPlugin.setMarkers(buildStrategyMarkers(layers));
   }
 
   clear(): void {

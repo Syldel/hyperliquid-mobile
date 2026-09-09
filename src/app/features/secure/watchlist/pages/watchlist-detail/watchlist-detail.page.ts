@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   ElementRef,
   OnDestroy,
   OnInit,
@@ -41,6 +42,7 @@ import {
   AnalysisCandle,
   AnalysisRequest,
   AnalysisResponse,
+  BacktestSummary,
   IndicatorMetadata,
 } from '@syldel/trading-shared-types';
 import { toChartInterval } from '@utils/hl-interval.utils';
@@ -50,8 +52,10 @@ import {
   calendarOutline,
   closeCircle,
   createOutline,
+  chevronUpOutline,
   receiptOutline,
   refreshOutline,
+  statsChartOutline,
 } from 'ionicons/icons';
 import {
   CandlestickSeries,
@@ -67,8 +71,10 @@ import { firstValueFrom } from 'rxjs';
 
 import { IndicatorOverlayService } from '@shared/components/indicator-picker/services/indicator-overlay.service';
 import { formatIndicatorLabel } from '@shared/components/indicator-picker/utils/indicator-label.util';
+import { strategyColor } from '../../../strategies/domain/strategy-color.util';
 import { isLocallyExecutable } from '../../../strategies/domain/strategy-issues.util';
 import { toAnalysisRequest } from '../../../strategies/models/strategy-document.model';
+import { StrategyPickerModalComponent } from '../../../strategies/components/strategy-picker-modal/strategy-picker-modal.component';
 import { StrategyLibraryService } from '../../../strategies/services/strategy-library.service';
 import {
   DATE_PRESETS,
@@ -77,9 +83,16 @@ import {
   StrategyRef,
   WatchlistItem,
 } from '../../models/watchlist-item.model';
+import { StrategyPositionsPaneService } from '../../services/strategy-positions-pane.service';
 import { StrategySignalsOverlayService } from '../../services/strategy-signals-overlay.service';
 import { WatchlistService } from '../../services/watchlist.service';
 import { mapIndicatorSeriesById } from '../../utils/indicator-series-map.util';
+import type { StrategySignalLayer } from '../../utils/strategy-markers.util';
+
+/** Une stratégie backtestée sur la fenêtre courante : ses marqueurs, plus son bilan. */
+interface StrategyRunResult extends StrategySignalLayer {
+  summary: BacktestSummary;
+}
 
 @Component({
   selector: 'app-watchlist-detail',
@@ -94,7 +107,7 @@ import { mapIndicatorSeriesById } from '../../utils/indicator-series-map.util';
     IonBadge,
     RefreshableLayoutComponent,
   ],
-  providers: [IndicatorOverlayService, StrategySignalsOverlayService],
+  providers: [IndicatorOverlayService, StrategySignalsOverlayService, StrategyPositionsPaneService],
   templateUrl: './watchlist-detail.page.html',
   styleUrls: ['./watchlist-detail.page.scss'],
 })
@@ -109,6 +122,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   private readonly chartAnalysis = inject(ChartAnalysisService);
   private readonly indicatorOverlay = inject(IndicatorOverlayService);
   private readonly strategySignals = inject(StrategySignalsOverlayService);
+  private readonly strategyPositions = inject(StrategyPositionsPaneService);
   private readonly modalCtrl = inject(ModalController);
   private readonly toastCtrl = inject(ToastController);
   private readonly watchlistService = inject(WatchlistService);
@@ -155,6 +169,30 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   activeIndicators = signal<ActiveIndicator[]>([]);
   /** Références vers la bibliothèque, jamais des copies — voir `StrategyRef`. */
   strategyRefs = signal<StrategyRef[]>([]);
+
+  /** Résultats du dernier backtest, par id de stratégie. */
+  private readonly strategyResults = signal<Map<string, StrategyRunResult>>(new Map());
+
+  /**
+   * Le bilan chiffré s'ouvre à la demande. Le panneau de positions montre déjà
+   * l'essentiel en un coup d'œil ; garder quatre chiffres par stratégie
+   * affichés en permanence coûterait de la hauteur sur un écran de téléphone.
+   */
+  readonly showBacktest = signal(false);
+
+  /**
+   * Ce que le chart et le bandeau affichent : les stratégies visibles dont un
+   * résultat est connu. Une référence orpheline (stratégie supprimée de la
+   * bibliothèque) n'y figure pas, mais reste listée dans les chips pour que
+   * l'utilisateur puisse la détacher.
+   */
+  readonly visibleStrategyResults = computed(() => {
+    const results = this.strategyResults();
+    return this.strategyRefs()
+      .filter((ref) => ref.visible)
+      .map((ref) => results.get(ref.strategyId))
+      .filter((result) => result !== undefined);
+  });
   indicatorsMeta = signal<IndicatorMetadata[]>([]);
   private indicatorSeriesCache = new Map<string, { time: number; value: number }[]>();
 
@@ -176,6 +214,8 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       addOutline,
       closeCircle,
       createOutline,
+      statsChartOutline,
+      chevronUpOutline,
     });
 
     const state = window.history.state as { backHref?: string };
@@ -256,6 +296,9 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     this.clearOverlay();
     this.indicatorOverlay.reset();
     this.strategySignals.reset();
+    // Après `chart.remove()` : `reset` oublie les séries sans chercher à les
+    // retirer d'un chart qui n'existe plus.
+    this.strategyPositions.reset();
     this.indicatorSeriesCache.clear();
     this.lastCandles = [];
     cancelAnimationFrame(this.animFrame!);
@@ -275,7 +318,8 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       const endTime = Date.now();
       const startTime = endTime - preset.days * 86_400_000;
       const hasOverlayData =
-        this.activeIndicators().some((i) => i.visible) || this.visibleStrategies().length > 0;
+        this.activeIndicators().some((i) => i.visible) ||
+        this.strategyRefs().some((r) => r.visible);
 
       try {
         if (hasOverlayData) {
@@ -301,7 +345,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     // ENTIÈRE (`collectExecutableStrategyRulesIssues` côté serveur), donc
     // emporterait aussi les indicateurs. On ne joint que celles qui passent la
     // validation locale ; les autres restent attachées, simplement pas envoyées.
-    const strategies = this.visibleStrategies()
+    const strategies = this.attachedStrategies()
       .filter((document) => isLocallyExecutable(document.rules))
       .map(toAnalysisRequest);
 
@@ -334,7 +378,8 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       this.computeStats(candles.filter((c) => c.t >= displayStartTime));
       this.cacheIndicatorSeries(res, active);
       this.applyIndicatorVisibility();
-      this.applyStrategySignals(res);
+      this.cacheStrategyResults(res);
+      this.applyStrategyVisibility();
       this.scheduleOverlayDraw();
 
       this.chart?.timeScale().setVisibleRange({
@@ -380,19 +425,49 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     );
   }
 
-  private applyStrategySignals(res: AnalysisResponse): void {
-    // Apparié par `id`, jamais par position : la réponse porte l'id de chaque
-    // stratégie, et rien ne garantit qu'elle les renvoie dans l'ordre demandé.
-    //
-    // Une seule stratégie est rendue pour l'instant : l'overlay ne dispose que
-    // d'un jeu de marqueurs, et fusionner ceux de plusieurs stratégies (avec une
-    // couleur par stratégie) appartient à l'UI d'attachement, pas à ce correctif.
-    const rendered = this.visibleStrategies()
-      .map((document) => res.strategies.find((result) => result.id === document.id))
-      .find((result) => result !== undefined);
+  /**
+   * Range les résultats de backtest par id de stratégie — la réponse porte
+   * l'id de chacune, il n'y a donc rien à deviner sur son ordre.
+   */
+  private cacheStrategyResults(res: AnalysisResponse): void {
+    this.strategyResults.set(
+      new Map(
+        res.strategies.map((result) => [
+          result.id,
+          {
+            strategyId: result.id,
+            name: result.name,
+            color: strategyColor(result.id),
+            signals: result.signals,
+            summary: result.summary,
+          },
+        ]),
+      ),
+    );
+  }
 
-    if (rendered) this.strategySignals.render(rendered.signals);
-    else this.strategySignals.clear();
+  /**
+   * Rejoue le rendu depuis le cache — AUCUN appel réseau, comme
+   * `applyIndicatorVisibility`. Masquer une stratégie n'a pas à relancer un
+   * backtest : la requête demande tout ce qui est attaché, l'affichage ne
+   * retient que ce qui est visible.
+   */
+  private applyStrategyVisibility(): void {
+    const layers = this.visibleStrategyResults();
+
+    if (layers.length === 0) {
+      this.strategySignals.clear();
+      this.strategyPositions.clear();
+      return;
+    }
+
+    this.strategySignals.render(layers);
+    // La bande a besoin des bougies : un segment de position sans elles ne
+    // serait qu'un début et une fin, pas une durée à colorer.
+    this.strategyPositions.render(
+      layers,
+      this.lastCandles.map((candle) => candle.t),
+    );
   }
 
   /** Affiche/masque chaque indicateur actif depuis le cache — AUCUN appel réseau.
@@ -496,6 +571,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
 
     this.indicatorOverlay.attach(this.chart);
     this.strategySignals.attach(this.candleSeries);
+    this.strategyPositions.attach(this.chart);
 
     this.chart.priceScale('volume').applyOptions({
       scaleMargins: { top: 0.8, bottom: 0 },
@@ -910,15 +986,69 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   }
 
   /**
-   * Documents de la bibliothèque désignés par les références visibles, dans
-   * l'ordre d'attachement. Une référence orpheline (stratégie supprimée de la
-   * bibliothèque alors qu'un chart la pointait encore) est simplement ignorée
-   * ici — le nettoyage des références mortes viendra avec l'UI de l'étape 3.
+   * Documents désignés par TOUTES les références attachées, visibles ou non.
+   *
+   * L'analyse demande tout ce qui est attaché — même patron que les
+   * indicateurs, où la requête porte la liste active et l'affichage filtre
+   * ensuite. Basculer la visibilité redevient ainsi instantané.
    */
-  private visibleStrategies() {
+  private attachedStrategies() {
     return this.strategyRefs()
-      .filter((ref) => ref.visible)
       .map((ref) => this.strategyLibrary.getById(ref.strategyId))
       .filter((document) => document !== undefined);
+  }
+
+  strategyName(strategyId: string): string {
+    return this.strategyLibrary.getById(strategyId)?.name ?? 'Unavailable';
+  }
+
+  strategyColorOf(strategyId: string): string {
+    return strategyColor(strategyId);
+  }
+
+  async openStrategyPicker(): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: StrategyPickerModalComponent,
+      componentProps: { attachedIds: () => this.strategyRefs().map((ref) => ref.strategyId) },
+      breakpoints: [0, 1],
+      initialBreakpoint: 1,
+    });
+    await modal.present();
+
+    const { data, role } = await modal.onWillDismiss<string[]>();
+    if (role !== 'confirm' || !data) return;
+
+    // Les références déjà présentes gardent leur visibilité ; les nouvelles
+    // arrivent visibles, sans quoi les attacher n'aurait aucun effet visible.
+    const previous = new Map(this.strategyRefs().map((ref) => [ref.strategyId, ref]));
+    this.strategyRefs.set(
+      data.map((strategyId) => previous.get(strategyId) ?? { strategyId, visible: true }),
+    );
+
+    this.persistIndicators();
+    this.loadData();
+  }
+
+  toggleStrategyVisibility(strategyId: string): void {
+    this.strategyRefs.update((refs) =>
+      refs.map((ref) => (ref.strategyId === strategyId ? { ...ref, visible: !ref.visible } : ref)),
+    );
+    this.persistIndicators();
+
+    // Une stratégie rendue visible alors qu'elle n'a pas de résultat en cache
+    // n'a jamais été backtestée sur cette fenêtre : là seulement, il faut
+    // refaire l'appel.
+    const missing = this.strategyRefs().some(
+      (ref) => ref.visible && !this.strategyResults().has(ref.strategyId),
+    );
+
+    if (missing) this.loadData();
+    else this.applyStrategyVisibility();
+  }
+
+  detachStrategy(strategyId: string): void {
+    this.strategyRefs.update((refs) => refs.filter((ref) => ref.strategyId !== strategyId));
+    this.persistIndicators();
+    this.applyStrategyVisibility();
   }
 }

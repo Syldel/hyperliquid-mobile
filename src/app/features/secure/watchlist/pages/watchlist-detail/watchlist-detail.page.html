@@ -73,6 +73,23 @@
     </ion-chip>
   </div>
 
+  <div class="strategies-strip">
+    @for (ref of strategyRefs(); track ref.strategyId) {
+    <ion-chip [outline]="!ref.visible" (click)="toggleStrategyVisibility(ref.strategyId)">
+      <span class="strategy-dot" [style.background]="strategyColorOf(ref.strategyId)"></span>
+      <span>{{ strategyName(ref.strategyId) }}</span>
+      <ion-icon
+        name="close-circle"
+        (click)="detachStrategy(ref.strategyId); $event.stopPropagation()"
+      />
+    </ion-chip>
+    }
+    <ion-chip color="primary" outline (click)="openStrategyPicker()">
+      <ion-icon name="add-outline" />
+      <span>Strategy</span>
+    </ion-chip>
+  </div>
+
   <div class="chart-wrapper">
     <div #chartEl class="chart-container">
       <canvas #overlayEl class="chart-overlay"></canvas>
@@ -89,4 +106,40 @@
     </div>
     }
   </div>
+
+  @if (visibleStrategyResults().length > 0) {
+  <div class="backtest-toggle">
+    <ion-button size="small" fill="clear" (click)="showBacktest.set(!showBacktest())">
+      <ion-icon
+        slot="start"
+        [name]="showBacktest() ? 'chevron-up-outline' : 'stats-chart-outline'"
+      />
+      {{ showBacktest() ? 'Hide backtest' : 'Backtest' }}
+    </ion-button>
+  </div>
+  } @if (visibleStrategyResults().length > 0 && showBacktest()) {
+  <div class="backtest-strip">
+    @for (result of visibleStrategyResults(); track result.strategyId) {
+    <div class="backtest-card">
+      <span class="strategy-dot" [style.background]="result.color"></span>
+      <span class="backtest-card__name">{{ result.name }}</span>
+      <span class="backtest-card__stat">{{ result.summary.totalTrades }} trades</span>
+      @if (result.summary.winRatePercent !== null) {
+      <span class="backtest-card__stat">{{ result.summary.winRatePercent }}% win</span>
+      }
+      <span
+        class="backtest-card__pnl"
+        [class.backtest-card__pnl--up]="result.summary.cumulativeProfitPercent >= 0"
+        [class.backtest-card__pnl--down]="result.summary.cumulativeProfitPercent < 0"
+      >
+        {{ result.summary.cumulativeProfitPercent >= 0 ? '+' : '' }}{{
+        result.summary.cumulativeProfitPercent }}%
+      </span>
+      @if (result.summary.openPositionAtEnd) {
+      <ion-badge color="medium">open</ion-badge>
+      }
+    </div>
+    }
+  </div>
+  }
 </app-refreshable-layout>
