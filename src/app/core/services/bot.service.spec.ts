@@ -1,7 +1,11 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { ExchangesMetaResponse, PACKAGE_VERSION } from '@syldel/trading-shared-types';
+import {
+  ExchangesMetaResponse,
+  IndicatorMetadata,
+  PACKAGE_VERSION,
+} from '@syldel/trading-shared-types';
 import { ConfigService } from './config.service';
 import { BotService } from './bot.service';
 
@@ -100,6 +104,81 @@ describe('BotService', () => {
 
       expect(service.serverPackageVersion()).toBeNull();
       expect(service.hasPackageVersionMismatch()).toBe(false);
+    });
+  });
+
+  /**
+   * La clé doit reproduire exactement celle que `POST /analysis` produit, mais
+   * en la dérivant du catalogue SERVI par le bot — jamais du registre compilé,
+   * qui peut être en retard sur les valeurs par défaut réellement exécutées.
+   */
+  describe('buildIndicatorKey', () => {
+    function loadMeta(indicators: IndicatorMetadata[]): void {
+      service.getExchangeFormMetadata().subscribe();
+      httpMock
+        .expectOne('http://api.test/exchanges/meta')
+        .flush({ ...buildMeta(PACKAGE_VERSION), indicators });
+    }
+
+    const ema: IndicatorMetadata = {
+      name: 'ema',
+      label: 'EMA',
+      overlay: true,
+      parameters: [{ type: 'number', name: 'period', label: 'Period', defaultValue: 9 }],
+    };
+
+    const macd: IndicatorMetadata = {
+      name: 'macd',
+      label: 'MACD',
+      overlay: false,
+      parameters: [
+        { type: 'number', name: 'fastPeriod', label: 'Fast', defaultValue: 12 },
+        { type: 'number', name: 'slowPeriod', label: 'Slow', defaultValue: 26 },
+        { type: 'number', name: 'signalPeriod', label: 'Signal', defaultValue: 9 },
+      ],
+    };
+
+    const obv: IndicatorMetadata = { name: 'obv', label: 'OBV', overlay: false, parameters: [] };
+
+    it('uses the explicit parameter values, in the order the catalogue declares', () => {
+      loadMeta([macd]);
+
+      expect(
+        service.buildIndicatorKey({
+          name: 'macd',
+          fastPeriod: 12,
+          slowPeriod: 26,
+          signalPeriod: 9,
+        }),
+      ).toBe('macd_12_26_9');
+    });
+
+    it('fills an omitted parameter with the default SERVED by the bot', () => {
+      loadMeta([
+        {
+          ...ema,
+          parameters: [{ type: 'number', name: 'period', label: 'Period', defaultValue: 12 }],
+        },
+      ]);
+
+      // Le registre compilé dirait `ema_9` ; c'est exactement la dérive évitée.
+      expect(service.buildIndicatorKey({ name: 'ema' })).toBe('ema_12');
+    });
+
+    it('omits the separator for a parameterless indicator', () => {
+      loadMeta([obv]);
+
+      expect(service.buildIndicatorKey({ name: 'obv' })).toBe('obv');
+    });
+
+    it('returns null when the indicator is absent from the loaded catalogue', () => {
+      loadMeta([ema]);
+
+      expect(service.buildIndicatorKey({ name: 'sma', period: 20 })).toBeNull();
+    });
+
+    it('returns null before any catalogue is loaded', () => {
+      expect(service.buildIndicatorKey({ name: 'ema', period: 9 })).toBeNull();
     });
   });
 });

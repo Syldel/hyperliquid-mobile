@@ -4,6 +4,7 @@ import {
   ExchangesMetaResponse,
   IExchangeStrategy,
   IndicatorMetadata,
+  IndicatorRequest,
   PACKAGE_VERSION,
   StrategyValidationResult,
 } from '@syldel/trading-shared-types';
@@ -99,6 +100,40 @@ export class BotService {
   readonly ruleBuilderGrammar = computed(
     () => this.metadataCache()?.strategyFormSchema.ruleBuilderGrammar ?? null,
   );
+
+  /**
+   * Clé sous laquelle `POST /analysis` range la série d'un indicateur dans
+   * `AnalysisResponse.indicators` (ex: `ema_9`, `macd_12_26_9`).
+   *
+   * Reconstruite depuis `IndicatorMetadata.parameters` — **ordre et valeurs par
+   * défaut servis par le bot** — et non via `buildIndicatorKeyFromOperand` du
+   * paquet compilé, dont l'import comme valeur est d'ailleurs interdit ici
+   * (no-catalog-imports.spec.ts). La raison est concrète : ce helper complète
+   * les paramètres omis avec `INDICATOR_DEFAULTS` **compilé**, si bien qu'un
+   * `ema` sans période explicite donnerait `ema_9` côté mobile et `ema_12` côté
+   * serveur dès que le registre du bot change. Seul le *format* de la clé est
+   * dupliqué ici ; c'est de la grammaire, pas du catalogue.
+   *
+   * `null` si l'indicateur est absent du catalogue chargé : l'appelant doit
+   * alors renoncer à la série plutôt que de l'attribuer au hasard.
+   *
+   * Pas de `subField` : les séries de chart sont demandées via
+   * `IndicatorRequest`, qui n'en porte pas — un sous-champ n'existe que sur un
+   * opérande de règle.
+   */
+  buildIndicatorKey(request: IndicatorRequest): string | null {
+    const meta = this.indicators().find((indicator) => indicator.name === request.name);
+    if (!meta) return null;
+
+    if (meta.parameters.length === 0) return request.name;
+
+    const provided = request as unknown as Record<string, unknown>;
+    const values = meta.parameters.map((parameter) =>
+      provided[parameter.name] !== undefined ? provided[parameter.name] : parameter.defaultValue,
+    );
+
+    return `${request.name}_${values.join('_')}`;
+  }
 
   /**
    * Ordre canonique des lignes d'un indicateur multi-sorties, tel que renvoyé

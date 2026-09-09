@@ -19,6 +19,7 @@ import {
   IonIcon,
   IonSkeletonText,
   ModalController,
+  ToastController,
 } from '@ionic/angular/standalone';
 import { AppLifecycleService } from '@services/app-lifecycle.service';
 import { BotService } from '@services/bot.service';
@@ -64,9 +65,9 @@ import {
 } from 'lightweight-charts';
 import { firstValueFrom } from 'rxjs';
 
-import { computeLookbackCandles } from '@shared/components/indicator-picker/models/indicator-lookback.util';
 import { IndicatorOverlayService } from '@shared/components/indicator-picker/services/indicator-overlay.service';
 import { formatIndicatorLabel } from '@shared/components/indicator-picker/utils/indicator-label.util';
+import { isLocallyExecutable } from '../../../strategies/domain/strategy-issues.util';
 import { toAnalysisRequest } from '../../../strategies/models/strategy-document.model';
 import { StrategyLibraryService } from '../../../strategies/services/strategy-library.service';
 import {
@@ -78,6 +79,7 @@ import {
 } from '../../models/watchlist-item.model';
 import { StrategySignalsOverlayService } from '../../services/strategy-signals-overlay.service';
 import { WatchlistService } from '../../services/watchlist.service';
+import { mapIndicatorSeriesById } from '../../utils/indicator-series-map.util';
 
 @Component({
   selector: 'app-watchlist-detail',
@@ -108,6 +110,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   private readonly indicatorOverlay = inject(IndicatorOverlayService);
   private readonly strategySignals = inject(StrategySignalsOverlayService);
   private readonly modalCtrl = inject(ModalController);
+  private readonly toastCtrl = inject(ToastController);
   private readonly watchlistService = inject(WatchlistService);
   private readonly strategyLibrary = inject(StrategyLibraryService);
 
@@ -294,16 +297,23 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     endTime: number,
   ): Promise<void> {
     const active = this.activeIndicators();
-    const strategies = this.visibleStrategies().map(toAnalysisRequest);
-
-    const intervalMs = this.getIntervalSeconds() * 1000;
-    const lookbackCandles = computeLookbackCandles(active);
-    const fetchStartTime = displayStartTime - lookbackCandles * intervalMs;
+    // Une stratégie sans côté à évaluer fait rejeter la requête d'analyse
+    // ENTIÈRE (`collectExecutableStrategyRulesIssues` côté serveur), donc
+    // emporterait aussi les indicateurs. On ne joint que celles qui passent la
+    // validation locale ; les autres restent attachées, simplement pas envoyées.
+    const strategies = this.visibleStrategies()
+      .filter((document) => isLocallyExecutable(document.rules))
+      .map(toAnalysisRequest);
 
     const request: AnalysisRequest = {
       symbol: item.coin,
       interval: toChartInterval(this.selectedInterval()),
-      startTime: fetchStartTime,
+      // Début de la fenêtre à AFFICHER, jamais une valeur pré-paddée : le
+      // serveur recule lui-même `startTime` du warm-up nécessaire
+      // (`AnalysisService.padStartTimeForWarmup`), en s'appuyant sur un registre
+      // de périodes qui peut évoluer sans ce build. Le client qui recalculait sa
+      // propre marge ici ajoutait la sienne par-dessus.
+      startTime: displayStartTime,
       endTime,
       indicators: active.map((i) => i.request),
       strategies: strategies.length > 0 ? strategies : undefined,
@@ -332,8 +342,22 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
         to: Math.floor(endTime / 1000) as Time,
       });
     } catch {
+      // Repli ANNONCÉ. Le chart reste utilisable en bougies nues, mais les
+      // indicateurs et les signaux disparaissaient jusqu'ici sans un mot : une
+      // panne du service d'analyse se lisait comme « cet indicateur ne donne
+      // rien », ce qui est le pire diagnostic possible sur un outil de trading.
       await this.fetchViaCandles(item, displayStartTime, endTime);
+      await this.notifyOverlaysUnavailable();
     }
+  }
+
+  private async notifyOverlaysUnavailable(): Promise<void> {
+    const toast = await this.toastCtrl.create({
+      message: 'Chart loaded without indicators — the analysis service did not respond.',
+      color: 'warning',
+      duration: 4000,
+    });
+    await toast.present();
   }
 
   private toCandleSnapshots(candles: AnalysisCandle[]): CandleSnapshot[] {
@@ -349,21 +373,26 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
 
   /** Stocke les points bruts par id d'indicateur actif, sans les rendre — le rendu se fait via applyIndicatorVisibility(). */
   private cacheIndicatorSeries(res: AnalysisResponse, active: ActiveIndicator[]): void {
-    const seriesList = Object.values(res.indicators);
-    this.indicatorSeriesCache.clear();
-    active.forEach((ind, idx) => {
-      const points = seriesList[idx];
-      if (points)
-        this.indicatorSeriesCache.set(ind.id, points as { time: number; value: number }[]);
-    });
+    this.indicatorSeriesCache = mapIndicatorSeriesById(
+      res.indicators as unknown as Record<string, { time: number; value: number }[]>,
+      active,
+      (request) => this.botService.buildIndicatorKey(request),
+    );
   }
 
   private applyStrategySignals(res: AnalysisResponse): void {
-    if (res.strategies.length > 0) {
-      this.strategySignals.render(res.strategies[0].signals);
-    } else {
-      this.strategySignals.clear();
-    }
+    // Apparié par `id`, jamais par position : la réponse porte l'id de chaque
+    // stratégie, et rien ne garantit qu'elle les renvoie dans l'ordre demandé.
+    //
+    // Une seule stratégie est rendue pour l'instant : l'overlay ne dispose que
+    // d'un jeu de marqueurs, et fusionner ceux de plusieurs stratégies (avec une
+    // couleur par stratégie) appartient à l'UI d'attachement, pas à ce correctif.
+    const rendered = this.visibleStrategies()
+      .map((document) => res.strategies.find((result) => result.id === document.id))
+      .find((result) => result !== undefined);
+
+    if (rendered) this.strategySignals.render(rendered.signals);
+    else this.strategySignals.clear();
   }
 
   /** Affiche/masque chaque indicateur actif depuis le cache — AUCUN appel réseau.

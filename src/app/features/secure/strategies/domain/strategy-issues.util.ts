@@ -1,4 +1,5 @@
 import {
+  collectExecutableStrategyRulesIssues,
   collectStrategyRulesIssues,
   isCatalogDependentIssue,
   type StrategyRules,
@@ -130,4 +131,20 @@ export function hasUnsupportedNodeAt(
   return issues.some(
     (issue) => UNRECOGNISED_VALUE_ISSUE_CODES.has(issue.code) && isPathInside(issue.path, path),
   );
+}
+
+/**
+ * `true` si la stratégie peut être envoyée telle quelle à `POST /analysis`.
+ *
+ * Sert de garde-fou avant l'appel : le backtest **rejette** une stratégie sans
+ * `long` ni `short` (`collectExecutableStrategyRulesIssues`), et ce rejet ferait
+ * échouer toute la requête d'analyse — y compris les indicateurs qui n'ont rien
+ * à voir. Mieux vaut ne pas la joindre que de perdre le chart entier.
+ *
+ * Aucun `editedPaths` n'est transmis : hors de l'éditeur, rien n'a été écrit
+ * par ce build, donc une valeur non reconnue vient d'un document plus récent et
+ * doit partir au verdict du serveur plutôt que d'être bloquée ici.
+ */
+export function isLocallyExecutable(rules: StrategyRules | undefined | null): boolean {
+  return partitionStrategyIssues(collectExecutableStrategyRulesIssues(rules)).blocking.length === 0;
 }

@@ -6,6 +6,7 @@ import type {
 import {
   collectEditorIssues,
   hasUnsupportedNodeAt,
+  isLocallyExecutable,
   partitionStrategyIssues,
 } from './strategy-issues.util';
 
@@ -154,5 +155,44 @@ describe('hasUnsupportedNodeAt', () => {
 
   it('ignores a merely malformed node', () => {
     expect(hasUnsupportedNodeAt('rules.long.entry.conditions[1]', issues)).toBe(false);
+  });
+});
+
+describe('isLocallyExecutable', () => {
+  const filled: StrategyRules = {
+    long: {
+      entry: {
+        type: 'logical',
+        operator: 'AND',
+        conditions: [{ type: 'constant', value: true }],
+      },
+    },
+  };
+
+  it('accepts a strategy with something to evaluate', () => {
+    expect(isLocallyExecutable(filled)).toBe(true);
+  });
+
+  it('rejects a strategy with neither side — POST /analysis would fail the whole request', () => {
+    expect(isLocallyExecutable({})).toBe(false);
+    expect(isLocallyExecutable(undefined)).toBe(false);
+  });
+
+  it('rejects a branch left empty', () => {
+    expect(
+      isLocallyExecutable({
+        long: { entry: { type: 'logical', operator: 'AND', conditions: [] } },
+      }),
+    ).toBe(false);
+  });
+
+  // Un nœud venu d'un build plus récent n'est pas notre verdict à rendre.
+  it('lets an unknown node through, for the server to judge', () => {
+    const alien = { type: 'quantum' } as unknown as RuleNode;
+    expect(
+      isLocallyExecutable({
+        long: { entry: { type: 'logical', operator: 'AND', conditions: [alien] } },
+      }),
+    ).toBe(true);
   });
 });
