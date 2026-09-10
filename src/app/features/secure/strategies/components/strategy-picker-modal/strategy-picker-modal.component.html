@@ -4,9 +4,11 @@
     <ion-buttons slot="start">
       <ion-button (click)="cancel()">Cancel</ion-button>
     </ion-buttons>
-    <ion-buttons slot="end">
-      <ion-button strong (click)="confirm()">Done</ion-button>
-    </ion-buttons>
+    @if (multiple()) {
+      <ion-buttons slot="end">
+        <ion-button strong (click)="confirm()">Done</ion-button>
+      </ion-buttons>
+    }
   </ion-toolbar>
 </ion-header>
 
@@ -28,7 +30,11 @@
             <h2>{{ document.name }}</h2>
             <ion-note>{{ branchSummary(document) }}</ion-note>
           </ion-label>
-          <ion-checkbox slot="end" [checked]="isSelected(document.id)" />
+          @if (multiple()) {
+            <ion-checkbox slot="end" [checked]="isSelected(document.id)" />
+          } @else if (isSelected(document.id)) {
+            <ion-icon slot="end" name="checkmark-outline" color="primary" />
+          }
         </ion-item>
       }
     </ion-list>

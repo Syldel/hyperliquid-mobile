@@ -5,6 +5,7 @@ import {
   IonCheckbox,
   IonContent,
   IonHeader,
+  IonIcon,
   IonItem,
   IonLabel,
   IonList,
@@ -13,19 +14,21 @@ import {
   IonToolbar,
   ModalController,
 } from '@ionic/angular/standalone';
+import { addIcons } from 'ionicons';
+import { checkmarkOutline } from 'ionicons/icons';
 import { strategyColor } from '../../domain/strategy-color.util';
-import { getAtPath, isLogicalGroup } from '../../domain/strategy-tree.ops';
-import {
-  DEFAULT_STRATEGY_BRANCHES,
-  type StrategyDocument,
-} from '../../models/strategy-document.model';
+import { branchSummary as summariseBranches } from '../../domain/strategy-summary.util';
+import { type StrategyDocument } from '../../models/strategy-document.model';
 import { StrategyLibraryService } from '../../services/strategy-library.service';
 
 /**
- * Choix des stratégies de la bibliothèque à attacher à un chart.
+ * Choix des stratégies de la bibliothèque.
  *
  * Renvoie la liste complète des identifiants cochés, pas un delta : l'appelant
- * n'a pas à reconstituer ce qui a été ajouté ou retiré, il remplace.
+ * n'a pas à reconstituer ce qui a été ajouté ou retiré, il remplace. En mode
+ * `multiple` (un chart, qui superpose plusieurs stratégies) la sélection se
+ * valide explicitement ; sinon (une paire du bot, qui n'en exécute qu'une) un
+ * appui vaut choix et referme, et le tableau renvoyé n'a qu'un élément.
  */
 @Component({
   selector: 'app-strategy-picker-modal',
@@ -40,6 +43,7 @@ import { StrategyLibraryService } from '../../services/strategy-library.service'
     IonContent,
     IonList,
     IonItem,
+    IonIcon,
     IonLabel,
     IonNote,
     IonCheckbox,
@@ -49,12 +53,18 @@ import { StrategyLibraryService } from '../../services/strategy-library.service'
 })
 export class StrategyPickerModalComponent implements OnInit {
   readonly attachedIds = input<readonly string[]>([]);
+  /** `false` pour n'en choisir qu'une : l'appui vaut alors validation. */
+  readonly multiple = input(true);
 
   private readonly library = inject(StrategyLibraryService);
   private readonly modalCtrl = inject(ModalController);
 
   readonly documents = signal<StrategyDocument[]>([]);
   readonly selected = signal<ReadonlySet<string>>(new Set());
+
+  constructor() {
+    addIcons({ checkmarkOutline });
+  }
 
   async ngOnInit(): Promise<void> {
     this.documents.set(await this.library.load());
@@ -66,6 +76,11 @@ export class StrategyPickerModalComponent implements OnInit {
   }
 
   toggle(id: string): void {
+    if (!this.multiple()) {
+      this.modalCtrl.dismiss([id], 'confirm');
+      return;
+    }
+
     this.selected.update((current) => {
       const next = new Set(current);
       if (!next.delete(id)) next.add(id);
@@ -79,12 +94,7 @@ export class StrategyPickerModalComponent implements OnInit {
 
   /** Branches réellement renseignées — le même résumé que la page bibliothèque. */
   branchSummary(document: StrategyDocument): string {
-    const used = DEFAULT_STRATEGY_BRANCHES.filter((branch) => {
-      const group = getAtPath(document.rules, `rules.${branch.id}`);
-      return isLogicalGroup(group) && group.conditions.length > 0;
-    });
-
-    return used.length > 0 ? used.map((branch) => branch.label).join(' · ') : 'Draft — no rule yet';
+    return summariseBranches(document.rules);
   }
 
   confirm(): void {

@@ -13,12 +13,9 @@ import {
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import { addIcons } from 'ionicons';
 import { addOutline, ellipsisHorizontal } from 'ionicons/icons';
-import { getAtPath, isLogicalGroup } from '../../domain/strategy-tree.ops';
+import { branchSummary as summariseBranches } from '../../domain/strategy-summary.util';
 import { StrategyBuilderModalComponent } from '../../components/strategy-builder-modal/strategy-builder-modal.component';
-import {
-  DEFAULT_STRATEGY_BRANCHES,
-  type StrategyDocument,
-} from '../../models/strategy-document.model';
+import { type StrategyDocument } from '../../models/strategy-document.model';
 import { StrategyLibraryService } from '../../services/strategy-library.service';
 
 /**
@@ -63,12 +60,7 @@ export class StrategiesPage {
 
   /** Libellés des branches réellement renseignées — résumé tenant sur une ligne. */
   branchSummary(document: StrategyDocument): string {
-    const used = DEFAULT_STRATEGY_BRANCHES.filter((branch) => {
-      const group = getAtPath(document.rules, `rules.${branch.id}`);
-      return isLogicalGroup(group) && group.conditions.length > 0;
-    });
-
-    return used.length > 0 ? used.map((branch) => branch.label).join(' · ') : 'Draft — no rule yet';
+    return summariseBranches(document.rules);
   }
 
   async create(): Promise<void> {

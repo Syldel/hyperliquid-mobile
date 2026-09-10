@@ -1,6 +1,7 @@
 import type {
   AnalysisStrategyRequest,
   IExchangeStrategy,
+  StrategyParameter,
   StrategyRules,
 } from '@syldel/trading-shared-types';
 
@@ -101,3 +102,51 @@ export const DEFAULT_STRATEGY_BRANCHES: readonly StrategyBranch[] = [
   { id: 'short.entry', label: 'Short entry' },
   { id: 'short.exit', label: 'Short exit' },
 ];
+
+/**
+ * Branches éditables déclarées par une entrée du catalogue.
+ *
+ * `StrategyMeta.parameters` décrit un formulaire ; ses champs `rule-builder`
+ * désignent chacun une branche de `rules` par leur `id` (`long.entry`), les
+ * autres une clé de `settings`. Lire les branches ici plutôt que d'utiliser
+ * `DEFAULT_STRATEGY_BRANCHES` laisse le serveur décider de ce qu'une stratégie
+ * donnée expose : une famille future n'ouvrant que le côté long n'aurait pas à
+ * afficher deux branches mortes.
+ *
+ * `[]` pour une stratégie codée en dur — c'est aussi le test « cette stratégie
+ * se pilote-t-elle par règles ? ».
+ */
+export function ruleBranchesOf(
+  parameters: readonly StrategyParameter[] | undefined,
+): StrategyBranch[] {
+  return (parameters ?? [])
+    .filter((parameter) => parameter.type === 'rule-builder')
+    .map((parameter) => ({ id: parameter.id, label: parameter.label }));
+}
+
+/**
+ * Document de travail bâti sur la stratégie déjà enregistrée pour une paire du
+ * bot, afin de la rouvrir dans le builder.
+ *
+ * L'`id` vient de l'appelant : `IExchangeStrategy` n'en porte pas, une paire ne
+ * peut donc pas se souvenir du document dont elle est issue. Ce que la paire
+ * conserve est un instantané, pas une référence — et c'est voulu : éditer une
+ * stratégie de la bibliothèque ne doit pas changer en silence ce qu'un bot
+ * exécute déjà.
+ *
+ * `schemaVersion` repart de la version courante pour la même raison : rien
+ * dans `IExchangeStrategy` ne dit quel build a écrit ces règles.
+ */
+export function toStrategyDocument(strategy: IExchangeStrategy, id: string): StrategyDocument {
+  const now = Date.now();
+
+  return {
+    id,
+    name: strategy.name,
+    ...(strategy.description ? { description: strategy.description } : {}),
+    rules: strategy.rules ?? {},
+    createdAt: now,
+    updatedAt: now,
+    schemaVersion: STRATEGY_DOCUMENT_SCHEMA_VERSION,
+  };
+}

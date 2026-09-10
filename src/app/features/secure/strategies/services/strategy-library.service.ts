@@ -165,7 +165,7 @@ let idSequence = 0;
  * (indicator-hline-defaults.util.ts). Le repli suffit ici : cet id n'a
  * besoin d'être unique que dans une bibliothèque locale.
  */
-function generateStrategyId(): string {
+export function generateStrategyId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return `st_${crypto.randomUUID()}`;
   }

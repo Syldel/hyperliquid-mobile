@@ -40,6 +40,7 @@ import {
   IonToggle,
   IonToolbar,
   ModalController,
+  ToastController,
 } from '@ionic/angular/standalone';
 import { TradingPair } from '@models/user.interface';
 import { AvailableCapitalService } from '@services/available-capital.service';
@@ -50,8 +51,11 @@ import {
   ExitBehavior,
   ExitBehaviorMeta,
   IExchange,
+  IExchangeStrategy,
+  PublicStrategyValidationIssue,
   StrategyMeta,
   StrategyParameter,
+  StrategySettings,
 } from '@syldel/trading-shared-types';
 import { addIcons } from 'ionicons';
 import {
@@ -62,7 +66,21 @@ import {
   closeOutline,
   removeOutline,
 } from 'ionicons/icons';
-import { combineLatest, debounceTime } from 'rxjs';
+import { combineLatest, debounceTime, firstValueFrom } from 'rxjs';
+import { StrategyBuilderModalComponent } from '../../../strategies/components/strategy-builder-modal/strategy-builder-modal.component';
+import { StrategyPickerModalComponent } from '../../../strategies/components/strategy-picker-modal/strategy-picker-modal.component';
+import { isLocallyExecutable } from '../../../strategies/domain/strategy-issues.util';
+import { branchSummary } from '../../../strategies/domain/strategy-summary.util';
+import { pruneEmptyRuleBranches } from '../../../strategies/domain/strategy-tree.ops';
+import {
+  ruleBranchesOf,
+  toStrategyDocument,
+  type StrategyDocument,
+} from '../../../strategies/models/strategy-document.model';
+import {
+  generateStrategyId,
+  StrategyLibraryService,
+} from '../../../strategies/services/strategy-library.service';
 
 interface TradingPairForm {
   exchangeKey: FormControl<string>;
@@ -114,6 +132,8 @@ export class TradingPairModalComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
   private readonly availableCapitalService = inject(AvailableCapitalService);
+  private readonly library = inject(StrategyLibraryService);
+  private readonly toastCtrl = inject(ToastController);
 
   // ------------------------------------------------------------------
   //  Inputs
@@ -138,8 +158,22 @@ export class TradingPairModalComponent implements OnInit {
   /** FormGroup reconstruit dynamiquement à chaque changement de strategy */
   strategyParamsForm = signal<FormGroup>(this.fb.group({}));
 
-  /** Paramètres de la strategy actuellement sélectionnée */
+  /** Paramètres scalaires de la strategy actuellement sélectionnée (hors `rule-builder`). */
   readonly currentStrategyParams = signal<StrategyParameter[]>([]);
+
+  /**
+   * Règles de la paire, sous la forme d'un document de bibliothèque.
+   *
+   * La paire en conserve un **instantané** : ce qui est enregistré côté compte
+   * utilisateur est `IExchangeStrategy.rules`, pas une référence au document.
+   * Éditer ensuite la stratégie dans la bibliothèque ne change donc pas ce que
+   * le bot exécute tant que la paire n'a pas été rouverte et réenregistrée.
+   */
+  readonly ruleDocument = signal<StrategyDocument | null>(null);
+
+  /** Anomalies renvoyées par le bot au dernier enregistrement — il fait autorité. */
+  readonly serverIssues = signal<PublicStrategyValidationIssue[]>([]);
+  readonly validating = signal(false);
 
   // ------------------------------------------------------------------
   //  Computed
@@ -163,6 +197,33 @@ export class TradingPairModalComponent implements OnInit {
   });
 
   readonly isEditMode = computed(() => !!this.editPair());
+
+  /**
+   * Branches de règles déclarées par la stratégie choisie, telles que servies
+   * par `/exchanges/meta`. Vide pour une stratégie codée en dur — c'est aussi
+   * ce qui décide de l'affichage de la section « rules », plutôt qu'un test sur
+   * le `shortname` : le catalogue reste seul juge de ce qu'une stratégie expose.
+   */
+  readonly ruleBranches = computed(() => ruleBranchesOf(this.formValue().strategy?.parameters));
+
+  readonly usesRules = computed(() => this.ruleBranches().length > 0);
+
+  readonly rulesSummary = computed(() =>
+    branchSummary(this.ruleDocument()?.rules, this.ruleBranches(), 'No rule yet'),
+  );
+
+  /**
+   * `true` si les règles peuvent être confiées au bot : au moins un côté à
+   * évaluer, et aucune anomalie dont ce build soit certain. Le verdict serveur
+   * reste demandé par-dessus à l'enregistrement — voir `submit`.
+   */
+  readonly rulesReady = computed(() => {
+    const document = this.ruleDocument();
+    if (!document) return false;
+
+    const rules = pruneEmptyRuleBranches(document.rules);
+    return (!!rules.long || !!rules.short) && isLocallyExecutable(rules);
+  });
 
   // ------------------------------------------------------------------
   //  Form
@@ -207,9 +268,19 @@ export class TradingPairModalComponent implements OnInit {
     initialValue: this.form.status,
   });
 
-  /** Valide si le form principal ET les paramètres dynamiques sont valides */
+  /**
+   * Valide si le form principal, les paramètres dynamiques et — pour une
+   * stratégie pilotée par règles — l'arbre lui-même sont exploitables.
+   *
+   * Sans ce dernier point, choisir « Advanced Logical Rules » sans jamais
+   * ouvrir le builder enregistrerait une paire que le bot chargerait pour
+   * n'en rien faire.
+   */
   readonly isValid = computed(
-    () => this.formStatus() === 'VALID' && this.strategyParamsForm().valid,
+    () =>
+      this.formStatus() === 'VALID' &&
+      this.strategyParamsForm().valid &&
+      (!this.usesRules() || this.rulesReady()),
   );
 
   // ------------------------------------------------------------------
@@ -234,6 +305,7 @@ export class TradingPairModalComponent implements OnInit {
 
         this.form.controls.strategy.enable();
         this.form.controls.interval.enable();
+        this.resolveEditedStrategy(all);
       },
       error: () => {
         this.metadataError.set(true);
@@ -241,6 +313,29 @@ export class TradingPairModalComponent implements OnInit {
       },
       complete: () => this.isLoadingMetadata.set(false),
     });
+  }
+
+  /**
+   * Rebranche la paire éditée sur l'entrée de catalogue correspondante.
+   *
+   * Une paire enregistrée porte une `IExchangeStrategy` — du métier, sans
+   * `parameters`. Le sélecteur, lui, a besoin de la `StrategyMeta` : c'est
+   * elle qui déclare les champs à afficher, y compris les branches de règles.
+   * Les faire coïncider ici est ce qui permet de rouvrir en édition une
+   * stratégie « advanced-rules » sans que le formulaire ait à deviner son
+   * schéma depuis les données.
+   *
+   * Une stratégie absente du catalogue (renommée, retirée) laisse le contrôle
+   * vide plutôt que d'inventer une entrée : le formulaire reste invalide et
+   * l'utilisateur doit en choisir une, ce qui vaut mieux qu'enregistrer un
+   * `shortname` que le bot n'exécute pas.
+   */
+  private resolveEditedStrategy(catalogue: StrategyMeta[]): void {
+    const shortname = this.editPair()?.strategy?.shortname;
+    if (!shortname) return;
+
+    const meta = catalogue.find((candidate) => candidate.shortname === shortname);
+    if (meta) this.form.patchValue({ strategy: meta });
   }
 
   availableCapital = signal<number | null>(null);
@@ -289,16 +384,22 @@ export class TradingPairModalComponent implements OnInit {
   // ------------------------------------------------------------------
 
   /**
-   * Reconstruit le FormGroup des paramètres dynamiques
-   * à chaque fois que la strategy change.
+   * Reconstruit le FormGroup des paramètres dynamiques à chaque fois que la
+   * strategy change.
+   *
+   * Les paramètres `rule-builder` en sont exclus : ils n'alimentent pas
+   * `settings` mais `rules`, et se saisissent dans le builder, pas dans un
+   * contrôle de formulaire. Les y laisser produisait des contrôles `null`
+   * enregistrés tels quels sur le compte utilisateur.
    */
   private buildStrategyParamsForm(
     params: StrategyParameter[],
     existingValues?: Record<string, any>,
   ): void {
+    const scalars = params.filter((param) => param.type !== 'rule-builder');
     const controls: Record<string, FormControl> = {};
 
-    for (const param of params) {
+    for (const param of scalars) {
       const savedValue = existingValues?.[param.id];
       const initialValue = savedValue !== undefined ? savedValue : param.defaultValue;
 
@@ -311,7 +412,7 @@ export class TradingPairModalComponent implements OnInit {
     }
 
     this.strategyParamsForm.set(this.fb.group(controls));
-    this.currentStrategyParams.set(params);
+    this.currentStrategyParams.set(scalars);
   }
 
   // ------------------------------------------------------------------
@@ -364,18 +465,13 @@ export class TradingPairModalComponent implements OnInit {
    * fermeture d'une modale ouverte par-dessus celle-ci : tout ce que
    * l'utilisateur avait saisi entre-temps repartait aux valeurs enregistrées.
    * Le défaut passait inaperçu tant que la seule sous-modale était le sélecteur
-   * de marché, qui réécrit `pairName` après coup. Hydrater n'est pas dériver :
-   * ça se fait à l'ouverture, pas à chaque notification.
+   * de marché, qui réécrit `pairName` après coup ; le builder de règles, lui,
+   * voyait ses règles effacées en revenant. Hydrater n'est pas dériver : ça se
+   * fait à l'ouverture, pas à chaque notification.
    *
-   * TODO(advanced-rules): le préremplissage des paramètres rule-builder en
-   * édition est désactivé depuis le passage à StrategyRules côté backend.
-   * `pair.strategy` (IExchangeStrategy) ne porte plus le schéma des champs —
-   * celui-ci vient désormais uniquement du catalogue (`StrategyMeta`,
-   * `GET /exchanges/meta`). Le formulaire dynamique reste fonctionnel pour les
-   * stratégies sans paramètres (ex: tol-langit-atr-v7-pro) via l'effet du
-   * constructeur, qui se redéclenche à l'ouverture (patchValue émet un
-   * valueChanges). À reprendre avec le reste du système de construction
-   * dynamique de stratégies (advanced-rules).
+   * `strategy` est volontairement absent du patch : le contrôle porte une
+   * `StrategyMeta` (le *schéma* du formulaire), que seul `/exchanges/meta`
+   * fournit — voir `resolveEditedStrategy`, appelé une fois le catalogue chargé.
    */
   private prefillFromEditedPair(): void {
     const pair = this.editPair();
@@ -384,12 +480,15 @@ export class TradingPairModalComponent implements OnInit {
     this.form.patchValue({
       exchangeKey: this.editExchangeKey() ?? '',
       pairName: pair.name,
-      strategy: pair.strategy,
       ratio: pair.ratio,
       interval: pair.interval,
       enabled: pair.enabled,
       exitBehavior: pair.exitBehavior ?? 'STRATEGY_SIGNAL',
     });
+
+    this.ruleDocument.set(
+      pair.strategy?.rules ? toStrategyDocument(pair.strategy, generateStrategyId()) : null,
+    );
   }
 
   // ------------------------------------------------------------------
@@ -427,15 +526,89 @@ export class TradingPairModalComponent implements OnInit {
   }
 
   // ------------------------------------------------------------------
+  //  Rules
+  // ------------------------------------------------------------------
+
+  /** Reprend une stratégie de la bibliothèque locale — la paire en garde un instantané. */
+  async pickRules(): Promise<void> {
+    const current = this.ruleDocument();
+    await this.library.load();
+
+    const modal = await this.modalCtrl.create({
+      component: StrategyPickerModalComponent,
+      componentProps: {
+        multiple: () => false,
+        attachedIds: () => (current ? [current.id] : []),
+      },
+      breakpoints: [0, 1],
+      initialBreakpoint: 1,
+    });
+    await modal.present();
+
+    const { data, role } = await modal.onDidDismiss<string[]>();
+    if (role !== 'confirm' || !data?.length) return;
+
+    const document = this.library.getById(data[0]);
+    if (!document) return;
+
+    this.ruleDocument.set(document);
+    this.serverIssues.set([]);
+  }
+
+  /**
+   * Ouvre le builder sur les règles de cette paire, avec les branches que le
+   * catalogue déclare pour la stratégie choisie.
+   *
+   * Le builder enregistre dans la bibliothèque locale : éditer les règles
+   * d'une paire l'y fait donc entrer si elle n'y était pas — le cas d'une paire
+   * configurée depuis un autre appareil, dont les règles arrivent du compte et
+   * non du stockage local. C'est préférable à un second éditeur qui saurait
+   * modifier un arbre hors bibliothèque.
+   */
+  async editRules(): Promise<void> {
+    const current =
+      this.ruleDocument() ??
+      toStrategyDocument(
+        { name: this.draftRuleName(), shortname: this.form.getRawValue().strategy.shortname },
+        generateStrategyId(),
+      );
+
+    const modal = await this.modalCtrl.create({
+      component: StrategyBuilderModalComponent,
+      componentProps: {
+        initialDocument: () => current,
+        branches: () => this.ruleBranches(),
+      },
+      breakpoints: [0, 1],
+      initialBreakpoint: 1,
+    });
+    await modal.present();
+
+    const { data, role } = await modal.onDidDismiss<StrategyDocument>();
+    if (role !== 'confirm' || !data) return;
+
+    this.ruleDocument.set(data);
+    this.serverIssues.set([]);
+  }
+
+  /** Nom proposé pour une stratégie créée depuis une paire. */
+  private draftRuleName(): string {
+    const pairName = this.form.getRawValue().pairName;
+    return pairName ? `${pairName} rules` : 'New strategy';
+  }
+
+  // ------------------------------------------------------------------
   //  Modal actions
   // ------------------------------------------------------------------
 
-  submit(): void {
-    if (!this.isValid()) return;
+  async submit(): Promise<void> {
+    if (!this.isValid() || this.validating()) return;
 
     const formValue = this.form.getRawValue();
-    const strategyParams = this.strategyParamsForm().getRawValue();
-    const hasParams = Object.keys(strategyParams).length > 0;
+    const settings = this.strategyParamsForm().getRawValue() as StrategySettings;
+    const strategy = this.buildStrategy(formValue.strategy, settings);
+
+    if (this.usesRules() && !(await this.approvedByBot(strategy))) return;
 
     const result: TradingPairModalResult = {
       exchangeKey: formValue.exchangeKey,
@@ -444,9 +617,8 @@ export class TradingPairModalComponent implements OnInit {
         ratio: formValue.ratio,
         interval: formValue.interval,
         enabled: formValue.enabled,
-        strategy: formValue.strategy,
+        strategy,
         exitBehavior: formValue.exitBehavior,
-        strategyParameters: hasParams ? strategyParams : undefined,
       },
     };
 
@@ -455,5 +627,72 @@ export class TradingPairModalComponent implements OnInit {
 
   dismiss(): void {
     this.modalCtrl.dismiss(null, 'cancel');
+  }
+
+  // ------------------------------------------------------------------
+  //  Private helpers
+  // ------------------------------------------------------------------
+
+  /**
+   * La stratégie telle qu'elle sera enregistrée sur le compte : des données
+   * métier, aucune métadonnée d'affichage.
+   *
+   * `StrategyMeta.parameters` décrit un formulaire ; le recopier dans la
+   * configuration y faisait vieillir une copie du catalogue. Les valeurs
+   * saisies, elles, se rangent selon le contrat des types partagés :
+   * `rule-builder` alimente `rules`, les scalaires alimentent `settings`.
+   *
+   * `latent` et `protective` appartiennent à la paire et non au choix de
+   * stratégie : les reconduire évite que changer de stratégie efface en
+   * silence les TP/SL réglés dans la modale Protective.
+   */
+  private buildStrategy(meta: StrategyMeta, settings: StrategySettings): IExchangeStrategy {
+    const previous = this.editPair()?.strategy;
+    const document = this.ruleDocument();
+
+    return {
+      name: meta.name,
+      shortname: meta.shortname,
+      ...(meta.description ? { description: meta.description } : {}),
+      ...(this.usesRules() && document ? { rules: pruneEmptyRuleBranches(document.rules) } : {}),
+      ...(Object.keys(settings).length > 0 ? { settings } : {}),
+      ...(previous?.latent ? { latent: previous.latent } : {}),
+      ...(previous?.protective ? { protective: previous.protective } : {}),
+    };
+  }
+
+  /**
+   * Verdict du bot avant d'écrire la paire sur le compte utilisateur.
+   *
+   * La validation locale ne suffit pas : elle s'appuie sur une copie compilée
+   * des catalogues, que le bot peut avoir dépassée. Un refus garde la modale
+   * ouverte, pour que le rapport soit lu plutôt qu'emporté par la fermeture.
+   *
+   * Bot injoignable : on avertit et on laisse passer, comme le builder. Une
+   * paire mal formée sera de toute façon refusée à l'exécution, alors qu'un
+   * blocage rendrait la configuration impossible dès que le service tousse.
+   */
+  private async approvedByBot(strategy: IExchangeStrategy): Promise<boolean> {
+    this.validating.set(true);
+    this.serverIssues.set([]);
+
+    try {
+      const result = await firstValueFrom(this.botService.validateStrategy(strategy));
+      if (result.valid) return true;
+
+      this.serverIssues.set(result.issues);
+      await this.toast('The bot rejected these rules — see below.', 'danger');
+      return false;
+    } catch {
+      await this.toast('The bot could not be reached to validate these rules.', 'warning');
+      return true;
+    } finally {
+      this.validating.set(false);
+    }
+  }
+
+  private async toast(message: string, color: string): Promise<void> {
+    const toast = await this.toastCtrl.create({ message, color, duration: 4000 });
+    await toast.present();
   }
 }

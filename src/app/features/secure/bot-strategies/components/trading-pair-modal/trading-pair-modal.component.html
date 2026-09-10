@@ -7,8 +7,12 @@
       </ion-button>
     </ion-buttons>
     <ion-buttons slot="end">
-      <ion-button (click)="submit()" [disabled]="!isValid()">
-        <ion-icon slot="icon-only" name="checkmark-outline" />
+      <ion-button (click)="submit()" [disabled]="!isValid() || validating()">
+        @if (validating()) {
+          <ion-spinner name="crescent" />
+        } @else {
+          <ion-icon slot="icon-only" name="checkmark-outline" />
+        }
       </ion-button>
     </ion-buttons>
   </ion-toolbar>
@@ -149,6 +153,57 @@
           </ion-item>
         }
       </ion-list>
+    }
+
+    <!-- Strategy rules (stratégies pilotées par un arbre de conditions) -->
+    @if (usesRules()) {
+      <ion-list inset>
+        <ion-item button (click)="pickRules()">
+          <ion-label>
+            <p>Rules</p>
+            <h3>{{ ruleDocument()?.name ?? 'Choose from library' }}</h3>
+          </ion-label>
+          <ion-icon slot="end" name="chevron-forward-outline" />
+        </ion-item>
+
+        <ion-item button (click)="editRules()">
+          <ion-label>
+            <p>{{ rulesSummary() }}</p>
+            <h3>{{ ruleDocument() ? 'Edit rules' : 'Build rules' }}</h3>
+          </ion-label>
+          <ion-icon slot="end" name="chevron-forward-outline" />
+        </ion-item>
+
+        @if (ruleDocument() && !rulesReady()) {
+          <ion-item lines="none">
+            <ion-label class="ion-text-wrap">
+              <ion-text color="warning">
+                <p>Needs at least one side with a usable entry before the bot can run it.</p>
+              </ion-text>
+            </ion-label>
+          </ion-item>
+        }
+      </ion-list>
+
+      @if (serverIssues().length > 0) {
+        <ion-list inset>
+          <ion-item lines="none">
+            <ion-label>
+              <h3>The bot rejected these rules</h3>
+            </ion-label>
+          </ion-item>
+          @for (issue of serverIssues(); track issue.path + issue.code) {
+            <ion-item>
+              <ion-label class="ion-text-wrap">
+                <ion-text color="danger">
+                  <p>{{ issue.path }}</p>
+                </ion-text>
+                <p>{{ issue.message }}</p>
+              </ion-label>
+            </ion-item>
+          }
+        </ion-list>
+      }
     }
 
     <!-- Ratio -->
