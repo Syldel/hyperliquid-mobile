@@ -328,34 +328,6 @@ export class TradingPairModalComponent implements OnInit {
       chevronForwardOutline,
     });
 
-    // Pré-remplissage en mode édition
-    effect(() => {
-      const pair = this.editPair();
-      const exchangeKey = this.editExchangeKey();
-      if (!pair) return;
-
-      this.form.patchValue({
-        exchangeKey: exchangeKey ?? '',
-        pairName: pair.name,
-        strategy: pair.strategy,
-        ratio: pair.ratio,
-        interval: pair.interval,
-        enabled: pair.enabled,
-        exitBehavior: pair.exitBehavior ?? 'STRATEGY_SIGNAL',
-      });
-
-      // TODO(advanced-rules): le préremplissage des paramètres rule-builder en
-      // édition est désactivé depuis le passage à StrategyRules côté backend.
-      // `pair.strategy` (IExchangeStrategy) ne porte plus le schéma des champs
-      // — celui-ci vient désormais uniquement du catalogue (`StrategyMeta`,
-      // `GET /exchanges/meta`). Le formulaire dynamique reste fonctionnel pour
-      // les stratégies sans paramètres (ex: tol-langit-atr-v7-pro) via l'effet
-      // ci-dessous, qui se redéclenche déjà à l'ouverture (patchValue émet un
-      // valueChanges). À reprendre avec le reste du système de construction
-      // dynamique de stratégies (advanced-rules), volontairement laissé de
-      // côté pour l'instant.
-    });
-
     // Reconstruction du form dynamique à chaque changement de strategy
     effect(() => {
       const strategy = this.formValue().strategy;
@@ -365,6 +337,8 @@ export class TradingPairModalComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.prefillFromEditedPair();
+
     this.form.controls.exchangeKey.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
@@ -381,6 +355,41 @@ export class TradingPairModalComponent implements OnInit {
       .subscribe(([exchangeKey, pairName]) => {
         this.loadCapital(exchangeKey, pairName);
       });
+  }
+
+  /**
+   * Recopie la paire éditée dans le formulaire, **une seule fois**.
+   *
+   * Ce pré-remplissage vivait dans un `effect`, qui se ré-exécutait à chaque
+   * fermeture d'une modale ouverte par-dessus celle-ci : tout ce que
+   * l'utilisateur avait saisi entre-temps repartait aux valeurs enregistrées.
+   * Le défaut passait inaperçu tant que la seule sous-modale était le sélecteur
+   * de marché, qui réécrit `pairName` après coup. Hydrater n'est pas dériver :
+   * ça se fait à l'ouverture, pas à chaque notification.
+   *
+   * TODO(advanced-rules): le préremplissage des paramètres rule-builder en
+   * édition est désactivé depuis le passage à StrategyRules côté backend.
+   * `pair.strategy` (IExchangeStrategy) ne porte plus le schéma des champs —
+   * celui-ci vient désormais uniquement du catalogue (`StrategyMeta`,
+   * `GET /exchanges/meta`). Le formulaire dynamique reste fonctionnel pour les
+   * stratégies sans paramètres (ex: tol-langit-atr-v7-pro) via l'effet du
+   * constructeur, qui se redéclenche à l'ouverture (patchValue émet un
+   * valueChanges). À reprendre avec le reste du système de construction
+   * dynamique de stratégies (advanced-rules).
+   */
+  private prefillFromEditedPair(): void {
+    const pair = this.editPair();
+    if (!pair) return;
+
+    this.form.patchValue({
+      exchangeKey: this.editExchangeKey() ?? '',
+      pairName: pair.name,
+      strategy: pair.strategy,
+      ratio: pair.ratio,
+      interval: pair.interval,
+      enabled: pair.enabled,
+      exitBehavior: pair.exitBehavior ?? 'STRATEGY_SIGNAL',
+    });
   }
 
   // ------------------------------------------------------------------
