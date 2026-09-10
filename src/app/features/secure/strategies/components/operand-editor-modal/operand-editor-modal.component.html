@@ -11,17 +11,20 @@
 </ion-header>
 
 <ion-content class="ion-padding">
-  <ion-segment [value]="type()" (ionChange)="onTypeChange($event.detail.value)">
-    <ion-segment-button value="price">
-      <ion-label>Price</ion-label>
-    </ion-segment-button>
-    <ion-segment-button value="number">
-      <ion-label>Value</ion-label>
-    </ion-segment-button>
-    <ion-segment-button value="indicator">
-      <ion-label>Indicator</ion-label>
-    </ion-segment-button>
-  </ion-segment>
+  <ion-list inset>
+    <ion-item>
+      <ion-label>Kind</ion-label>
+      <ion-select
+        interface="action-sheet"
+        [value]="type()"
+        (ionChange)="onTypeChange($event.detail.value)"
+      >
+        @for (option of availableTypes(); track option.value) {
+          <ion-select-option [value]="option.value">{{ option.label }}</ion-select-option>
+        }
+      </ion-select>
+    </ion-item>
+  </ion-list>
 
   @switch (type()) {
     @case ('price') {
@@ -126,9 +129,116 @@
         }
       }
     }
+
+    @case ('arith') {
+      <ion-list inset>
+        <ion-item button (click)="editLeft()">
+          <ion-label>
+            <p>Left side</p>
+            <h3>{{ label(left()) }}</h3>
+          </ion-label>
+        </ion-item>
+        <ion-item>
+          <ion-label>Operator</ion-label>
+          <ion-select
+            interface="action-sheet"
+            [value]="arithOperator()"
+            (ionChange)="arithOperator.set($event.detail.value)"
+          >
+            @for (option of arithOperators(); track option.value) {
+              <ion-select-option [value]="option.value">{{ option.label }}</ion-select-option>
+            }
+          </ion-select>
+        </ion-item>
+        <ion-item button (click)="editRight()">
+          <ion-label>
+            <p>Right side</p>
+            <h3>{{ label(right()) }}</h3>
+          </ion-label>
+        </ion-item>
+      </ion-list>
+    }
+
+    @case ('transform') {
+      <ion-list inset>
+        <ion-item>
+          <ion-label>Transform</ion-label>
+          <ion-select
+            interface="action-sheet"
+            placeholder="Select"
+            [value]="transformKind()"
+            (ionChange)="selectTransform($event.detail.value)"
+          >
+            @for (transform of transforms(); track transform.kind) {
+              <ion-select-option [value]="transform.kind">{{ transform.label }}</ion-select-option>
+            }
+          </ion-select>
+        </ion-item>
+        <ion-item>
+          <ion-input
+            label="Window"
+            labelPlacement="stacked"
+            type="number"
+            min="2"
+            [value]="transformPeriod()"
+            (ionInput)="transformPeriod.set(+$event.detail.value!)"
+          />
+        </ion-item>
+        <ion-item button (click)="editSource()">
+          <ion-label>
+            <p>Source</p>
+            <h3>{{ label(source()) }}</h3>
+          </ion-label>
+        </ion-item>
+      </ion-list>
+    }
+
+    @case ('fn') {
+      <ion-list inset>
+        <ion-item>
+          <ion-label>Function</ion-label>
+          <ion-select
+            interface="action-sheet"
+            placeholder="Select"
+            [value]="fnKind()"
+            (ionChange)="selectFunction($event.detail.value)"
+          >
+            @for (fn of functions(); track fn.kind) {
+              <ion-select-option [value]="fn.kind">{{ fn.label }}</ion-select-option>
+            }
+          </ion-select>
+        </ion-item>
+
+        @for (argument of args(); track $index) {
+          <ion-item button (click)="editArgument($index)">
+            <ion-label>
+              <p>Argument {{ $index + 1 }}</p>
+              <h3>{{ label(argument) }}</h3>
+            </ion-label>
+            @if (canRemoveArgument()) {
+              <ion-icon
+                slot="end"
+                name="close-circle"
+                color="medium"
+                (click)="removeArgument($index); $event.stopPropagation()"
+              />
+            }
+          </ion-item>
+        }
+
+        @if (canAddArgument()) {
+          <ion-item lines="none">
+            <ion-button fill="clear" size="small" (click)="addArgument()">
+              <ion-icon slot="start" name="add-outline" />
+              Add argument
+            </ion-button>
+          </ion-item>
+        }
+      </ion-list>
+    }
   }
 
-  @if (type() !== 'number') {
+  @if (type() === 'price' || type() === 'indicator' || type() === 'transform') {
     <ion-list inset>
       <ion-item>
         <ion-input

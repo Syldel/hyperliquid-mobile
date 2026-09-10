@@ -91,6 +91,16 @@ export class BotService {
   readonly indicators = computed(() => this.metadataCache()?.indicators ?? []);
 
   /**
+   * Transformations glissantes et fonctions combinatoires disponibles, telles
+   * que servies par `/exchanges/meta` — jamais `AVAILABLE_TRANSFORMS_METADATA`
+   * ni `AVAILABLE_FUNCTIONS_METADATA` du paquet compilé, dont l'import comme
+   * valeur est interdit ici (no-catalog-imports.spec.ts). Un bot plus récent
+   * peut en proposer davantage sans qu'on rebuilde l'app.
+   */
+  readonly transforms = computed(() => this.metadataCache()?.transforms ?? []);
+  readonly functions = computed(() => this.metadataCache()?.functions ?? []);
+
+  /**
    * Libellés des énumérations du rule-builder, tels que servis par
    * `/exchanges/meta` — jamais la copie compilée `RULE_BUILDER_GRAMMAR`, dont
    * l'import comme valeur est interdit côté mobile (no-catalog-imports.spec.ts).
