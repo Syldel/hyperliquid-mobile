@@ -2,6 +2,7 @@ import {
   collectExecutableStrategyRulesIssues,
   collectStrategyRulesIssues,
   isCatalogDependentIssue,
+  type PublicStrategyValidationIssue,
   type StrategyRules,
   type StrategyValidationIssue,
 } from '@syldel/trading-shared-types';
@@ -197,4 +198,55 @@ export function locateIssue(
   }
 
   return null;
+}
+
+/**
+ * Anomalies différées que le verdict du serveur n'a pas contredites.
+ *
+ * Différer, c'est faire une hypothèse : « ce build est peut-être plus vieux que
+ * le bot, cette valeur lui est peut-être connue ». Le verdict met l'hypothèse à
+ * l'épreuve. Si le serveur signale la **même anomalie au même endroit**, elle
+ * tombe : ce n'est pas un écart de version, c'est une valeur fausse — et
+ * continuer à l'annoncer comme « écrite par une version plus récente »
+ * contredirait le message que le bot vient de renvoyer.
+ *
+ * L'appariement porte sur le code **et** le chemin. Les deux validations
+ * partagent le même union de codes (`PublicStrategyValidationIssue` n'est
+ * qu'un `Pick` de `StrategyValidationIssue`) et le même vocabulaire de chemins,
+ * une fois retiré le préfixe que le serveur ajoute.
+ *
+ * Ne change rien à ce que l'éditeur sait rendre : un type de nœud inconnu reste
+ * inconnu, donc en lecture seule, que le bot l'ait confirmé ou non. Seule
+ * l'explication donnée change.
+ */
+export function withoutServerVerdict(
+  deferred: readonly StrategyValidationIssue[],
+  serverIssues: readonly PublicStrategyValidationIssue[],
+): StrategyValidationIssue[] {
+  if (serverIssues.length === 0) return [...deferred];
+
+  const refuted = new Set(
+    serverIssues
+      .map((issue) => {
+        const local = toLocalIssuePath(issue.path);
+        return local === null ? null : `${issue.code}@${local}`;
+      })
+      .filter((key) => key !== null),
+  );
+
+  return deferred.filter((issue) => !refuted.has(`${issue.code}@${issue.path}`));
+}
+
+/**
+ * Parmi des anomalies différées, celles qui rendent vraiment un nœud illisible
+ * pour ce build — donc affiché en lecture seule.
+ *
+ * Un indicateur inconnu localement n'en fait pas partie : le nœud reste un
+ * `comparison` ordinaire, parfaitement éditable. Confondre les deux faisait
+ * annoncer « shown read-only » à propos de conditions qui ne l'étaient pas.
+ */
+export function unrecognisedNodeIssues(
+  deferred: readonly StrategyValidationIssue[],
+): StrategyValidationIssue[] {
+  return deferred.filter((issue) => UNRECOGNISED_VALUE_ISSUE_CODES.has(issue.code));
 }

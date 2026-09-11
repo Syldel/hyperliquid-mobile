@@ -1,5 +1,5 @@
 import type { LogicalGroup, RuleNode, StrategyRules } from '@syldel/trading-shared-types';
-import { locateIssue } from './strategy-issues.util';
+import { locateIssue, unrecognisedNodeIssues, withoutServerVerdict } from './strategy-issues.util';
 import { toLocalIssuePath } from './strategy-path.util';
 
 function comparison(value: number): RuleNode {
@@ -113,5 +113,91 @@ describe('locateIssue', () => {
   it('handles being asked before any rules exist', () => {
     expect(locateIssue(undefined, 'strategy.rules.long.entry')).toBeNull();
     expect(locateIssue({}, 'strategy.rules.long.entry')).toBeNull();
+  });
+});
+
+describe('withoutServerVerdict', () => {
+  const deferred = [
+    {
+      code: 'UNKNOWN_INDICATOR' as const,
+      path: 'rules.long.entry.conditions[0].left',
+      message: '',
+    },
+    { code: 'UNKNOWN_NODE_TYPE' as const, path: 'rules.short.entry.conditions[0]', message: '' },
+  ];
+
+  it('keeps everything while the bot has said nothing', () => {
+    expect(withoutServerVerdict(deferred, [])).toEqual(deferred);
+  });
+
+  // Le bot a signale la meme chose : l'hypothese « version plus recente » tombe.
+  it('drops an issue the server reported at the same place', () => {
+    const kept = withoutServerVerdict(deferred, [
+      {
+        code: 'UNKNOWN_INDICATOR',
+        path: 'strategy.rules.long.entry.conditions[0].left',
+        message: 'nope',
+      },
+    ]);
+
+    expect(kept.map((i) => i.code)).toEqual(['UNKNOWN_NODE_TYPE']);
+  });
+
+  it('needs the same code, not just the same place', () => {
+    const kept = withoutServerVerdict(deferred, [
+      {
+        code: 'INVALID_TREND_PERIOD',
+        path: 'strategy.rules.long.entry.conditions[0].left',
+        message: 'nope',
+      },
+    ]);
+
+    expect(kept).toHaveLength(2);
+  });
+
+  it('needs the same place, not just the same code', () => {
+    const kept = withoutServerVerdict(deferred, [
+      {
+        code: 'UNKNOWN_INDICATOR',
+        path: 'strategy.rules.short.exit.conditions[0].left',
+        message: '',
+      },
+    ]);
+
+    expect(kept).toHaveLength(2);
+  });
+
+  it('ignores a server issue that addresses nothing in the tree', () => {
+    const kept = withoutServerVerdict(deferred, [
+      { code: 'UNKNOWN_INDICATOR', path: 'expressions[0].operand', message: '' },
+    ]);
+
+    expect(kept).toHaveLength(2);
+  });
+});
+
+describe('unrecognisedNodeIssues', () => {
+  // Un indicateur inconnu laisse une condition parfaitement editable : l'annoncer
+  // en lecture seule etait faux.
+  it('keeps only what actually makes a node unreadable for this build', () => {
+    const issues = unrecognisedNodeIssues([
+      {
+        code: 'UNKNOWN_INDICATOR' as const,
+        path: 'rules.long.entry.conditions[0].left',
+        message: '',
+      },
+      { code: 'UNKNOWN_NODE_TYPE' as const, path: 'rules.long.entry.conditions[1]', message: '' },
+      {
+        code: 'UNKNOWN_COMPARISON_OPERATOR' as const,
+        path: 'rules.long.entry.conditions[2]',
+        message: '',
+      },
+    ]);
+
+    expect(issues.map((i) => i.code)).toEqual(['UNKNOWN_NODE_TYPE', 'UNKNOWN_COMPARISON_OPERATOR']);
+  });
+
+  it('returns nothing for an empty list', () => {
+    expect(unrecognisedNodeIssues([])).toEqual([]);
   });
 });

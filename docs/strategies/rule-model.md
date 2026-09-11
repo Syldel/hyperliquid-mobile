@@ -167,6 +167,23 @@ toucher bloque, elle : ce n'est plus un héritage, c'est un bug d'ici. D'où le 
 `isLocallyExecutable(rules)` résume le tout pour les appelants qui veulent juste savoir
 s'ils peuvent envoyer la stratégie au bot.
 
+## Le verdict du serveur réfute une hypothèse
+
+Différer, c'est faire une hypothèse : « ce build est peut-être plus vieux que le bot ».
+Le verdict la met à l'épreuve. Si le serveur signale **le même code au même chemin**,
+l'hypothèse tombe : ce n'est pas un écart de version, c'est une valeur fausse, et
+continuer à l'annoncer comme « écrite par une version plus récente » contredirait le
+message que le bot vient de renvoyer. `withoutServerVerdict` écarte ces anomalies-là.
+
+Ce qui ne change pas : **ce que l'éditeur sait rendre**. Un type de nœud inconnu reste
+inconnu, donc en lecture seule, que le bot l'ait confirmé ou non — la lecture seule est
+une constatation de capacité, pas une hypothèse. Seule l'explication change : la puce
+passe de « newer version » à « rejected ».
+
+`unrecognisedNodeIssues` sert l'autre moitié de la distinction : seuls les codes de
+_valeur non reconnue_ rendent un nœud illisible. Un indicateur inconnu laisse une
+condition parfaitement éditable, et l'annoncer en lecture seule était faux.
+
 ---
 
 # Affichage d'un arbre

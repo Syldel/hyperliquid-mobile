@@ -5,7 +5,12 @@ import type {
   RuleNode,
   StrategyRules,
 } from '@syldel/trading-shared-types';
-import { collectEditorIssues, locateIssue } from '../domain/strategy-issues.util';
+import {
+  collectEditorIssues,
+  locateIssue,
+  unrecognisedNodeIssues,
+  withoutServerVerdict,
+} from '../domain/strategy-issues.util';
 import { createLogicalGroup } from '../domain/strategy-node.factory';
 import {
   childPath,
@@ -102,6 +107,21 @@ export class StrategyBuilderStore {
 
   /** Nœuds hérités que ce build ne sait pas interpréter : affichés en lecture seule. */
   readonly deferredIssues = computed(() => this.issues().deferred);
+
+  /**
+   * Nœuds en lecture seule dont l'explication « écrit par une version plus
+   * récente » tient encore.
+   *
+   * Deux filtres, pour deux raisons distinctes. Seuls les codes de *valeur non
+   * reconnue* rendent un nœud illisible — un indicateur inconnu laisse une
+   * condition parfaitement éditable, et l'annoncer en lecture seule était faux.
+   * Et une anomalie que le bot a signalée à son tour n'est plus un écart de
+   * version : le bandeau se tairait à son sujet, la ligne étant déjà marquée et
+   * le message du serveur déjà affiché.
+   */
+  readonly newerBuildIssues = computed(() =>
+    unrecognisedNodeIssues(withoutServerVerdict(this.deferredIssues(), this._serverIssues())),
+  );
 
   /** `true` si le nom est renseigné : seule condition pour enregistrer un brouillon. */
   readonly canSave = computed(() => this._name().trim().length > 0);

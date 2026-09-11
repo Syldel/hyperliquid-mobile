@@ -40,7 +40,13 @@
       <span class="label">{{ label() }}</span>
 
       @if (unsupported()) {
-        <ion-badge color="warning">newer version</ion-badge>
+        <!-- Le nœud reste illisible pour ce build dans les deux cas ; seule
+             l'explication change une fois que le bot a tranché. -->
+        @if (faulty()) {
+          <ion-badge color="danger">rejected</ion-badge>
+        } @else {
+          <ion-badge color="warning">newer version</ion-badge>
+        }
       } @else {
         <ion-button fill="clear" size="small" color="medium" (click)="editNode()">
           <ion-icon slot="icon-only" name="create-outline" />
