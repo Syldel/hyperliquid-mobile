@@ -28,8 +28,17 @@ const PACKAGE = '@syldel/trading-shared-types';
  * Symboles qui exposent un catalogue ou dérivent une clé/donnée du registre
  * compilé, plutôt qu'une donnée servie par `/exchanges/meta`. Volontairement
  * distinct des types et des fonctions pures sur l'AST (`Operand`, `RuleNode`,
- * `buildOperandKey`, `walkRuleTree`, `collectStrategyRulesIssues`...), qui ne
- * portent aucun catalogue et restent libres d'usage partout.
+ * `walkRuleTree`, `collectStrategyRulesIssues`...), qui ne portent aucun
+ * catalogue et restent libres d'usage partout.
+ *
+ * La dépendance peut être **transitive**, et c'est le piège : `buildOperandKey`
+ * a longtemps figuré dans la liste des fonctions « pures sur l'AST »
+ * ci-dessus. Elle l'est pour tout l'arbre sauf une branche — `indicator`
+ * délègue à `buildIndicatorKeyFromOperand`, qui complète les paramètres
+ * absents depuis `INDICATOR_DEFAULTS` compilé. Un `ema` sans période explicite
+ * se lit donc `ema_9` ici et `ema_12` sur un bot dont les défauts ont bougé, et
+ * la série correspondante devient introuvable dans la réponse. Juger une
+ * fonction sur sa signature ne suffit pas : il faut lire ce qu'elle appelle.
  */
 const FORBIDDEN_CATALOG_IMPORTS = [
   'isIndicatorName',
@@ -45,6 +54,10 @@ const FORBIDDEN_CATALOG_IMPORTS = [
   'resolveIndicatorParams',
   'buildIndicatorKey',
   'buildIndicatorKeyFromOperand',
+  // Transitivement dépendante du registre compilé — voir l'en-tête ci-dessus.
+  // `AnalysisRequest.expressions[]` s'en passe en portant un `id` calculé
+  // localement (strategy-operands.util.ts).
+  'buildOperandKey',
   'computeStrategyRulesLookback',
   'computeOperandLookback',
   'getIndicatorOperandLookback',
@@ -63,15 +76,19 @@ const ALLOWED_EXCEPTIONS: Record<string, readonly string[]> = {
   ],
 };
 
-const IMPORT_RE =
-  /import\s+(type\s+)?\{([^}]*)\}\s+from\s+['"]@syldel\/trading-shared-types['"]/g;
+const IMPORT_RE = /import\s+(type\s+)?\{([^}]*)\}\s+from\s+['"]@syldel\/trading-shared-types['"]/g;
 
 function extractSpecifiers(rawBraceContent: string): string[] {
   return rawBraceContent
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean)
-    .map((s) => s.split(/\s+as\s+/)[0].replace(/^type\s+/, '').trim());
+    .map((s) =>
+      s
+        .split(/\s+as\s+/)[0]
+        .replace(/^type\s+/, '')
+        .trim(),
+    );
 }
 
 /** Logique pure, testée isolément ci-dessous — indépendante du système de fichiers. */
@@ -139,8 +156,15 @@ describe('findCatalogImportViolations (detection logic)', () => {
   });
 
   it('ignores symbols not in the forbidden list (types, AST helpers)', () => {
-    const content = `import { Operand, buildOperandKey, collectStrategyRulesIssues } from '@syldel/trading-shared-types';`;
+    const content = `import { Operand, walkRuleTree, collectStrategyRulesIssues } from '@syldel/trading-shared-types';`;
     expect(findCatalogImportViolations(content)).toEqual([]);
+  });
+
+  // Sa signature ne prend qu'un `Operand` : rien n'y annonce qu'elle lit le
+  // registre compilé une branche plus bas.
+  it('flags a symbol that depends on the registry only transitively', () => {
+    const content = `import { buildOperandKey } from '@syldel/trading-shared-types';`;
+    expect(findCatalogImportViolations(content)).toEqual(['buildOperandKey']);
   });
 
   it('ignores imports from an unrelated package', () => {

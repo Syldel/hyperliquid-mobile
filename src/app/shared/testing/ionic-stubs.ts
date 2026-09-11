@@ -124,6 +124,61 @@ export class IonInputStub implements ControlValueAccessor {
 }
 
 /**
+ * `ion-range` et `ion-toggle` : des contrôles de formulaire, donc porteurs d'un
+ * `ControlValueAccessor` comme `ion-input`. Sans lui, `formControlName` lève
+ * `NG01203` et le composant testé ne se monte pas.
+ *
+ * Les `@Input()` déclarés ne sont pas décoratifs : sous `strictTemplates`, tout
+ * binding présent dans un template testé doit exister sur le stub.
+ */
+@Component({
+  selector: 'ion-range',
+  standalone: true,
+  template: '',
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => IonRangeStub),
+      multi: true,
+    },
+  ],
+})
+export class IonRangeStub implements ControlValueAccessor {
+  @Input() min = 0;
+  @Input() max = 100;
+  @Input() step = 1;
+  @Input() pin = false;
+  @Input() pinFormatter: (value: number) => string = String;
+  @Input() color = '';
+
+  writeValue(): void {}
+  registerOnChange(): void {}
+  registerOnTouched(): void {}
+}
+
+@Component({
+  selector: 'ion-toggle',
+  standalone: true,
+  template: '<ng-content />',
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => IonToggleStub),
+      multi: true,
+    },
+  ],
+})
+export class IonToggleStub implements ControlValueAccessor {
+  @Input() checked = false;
+  @Input() slot = '';
+  @Output() ionChange = new EventEmitter<{ detail: { checked: boolean } }>();
+
+  writeValue(): void {}
+  registerOnChange(): void {}
+  registerOnTouched(): void {}
+}
+
+/**
  * Stub de service (pas un composant) : `@ionic/angular` (module classique,
  * distinct de `/standalone`) exporte `Platform`, une classe injectable
  * utilisée via `inject(Platform)` — pas un sélecteur de template.
@@ -241,12 +296,33 @@ export class IonFabButtonStub {}
  * builder — sous `strictTemplates`, un binding vers une propriété non déclarée
  * est une erreur de compilation, pas seulement d'exécution.
  */
-@Component({ selector: 'ion-select', standalone: true, template: '<ng-content></ng-content>' })
-export class IonSelectStub {
+@Component({
+  selector: 'ion-select',
+  standalone: true,
+  template: '<ng-content></ng-content>',
+  // `ion-select` est piloté par `[value]`/`(ionChange)` dans le builder, mais
+  // par `formControlName` dans la modale des paires : sans accesseur, Forms
+  // lève `NG01203` et le composant ne se monte pas du tout.
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => IonSelectStub),
+      multi: true,
+    },
+  ],
+})
+export class IonSelectStub implements ControlValueAccessor {
   @Input() value: unknown;
   @Input() interface = '';
   @Input() placeholder = '';
+  @Input() label = '';
+  @Input() labelPlacement = '';
+  @Input() compareWith: ((a: unknown, b: unknown) => boolean) | null = null;
   @Output() ionChange = new EventEmitter<{ detail: { value: unknown } }>();
+
+  writeValue(): void {}
+  registerOnChange(): void {}
+  registerOnTouched(): void {}
 }
 
 @Component({
@@ -307,6 +383,7 @@ export {
   IonLabelStub as IonLabel,
   IonListStub as IonList,
   IonNoteStub as IonNote,
+  IonRangeStub as IonRange,
   IonSegmentStub as IonSegment,
   IonSegmentButtonStub as IonSegmentButton,
   IonSelectStub as IonSelect,
@@ -314,6 +391,7 @@ export {
   IonSpinnerStub as IonSpinner,
   IonTextStub as IonText,
   IonTitleStub as IonTitle,
+  IonToggleStub as IonToggle,
   IonToolbarStub as IonToolbar,
   ActionSheetControllerStub as ActionSheetController,
   ModalControllerStub as ModalController,

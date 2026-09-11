@@ -134,6 +134,9 @@ export class TradingPairModalComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly availableCapitalService = inject(AvailableCapitalService);
   private readonly library = inject(StrategyLibraryService);
+
+  /** Voir `prefillFromEditedPair` : l'hydratation n'a lieu qu'une fois. */
+  private prefilled = false;
   private readonly toastCtrl = inject(ToastController);
 
   // ------------------------------------------------------------------
@@ -473,10 +476,20 @@ export class TradingPairModalComponent implements OnInit {
    * `strategy` est volontairement absent du patch : le contrôle porte une
    * `StrategyMeta` (le *schéma* du formulaire), que seul `/exchanges/meta`
    * fournit — voir `resolveEditedStrategy`, appelé une fois le catalogue chargé.
+   *
+   * Le drapeau ne protège pas d'un second `ngOnInit`, qu'Angular n'appelle pas :
+   * il fait de « hydrater une fois » une propriété de cette méthode plutôt
+   * qu'une conséquence de l'endroit d'où on l'appelle. C'est ce qui la rend
+   * vérifiable sans rejouer le cycle de vie d'une modale Ionic, et ce qui
+   * empêche le défaut de revenir par un autre déclencheur.
    */
   private prefillFromEditedPair(): void {
+    if (this.prefilled) return;
+
     const pair = this.editPair();
     if (!pair) return;
+
+    this.prefilled = true;
 
     this.form.patchValue({
       exchangeKey: this.editExchangeKey() ?? '',
