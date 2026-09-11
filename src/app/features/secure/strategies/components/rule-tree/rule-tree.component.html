@@ -1,7 +1,7 @@
 @if (node(); as current) {
   @if (group() && !collapsed()) {
     <!-- Groupe logique déplié : opérateur, puis ses conditions -->
-    <div class="group" [class.nested]="depth() > 0">
+    <div class="group" [class.nested]="depth() > 0" [class.faulty]="faulty()">
       <div class="group-head">
         <ion-chip outline (click)="editNode()">
           <ion-label>{{ group()!.operator }}</ion-label>
@@ -30,13 +30,13 @@
     </div>
   } @else if (collapsed()) {
     <!-- Trop profond pour rester lisible en ligne : résumé cliquable -->
-    <div class="row" (click)="focusHere()">
+    <div class="row" [class.faulty]="faulty()" (click)="focusHere()">
       <span class="label">{{ group()!.operator }} · {{ summaryLabel() }}</span>
       <ion-icon name="chevron-forward-outline" color="medium" />
     </div>
   } @else {
     <!-- Condition terminale -->
-    <div class="row" [class.unsupported]="unsupported()">
+    <div class="row" [class.unsupported]="unsupported()" [class.faulty]="faulty()">
       <span class="label">{{ label() }}</span>
 
       @if (unsupported()) {

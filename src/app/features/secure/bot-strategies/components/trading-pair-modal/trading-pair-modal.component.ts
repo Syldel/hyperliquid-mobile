@@ -70,6 +70,7 @@ import { combineLatest, debounceTime, firstValueFrom } from 'rxjs';
 import { StrategyBuilderModalComponent } from '../../../strategies/components/strategy-builder-modal/strategy-builder-modal.component';
 import { StrategyPickerModalComponent } from '../../../strategies/components/strategy-picker-modal/strategy-picker-modal.component';
 import { isLocallyExecutable } from '../../../strategies/domain/strategy-issues.util';
+import { toLocalIssuePath } from '../../../strategies/domain/strategy-path.util';
 import { branchSummary } from '../../../strategies/domain/strategy-summary.util';
 import { pruneEmptyRuleBranches } from '../../../strategies/domain/strategy-tree.ops';
 import {
@@ -589,6 +590,17 @@ export class TradingPairModalComponent implements OnInit {
 
     this.ruleDocument.set(data);
     this.serverIssues.set([]);
+  }
+
+  /**
+   * Chemin d'une anomalie dans le vocabulaire de l'éditeur de règles.
+   *
+   * Le serveur situe depuis la stratégie entière (`strategy.rules.long…`), ce
+   * qui ne correspond à rien de ce que l'utilisateur voit. Une anomalie hors de
+   * l'arbre garde son chemin d'origine.
+   */
+  issuePath(issue: PublicStrategyValidationIssue): string {
+    return toLocalIssuePath(issue.path) ?? issue.path;
   }
 
   /** Nom proposé pour une stratégie créée depuis une paire. */

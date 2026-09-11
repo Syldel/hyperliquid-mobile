@@ -47,3 +47,13 @@
   padding-left: 0.5rem;
   border-left: 2px solid var(--ion-color-step-150, #2a2a2a);
 }
+
+/**
+ * Ligne visée par le dernier verdict du bot. Un liseré, pas un fond rouge :
+ * l'arbre reste lisible même quand plusieurs conditions sont en cause.
+ */
+.row.faulty,
+.group.faulty > .group-head {
+  border-left: 3px solid var(--ion-color-danger);
+  padding-left: 0.5rem;
+}

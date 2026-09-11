@@ -206,3 +206,73 @@ describe('StrategyBuilderStore', () => {
     });
   });
 });
+
+describe('StrategyBuilderStore - server issues', () => {
+  let store: StrategyBuilderStore;
+
+  const rules = (): StrategyRules => ({
+    long: { entry: { type: 'logical', operator: 'AND', conditions: [createComparison()] } },
+    short: { entry: { type: 'logical', operator: 'AND', conditions: [createComparison()] } },
+  });
+
+  const issue = (path: string) => ({ path, code: 'UNKNOWN_INDICATOR' as const, message: 'nope' });
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [StrategyBuilderStore] });
+    store = TestBed.inject(StrategyBuilderStore);
+    store.open(document(rules()));
+  });
+
+  it('points at the condition that contains the offending operand', () => {
+    store.setServerIssues([issue('strategy.rules.long.entry.conditions[0].left')]);
+
+    expect([...store.serverIssuePaths()]).toEqual(['rules.long.entry.conditions[0]']);
+  });
+
+  it('ignores an issue that addresses nothing in the tree', () => {
+    store.setServerIssues([issue('strategy.settings.atrPeriod')]);
+
+    expect(store.serverIssuePaths().size).toBe(0);
+  });
+
+  // Le verdict decrivait un arbre qui n'existe plus a cet endroit : le garder
+  // laisserait croire que la correction n'a pas pris.
+  it('forgets the issues of a subtree once it is edited', () => {
+    store.setServerIssues([
+      issue('strategy.rules.long.entry.conditions[0].left'),
+      issue('strategy.rules.short.entry.conditions[0].left'),
+    ]);
+
+    store.replaceNode('rules.long.entry.conditions[0]', createConstant(true));
+
+    expect(store.serverIssues().map((i) => i.path)).toEqual([
+      'strategy.rules.short.entry.conditions[0].left',
+    ]);
+  });
+
+  it('keeps them when an unrelated branch is edited', () => {
+    store.setServerIssues([issue('strategy.rules.long.entry.conditions[0].left')]);
+
+    store.replaceNode('rules.short.entry.conditions[0]', createConstant(true));
+
+    expect(store.serverIssues()).toHaveLength(1);
+  });
+
+  // Une ecriture sans effet ne commit pas, donc n'efface rien.
+  it('keeps them when an edit changes nothing', () => {
+    store.setServerIssues([issue('strategy.rules.long.entry.conditions[0].left')]);
+    const untouched = store.rules();
+
+    store.removeNode('rules.long.entry.conditions[9]');
+
+    expect(store.rules()).toBe(untouched);
+    expect(store.serverIssues()).toHaveLength(1);
+  });
+
+  it('drops the previous verdict when another document is opened', () => {
+    store.setServerIssues([issue('strategy.rules.long.entry.conditions[0].left')]);
+    store.open(document(rules()));
+
+    expect(store.serverIssues()).toEqual([]);
+  });
+});

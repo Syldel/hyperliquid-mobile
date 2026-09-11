@@ -20,9 +20,11 @@ import {
 import { BotService } from '@services/bot.service';
 import type { LogicalGroup, PublicStrategyValidationIssue } from '@syldel/trading-shared-types';
 import { addIcons } from 'ionicons';
-import { arrowBackOutline, arrowUndoOutline } from 'ionicons/icons';
+import { arrowBackOutline, arrowUndoOutline, chevronForwardOutline } from 'ionicons/icons';
 import { firstValueFrom } from 'rxjs';
+import { locateIssue } from '../../domain/strategy-issues.util';
 import { createLogicalGroup } from '../../domain/strategy-node.factory';
+import { toLocalIssuePath } from '../../domain/strategy-path.util';
 import { getAtPath, isLogicalGroup } from '../../domain/strategy-tree.ops';
 import {
   DEFAULT_STRATEGY_BRANCHES,
@@ -82,11 +84,14 @@ export class StrategyBuilderModalComponent implements OnInit {
   readonly metaFailed = signal(false);
   readonly saving = signal(false);
 
-  /** Anomalies renvoyées par le bot au dernier enregistrement — il fait autorité. */
-  readonly serverIssues = signal<PublicStrategyValidationIssue[]>([]);
+  /**
+   * Anomalies renvoyées par le bot au dernier enregistrement — il fait autorité.
+   * Conservées dans le store, que l'arbre consulte pour signaler ses lignes.
+   */
+  readonly serverIssues = this.store.serverIssues;
 
   constructor() {
-    addIcons({ arrowBackOutline, arrowUndoOutline });
+    addIcons({ arrowBackOutline, arrowUndoOutline, chevronForwardOutline });
   }
 
   ngOnInit(): void {
@@ -135,7 +140,7 @@ export class StrategyBuilderModalComponent implements OnInit {
     if (!document || !this.store.canSave()) return;
 
     this.saving.set(true);
-    this.serverIssues.set([]);
+    this.store.setServerIssues([]);
 
     try {
       const saved = await this.library.save(document);
@@ -152,7 +157,7 @@ export class StrategyBuilderModalComponent implements OnInit {
         return;
       }
 
-      this.serverIssues.set(result.issues);
+      this.store.setServerIssues(result.issues);
       await this.toast('Saved, but the bot rejected these rules — see below.', 'warning');
     } catch {
       // La stratégie est enregistrée quoi qu'il arrive : seul le verdict manque.
@@ -161,6 +166,35 @@ export class StrategyBuilderModalComponent implements OnInit {
     } finally {
       this.saving.set(false);
     }
+  }
+
+  /**
+   * Chemin de l'anomalie dans le vocabulaire de l'éditeur.
+   *
+   * Le serveur situe depuis la stratégie entière (`strategy.rules.long…`) ;
+   * l'afficher tel quel montrerait à l'utilisateur une racine qui n'existe pas
+   * dans ce qu'il édite. Une anomalie hors de l'arbre garde son chemin d'origine
+   * — mieux vaut une racine inattendue qu'un chemin muet.
+   */
+  issuePath(issue: PublicStrategyValidationIssue): string {
+    return toLocalIssuePath(issue.path) ?? issue.path;
+  }
+
+  /** `true` si l'anomalie désigne un nœud qu'on sait ouvrir. */
+  canReveal(issue: PublicStrategyValidationIssue): boolean {
+    return locateIssue(this.store.rules(), issue.path) !== null;
+  }
+
+  /**
+   * Ouvre le groupe qui contient le nœud visé.
+   *
+   * On ouvre le groupe et non le nœud lui-même : une anomalie désigne souvent un
+   * opérande, et le montrer seul le priverait de ce qui le rend lisible — la
+   * condition qui l'entoure. La ligne fautive y est signalée par l'arbre.
+   */
+  revealIssue(issue: PublicStrategyValidationIssue): void {
+    const located = locateIssue(this.store.rules(), issue.path);
+    if (located) this.store.focus(located.groupPath);
   }
 
   cancel(): void {

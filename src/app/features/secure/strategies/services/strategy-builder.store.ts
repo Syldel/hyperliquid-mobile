@@ -1,8 +1,18 @@
 import { computed, Injectable, signal } from '@angular/core';
-import type { LogicalGroup, RuleNode, StrategyRules } from '@syldel/trading-shared-types';
-import { collectEditorIssues } from '../domain/strategy-issues.util';
+import type {
+  LogicalGroup,
+  PublicStrategyValidationIssue,
+  RuleNode,
+  StrategyRules,
+} from '@syldel/trading-shared-types';
+import { collectEditorIssues, locateIssue } from '../domain/strategy-issues.util';
 import { createLogicalGroup } from '../domain/strategy-node.factory';
-import { childPath, isPathInside, parentPath } from '../domain/strategy-path.util';
+import {
+  childPath,
+  isPathInside,
+  parentPath,
+  toLocalIssuePath,
+} from '../domain/strategy-path.util';
 import {
   appendCondition,
   getAtPath,
@@ -48,6 +58,7 @@ export class StrategyBuilderStore {
    * autre store, donc un autre brouillon.
    */
   private readonly _focusedPath = signal<string | null>(null);
+  private readonly _serverIssues = signal<PublicStrategyValidationIssue[]>([]);
 
   readonly document = this._document.asReadonly();
   readonly name = this._name.asReadonly();
@@ -61,6 +72,30 @@ export class StrategyBuilderStore {
   }
 
   readonly issues = computed(() => collectEditorIssues(this._rules(), this._editedPaths()));
+
+  /**
+   * Anomalies renvoyées par le dernier verdict du bot.
+   *
+   * Elles vivent ici et non dans la modale parce que deux vues en ont besoin :
+   * la liste qui les énumère, et l'arbre qui doit signaler les lignes visées.
+   */
+  readonly serverIssues = this._serverIssues.asReadonly();
+
+  /**
+   * Lignes de l'arbre visées par une anomalie serveur.
+   *
+   * Recalculé depuis l'arbre courant : un chemin que l'édition a rendu caduc
+   * cesse de désigner quoi que ce soit, sans qu'on ait à le nettoyer.
+   */
+  readonly serverIssuePaths = computed(() => {
+    const rules = this._rules();
+
+    return new Set(
+      this._serverIssues()
+        .map((issue) => locateIssue(rules, issue.path)?.nodePath)
+        .filter((path) => path !== undefined),
+    );
+  });
 
   /** Anomalies dont ce build est certain — elles seules empêchent la mise en service. */
   readonly blockingIssues = computed(() => this.issues().blocking);
@@ -88,6 +123,12 @@ export class StrategyBuilderStore {
     this._editedPaths.set([]);
     this._history.set([]);
     this._focusedPath.set(null);
+    this._serverIssues.set([]);
+  }
+
+  /** Enregistre le verdict du bot. Un tableau vide efface le précédent. */
+  setServerIssues(issues: readonly PublicStrategyValidationIssue[]): void {
+    this._serverIssues.set([...issues]);
   }
 
   setName(name: string): void {
@@ -188,6 +229,27 @@ export class StrategyBuilderStore {
     this._editedPaths.update((paths) =>
       paths.includes(editedPath) ? paths : [...paths, editedPath],
     );
+    this.dropServerIssuesUnder(editedPath);
+  }
+
+  /**
+   * Oublie les anomalies portant sur le sous-arbre qu'on vient de modifier.
+   *
+   * Le verdict du bot décrivait un arbre qui n'existe plus à cet endroit :
+   * continuer à signaler la ligne laisserait croire que la correction n'a pas
+   * pris. Les anomalies des autres branches, elles, restent valables et restent
+   * affichées — c'est ce qui permet de les corriger une par une.
+   */
+  private dropServerIssuesUnder(editedPath: string): void {
+    const issues = this._serverIssues();
+    if (issues.length === 0) return;
+
+    const kept = issues.filter((issue) => {
+      const local = toLocalIssuePath(issue.path);
+      return !local || !isPathInside(local, editedPath);
+    });
+
+    if (kept.length !== issues.length) this._serverIssues.set(kept);
   }
 
   private pushHistory(): void {

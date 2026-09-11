@@ -77,3 +77,33 @@ export function isPathInside(candidate: string, ancestor: string): boolean {
 
   return parent.every((segment, index) => segment === child[index]);
 }
+
+/**
+ * Préfixe dont le serveur habille ses chemins d'anomalie.
+ *
+ * `POST /exchanges/strategies/validate` valide une `IExchangeStrategy` entière,
+ * donc situe ses anomalies depuis cette racine : `strategy.rules.long.entry…`.
+ * La validation partagée appelée localement part de `rules`, puisqu'elle ne
+ * reçoit que l'arbre. Les deux décrivent le même nœud.
+ */
+const SERVER_ISSUE_PREFIX = 'strategy.';
+
+/**
+ * Ramène un chemin d'anomalie serveur dans le vocabulaire local, ou `null` s'il
+ * ne désigne rien d'adressable dans l'arbre.
+ *
+ * `null` n'est pas une erreur : le serveur situe aussi des anomalies hors de
+ * `rules` (`settings.…`, `expressions[0].operand`, le `shortname` d'une paire).
+ * L'appelant doit alors se contenter d'afficher le message, ce qui est déjà
+ * utile — d'où un retour explicite plutôt qu'un chemin approximatif.
+ */
+export function toLocalIssuePath(path: unknown): string | null {
+  if (typeof path !== 'string') return null;
+
+  const local = path.startsWith(SERVER_ISSUE_PREFIX)
+    ? path.slice(SERVER_ISSUE_PREFIX.length)
+    : path;
+
+  const segments = parseStrategyPath(local);
+  return segments?.[0] === STRATEGY_PATH_ROOT ? local : null;
+}

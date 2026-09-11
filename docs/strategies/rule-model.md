@@ -104,10 +104,19 @@ illisible s'ignore, il ne fait pas tomber l'éditeur.
 `isPathInside` compare **segment par segment**, jamais par préfixe de chaîne :
 `rules.long.entry` n'est pas un ancêtre de `rules.long.entryX`.
 
-⚠️ Les chemins renvoyés par `POST /exchanges/strategies/validate` sont préfixés
-`strategy.rules…` là où les chemins locaux disent `rules…`. Aujourd'hui on n'affiche que
-le message, donc l'écart ne se voit pas ; il faudra retirer le préfixe le jour où on
-voudra surligner le nœud fautif dans l'arbre.
+## Chemins venus du serveur
+
+`POST /exchanges/strategies/validate` valide une `IExchangeStrategy` entière et situe donc
+ses anomalies depuis cette racine : `strategy.rules.long.entry…`. La validation partagée
+appelée localement ne reçoit que l'arbre et part de `rules`. `toLocalIssuePath` ramène les
+deux au même vocabulaire, et rend `null` pour ce qui ne désigne rien dans l'arbre
+(`settings.…`, `expressions[0].operand`) — un cas normal, pas une erreur.
+
+Retirer le préfixe ne suffit pas à montrer le nœud : une anomalie vise souvent un
+**opérande** (`…conditions[0].left`), que l'arbre ne sait pas rendre seul. `locateIssue`
+remonte jusqu'au premier groupe logique et renvoie deux chemins — le groupe à ouvrir, et
+la condition à signaler. Il rend `null` si le chemin ne correspond plus à l'arbre courant,
+plutôt que de désigner un voisin au hasard.
 
 ---
 

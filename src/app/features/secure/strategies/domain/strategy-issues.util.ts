@@ -5,7 +5,8 @@ import {
   type StrategyRules,
   type StrategyValidationIssue,
 } from '@syldel/trading-shared-types';
-import { isPathInside } from './strategy-path.util';
+import { isPathInside, parentPath, toLocalIssuePath } from './strategy-path.util';
+import { getAtPath, isLogicalGroup } from './strategy-tree.ops';
 
 /**
  * ============================================================================
@@ -147,4 +148,53 @@ export function hasUnsupportedNodeAt(
  */
 export function isLocallyExecutable(rules: StrategyRules | undefined | null): boolean {
   return partitionStrategyIssues(collectExecutableStrategyRulesIssues(rules)).blocking.length === 0;
+}
+
+/**
+ * Où se trouve, dans l'arbre, le nœud qu'une anomalie désigne.
+ *
+ * Deux chemins et non un seul, parce que l'éditeur en a besoin de deux : le
+ * **groupe** est ce qu'il sait ouvrir (la vue focalisée rend un sous-arbre,
+ * pas un opérande isolé), la **ligne** est ce qu'il sait marquer.
+ */
+export interface IssueLocation {
+  /** Groupe logique à ouvrir pour montrer l'anomalie dans son contexte. */
+  groupPath: string;
+  /** Ligne à signaler — le groupe lui-même si l'anomalie le vise directement. */
+  nodePath: string;
+}
+
+/**
+ * Situe une anomalie dans l'arbre, ou `null` si elle n'y est pas adressable.
+ *
+ * Une anomalie désigne souvent un **opérande** (`…conditions[0].left`), que
+ * l'arbre ne sait pas rendre seul : on remonte donc jusqu'au premier groupe
+ * logique, et la ligne à marquer est le dernier nœud traversé avant lui. Un
+ * chemin devenu invalide entre-temps — l'utilisateur a supprimé la condition
+ * depuis le verdict — rend `null` plutôt que de désigner un voisin au hasard.
+ */
+export function locateIssue(
+  rules: StrategyRules | undefined | null,
+  issuePath: unknown,
+): IssueLocation | null {
+  const local = toLocalIssuePath(issuePath);
+  if (!rules || !local) return null;
+
+  let nodePath = local;
+  let current: string | null = local;
+
+  while (current) {
+    const value = getAtPath(rules, current);
+
+    // Rien à cette adresse : le chemin ne correspond plus à l'arbre courant.
+    if (value === undefined) return null;
+    if (isLogicalGroup(value)) return { groupPath: current, nodePath };
+
+    // `conditions` est un tableau, pas un nœud : le traverser sans le retenir,
+    // sinon la ligne signalée serait la liste entière plutôt que la condition.
+    if (!Array.isArray(value)) nodePath = current;
+    current = parentPath(current);
+  }
+
+  return null;
 }

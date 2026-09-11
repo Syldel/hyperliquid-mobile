@@ -97,13 +97,16 @@
           </ion-label>
         </ion-item>
         @for (issue of serverIssues(); track issue.path + issue.code) {
-          <ion-item>
+          <ion-item [button]="canReveal(issue)" (click)="revealIssue(issue)">
             <ion-label class="ion-text-wrap">
               <ion-text color="danger">
-                <p>{{ issue.path }}</p>
+                <p>{{ issuePath(issue) }}</p>
               </ion-text>
               <p>{{ issue.message }}</p>
             </ion-label>
+            @if (canReveal(issue)) {
+              <ion-icon slot="end" name="chevron-forward-outline" color="medium" />
+            }
           </ion-item>
         }
       </ion-list>

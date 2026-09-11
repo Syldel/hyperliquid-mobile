@@ -67,6 +67,15 @@ export class RuleTreeComponent {
     hasUnsupportedNodeAt(this.path(), this.store.deferredIssues()),
   );
 
+  /**
+   * `true` si le dernier verdict du bot vise cette ligne.
+   *
+   * Signalé sur la ligne et pas seulement dans la liste d'anomalies : un
+   * message comme « Unknown indicator » ne dit rien tant qu'on ne sait pas
+   * laquelle des douze conditions il désigne.
+   */
+  readonly faulty = computed(() => this.store.serverIssuePaths().has(this.path()));
+
   readonly isNegation = computed(
     () => (this.node() as { type?: unknown } | undefined)?.type === 'not',
   );
