@@ -31,12 +31,22 @@ import type { StrategySignalLayer } from '../utils/strategy-markers.util';
  * ============================================================================
  */
 
-/** Hauteur allouée à une stratégie dans le panneau. */
-const ROW_HEIGHT_PX = 22;
+/**
+ * Part de la hauteur du chart allouée à une ligne de stratégie, relativement au
+ * panneau des prix.
+ *
+ * Les panneaux se partagent une hauteur totale fixe par facteurs d'étirement,
+ * pas par pixels : `setHeight` ne fait que proposer une valeur que la
+ * répartition écrase aussitôt. `setStretchFactor` est le seul levier qui tient.
+ */
+const ROW_STRETCH = 0.08;
 
-/** Bornes de hauteur du panneau : lisible à une stratégie, jamais envahissant à dix. */
-const MIN_PANE_HEIGHT_PX = 44;
-const MAX_PANE_HEIGHT_PX = 132;
+/** Bornes : lisible à une stratégie, jamais envahissant à dix. */
+const MIN_STRETCH = 0.2;
+const MAX_STRETCH = 0.4;
+
+/** Juste sous les bougies : c'est le contexte que la bande commente. */
+const DESIRED_PANE_INDEX = 1;
 
 /**
  * Vert et rouge, délibérément : ce sont les couleurs du long et du short
@@ -88,18 +98,31 @@ export class StrategyPositionsPaneService {
       series.priceScale().applyOptions({ scaleMargins: { top: 0.05, bottom: 0.05 } });
     });
 
-    pane.setHeight(this.paneHeightFor(layers.length));
+    pane.setStretchFactor(this.stretchFor(layers.length));
   }
 
-  /** Retire les séries ET le panneau : un panneau vide occuperait de la place pour rien. */
+  /**
+   * Retire les séries ET le panneau : un panneau vide occuperait de la place
+   * pour rien.
+   *
+   * L'ordre compte. lightweight-charts supprime **lui-même** un panneau dès que
+   * sa dernière série disparaît (`_cleanupIfPaneIsEmpty`), si bien que retirer
+   * les séries puis appeler `removePane` visait un index périmé et levait
+   * « Invalid pane index » — l'exception interrompait le rendu en cours et
+   * laissait le chart à moitié dessiné. Le panneau est donc créé avec
+   * `preserveEmptyPane`, ce qui nous en rend la durée de vie, et on vérifie
+   * qu'il est encore attaché avant de le retirer.
+   */
   clear(): void {
     for (const series of this.series.values()) this.chart?.removeSeries(series);
     this.series.clear();
 
-    if (this.pane && this.chart) {
-      this.chart.removePane(this.pane.paneIndex());
-      this.pane = undefined;
-    }
+    const pane = this.pane;
+    this.pane = undefined;
+    if (!pane || !this.chart) return;
+
+    const index = this.chart.panes().indexOf(pane);
+    if (index >= 0) this.chart.removePane(index);
   }
 
   /** À appeler dans ngOnDestroy du composant, avant chart.remove(). */
@@ -109,13 +132,24 @@ export class StrategyPositionsPaneService {
     this.chart = undefined;
   }
 
+  /**
+   * `preserveEmptyPane` : voir `clear`. `moveTo` fixe la place du panneau au
+   * lieu de la laisser dépendre de l'ordre de création — sans quoi une bande
+   * masquée puis réaffichée réapparaissait tout en bas, sous les autres
+   * panneaux ajoutés entre-temps.
+   */
   private ensurePane(): IPaneApi<Time> {
-    if (!this.pane) this.pane = this.chart!.addPane();
+    if (!this.pane) {
+      this.pane = this.chart!.addPane(true);
+      this.pane.moveTo(Math.min(DESIRED_PANE_INDEX, this.chart!.panes().length - 1));
+    }
+
     return this.pane;
   }
 
-  private paneHeightFor(rows: number): number {
-    return Math.min(MAX_PANE_HEIGHT_PX, Math.max(MIN_PANE_HEIGHT_PX, rows * ROW_HEIGHT_PX));
+  private stretchFor(rows: number): number {
+    const base = this.chart!.panes()[0]?.getStretchFactor() ?? 1;
+    return base * Math.min(MAX_STRETCH, Math.max(MIN_STRETCH, rows * ROW_STRETCH));
   }
 
   private seriesFor(strategyId: string, paneIndex: number): ISeriesApi<'Histogram'> {
