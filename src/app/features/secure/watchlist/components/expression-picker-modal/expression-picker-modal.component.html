@@ -1,0 +1,47 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Expressions</ion-title>
+    <ion-buttons slot="start">
+      <ion-button (click)="cancel()">Cancel</ion-button>
+    </ion-buttons>
+    <ion-buttons slot="end">
+      <ion-button strong (click)="confirm()">Done</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  @if (rows().length === 0) {
+    <ion-list inset>
+      <ion-item lines="none">
+        <ion-note>
+          Nothing to plot yet — attach a strategy whose rules compare indicators or prices.
+        </ion-note>
+      </ion-item>
+    </ion-list>
+  } @else {
+    <ion-list inset>
+      <ion-item lines="none">
+        <ion-note>
+          Each line is an operand a rule evaluates. Plotting both sides of a condition shows why it
+          fires — or why it never does. Price levels are drawn over the candles; anything on another
+          scale gets its own pane.
+        </ion-note>
+      </ion-item>
+    </ion-list>
+
+    <ion-list inset>
+      @for (row of rows(); track row.id) {
+        <ion-item button (click)="toggle(row.id)">
+          <span class="expression-dot" slot="start" [style.background]="row.color"></span>
+          <ion-label class="ion-text-wrap">
+            <h2>{{ row.label }}</h2>
+            <ion-note>{{ row.detail }}</ion-note>
+            <ion-note class="expression-placement">{{ row.placement }}</ion-note>
+          </ion-label>
+          <ion-checkbox slot="end" [checked]="isSelected(row.id)" />
+        </ion-item>
+      }
+    </ion-list>
+  }
+</ion-content>

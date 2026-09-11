@@ -19,12 +19,27 @@ export interface StrategyRef {
   visible: boolean;
 }
 
+/**
+ * Une expression tracée sur le chart, désignée par son `expressionId`.
+ *
+ * Un id, pas un opérande : ce qui est traçable se déduit des stratégies
+ * attachées, et un id qui n'y correspond plus est simplement ignoré au
+ * chargement. `visible` se pilote indépendamment de l'attachement, comme pour
+ * une stratégie — masquer une courbe ne la retire pas de la requête, ce qui
+ * rend le basculement instantané.
+ */
+export interface ExpressionRef {
+  id: string;
+  visible: boolean;
+}
+
 export interface WatchlistItem {
   coin: string;
   interval: CandleInterval;
   addedAt: number;
   activeIndicators?: ActiveIndicator[];
   strategyRefs?: StrategyRef[];
+  expressionRefs?: ExpressionRef[];
 }
 
 export const INTERVAL_LABELS: Record<CandleInterval, string> = {

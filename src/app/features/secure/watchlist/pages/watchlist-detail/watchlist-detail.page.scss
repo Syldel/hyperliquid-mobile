@@ -209,7 +209,10 @@
 // Même bande défilante que `.indicators-strip` : une stratégie s'attache et se
 // masque exactement comme un indicateur, l'interface ne doit pas laisser croire
 // le contraire.
-.strategies-strip {
+// Le bandeau des expressions partage la mise en forme des stratégies : même
+// nature (des chips défilantes sous le chart), donc même gabarit.
+.strategies-strip,
+.expressions-strip {
   display: flex;
   flex-wrap: nowrap;
   padding: 0 16px 8px;
@@ -302,4 +305,10 @@
     font-size: 11px;
     text-transform: none;
   }
+}
+
+/** Nombre de points où l'expression n'a pas de valeur — voir expression-series.util.ts. */
+.expression-gaps {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
 }

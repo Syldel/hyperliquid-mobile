@@ -90,6 +90,27 @@
     </ion-chip>
   </div>
 
+  <!-- Opérandes tracés sous le chart : débogage visuel d'une règle. -->
+  @if (availableExpressions().length > 0) {
+  <div class="expressions-strip">
+    @for (row of selectedExpressionRows(); track row.id) {
+    <ion-chip [outline]="!isExpressionVisible(row.id)" (click)="toggleExpressionVisibility(row.id)">
+      <span class="strategy-dot" [style.background]="row.color"></span>
+      <span>{{ row.label }}</span>
+      @if (indeterminateCount(row.id); as gaps) {
+      <ion-icon name="alert-circle-outline" color="warning" />
+      <span class="expression-gaps">{{ gaps }}</span>
+      }
+      <ion-icon name="close-circle" (click)="removeExpression(row.id); $event.stopPropagation()" />
+    </ion-chip>
+    }
+    <ion-chip color="primary" outline (click)="openExpressionPicker()">
+      <ion-icon name="add-outline" />
+      <span>Expression</span>
+    </ion-chip>
+  </div>
+  }
+
   <div class="chart-wrapper">
     <div #chartEl class="chart-container">
       <canvas #overlayEl class="chart-overlay"></canvas>

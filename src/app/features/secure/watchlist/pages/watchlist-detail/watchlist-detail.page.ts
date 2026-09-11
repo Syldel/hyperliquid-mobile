@@ -49,6 +49,7 @@ import { toChartInterval } from '@utils/hl-interval.utils';
 import { addIcons } from 'ionicons';
 import {
   addOutline,
+  alertCircleOutline,
   calendarOutline,
   closeCircle,
   createOutline,
@@ -74,17 +75,42 @@ import { formatIndicatorLabel } from '@shared/components/indicator-picker/utils/
 import { strategyColor } from '../../../strategies/domain/strategy-color.util';
 import { isLocallyExecutable } from '../../../strategies/domain/strategy-issues.util';
 import { toAnalysisRequest } from '../../../strategies/models/strategy-document.model';
+import {
+  collectStrategyOperands,
+  type StrategyExpression,
+} from '../../../strategies/domain/strategy-operands.util';
+import {
+  isPriceScale,
+  scaleGroupOf,
+  type ScaleCatalogue,
+} from '../../../strategies/domain/operand-scale.util';
+import { formatOperand } from '../../../strategies/domain/strategy-format.util';
 import { StrategyPickerModalComponent } from '../../../strategies/components/strategy-picker-modal/strategy-picker-modal.component';
 import { StrategyLibraryService } from '../../../strategies/services/strategy-library.service';
 import {
   DATE_PRESETS,
   DatePreset,
   INTERVAL_LABELS,
+  ExpressionRef,
   StrategyRef,
   WatchlistItem,
 } from '../../models/watchlist-item.model';
 import { StrategyPositionsPaneService } from '../../services/strategy-positions-pane.service';
 import { StrategySignalsOverlayService } from '../../services/strategy-signals-overlay.service';
+import {
+  ExpressionsPaneService,
+  PRICE_GROUP,
+  type ExpressionLayer,
+} from '../../services/expressions-pane.service';
+import {
+  ExpressionPickerModalComponent,
+  type ExpressionRow,
+} from '../../components/expression-picker-modal/expression-picker-modal.component';
+import {
+  toExpressionSeries,
+  type ExpressionSeries,
+  type RawExpressionPoint,
+} from '../../utils/expression-series.util';
 import { WatchlistService } from '../../services/watchlist.service';
 import { mapIndicatorSeriesById } from '../../utils/indicator-series-map.util';
 import type { StrategySignalLayer } from '../../utils/strategy-markers.util';
@@ -107,7 +133,12 @@ interface StrategyRunResult extends StrategySignalLayer {
     IonBadge,
     RefreshableLayoutComponent,
   ],
-  providers: [IndicatorOverlayService, StrategySignalsOverlayService, StrategyPositionsPaneService],
+  providers: [
+    IndicatorOverlayService,
+    StrategySignalsOverlayService,
+    StrategyPositionsPaneService,
+    ExpressionsPaneService,
+  ],
   templateUrl: './watchlist-detail.page.html',
   styleUrls: ['./watchlist-detail.page.scss'],
 })
@@ -123,6 +154,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   private readonly indicatorOverlay = inject(IndicatorOverlayService);
   private readonly strategySignals = inject(StrategySignalsOverlayService);
   private readonly strategyPositions = inject(StrategyPositionsPaneService);
+  private readonly expressionsPane = inject(ExpressionsPaneService);
   private readonly modalCtrl = inject(ModalController);
   private readonly toastCtrl = inject(ToastController);
   private readonly watchlistService = inject(WatchlistService);
@@ -196,6 +228,83 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   indicatorsMeta = signal<IndicatorMetadata[]>([]);
   private indicatorSeriesCache = new Map<string, { time: number; value: number }[]>();
 
+  // ── Expressions ────────────────────────────────────────────────────────────
+
+  /**
+   * Expressions attachées. Ce sont des opérandes de règles, pas des courbes
+   * libres : la liste de ce qu'on peut tracer se déduit des stratégies
+   * attachées, et une expression dont la stratégie a été détachée disparaît
+   * d'elle-même de `availableExpressions`.
+   *
+   * Même patron que les indicateurs et les stratégies : la requête porte tout
+   * ce qui est attaché, la visibilité ne fait que filtrer l'affichage — ce qui
+   * rend le basculement instantané.
+   */
+  readonly expressionRefs = signal<ExpressionRef[]>([]);
+  private readonly expressionSeriesCache = signal<Map<string, ExpressionSeries>>(new Map());
+
+  /**
+   * Ce que le catalogue du bot sait dire de l'échelle d'un opérande — servi par
+   * `/exchanges/meta`, jamais dérivé d'un registre compilé.
+   */
+  private readonly scaleCatalogue = computed<ScaleCatalogue>(() => {
+    const indicators = this.botService.indicators();
+    const transforms = this.botService.transforms();
+
+    return {
+      indicatorOverlay: (name) => indicators.find((meta) => meta.name === name)?.overlay,
+      transformOutputScale: (kind) => transforms.find((meta) => meta.kind === kind)?.outputScale,
+    };
+  });
+
+  /**
+   * Tout ce que les stratégies attachées comparent, dédupliqué.
+   *
+   * Le même `EMA(9)` employé par deux stratégies est une seule courbe : c'est
+   * la même série, la tracer deux fois n'apprendrait rien et doublerait le
+   * calcul demandé au bot.
+   */
+  private readonly collectedExpressions = computed(() => {
+    const catalogue = this.scaleCatalogue();
+    const collected = new Map<string, StrategyExpression & { sources: string[] }>();
+
+    for (const ref of this.strategyRefs()) {
+      const document = this.strategyLibrary.getById(ref.strategyId);
+      if (!document) continue;
+
+      for (const expression of collectStrategyOperands(document.rules, catalogue)) {
+        const source = `${document.name} · ${expression.branches.join(', ')}`;
+        const existing = collected.get(expression.id);
+
+        if (existing) {
+          if (!existing.sources.includes(source)) existing.sources.push(source);
+          continue;
+        }
+
+        collected.set(expression.id, { ...expression, sources: [source] });
+      }
+    }
+
+    return [...collected.values()];
+  });
+
+  /** Les mêmes, mises en forme pour le sélecteur et les puces. */
+  readonly availableExpressions = computed<ExpressionRow[]>(() =>
+    this.collectedExpressions().map((expression) => ({
+      id: expression.id,
+      label: formatOperand(expression.operand),
+      detail: expression.sources.join(' — '),
+      placement: isPriceScale(expression.scale) ? 'On the price chart' : 'Own pane',
+      color: strategyColor(expression.id),
+    })),
+  );
+
+  /** Opérandes à demander au bot : tout ce qui est attaché, visible ou non. */
+  private attachedExpressions() {
+    const attached = new Set(this.expressionRefs().map((ref) => ref.id));
+    return this.collectedExpressions().filter((expression) => attached.has(expression.id));
+  }
+
   // ── Overlay internals ──────────────────────────────────────────────────────
   private overlayCtx?: CanvasRenderingContext2D;
   private animFrame?: number;
@@ -216,6 +325,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       createOutline,
       statsChartOutline,
       chevronUpOutline,
+      alertCircleOutline,
     });
 
     const state = window.history.state as { backHref?: string };
@@ -270,6 +380,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       this.selectedInterval.set(existing.interval);
       this.activeIndicators.set(existing.activeIndicators ?? []);
       this.strategyRefs.set(existing.strategyRefs ?? []);
+      this.expressionRefs.set(existing.expressionRefs ?? []);
     }
 
     // Les références ci-dessus ne veulent rien dire tant que la bibliothèque
@@ -299,7 +410,9 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     // Après `chart.remove()` : `reset` oublie les séries sans chercher à les
     // retirer d'un chart qui n'existe plus.
     this.strategyPositions.reset();
+    this.expressionsPane.reset();
     this.indicatorSeriesCache.clear();
+    this.expressionSeriesCache.set(new Map());
     this.lastCandles = [];
     cancelAnimationFrame(this.animFrame!);
   }
@@ -319,7 +432,8 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       const startTime = endTime - preset.days * 86_400_000;
       const hasOverlayData =
         this.activeIndicators().some((i) => i.visible) ||
-        this.strategyRefs().some((r) => r.visible);
+        this.strategyRefs().some((r) => r.visible) ||
+        this.expressionRefs().length > 0;
 
       try {
         if (hasOverlayData) {
@@ -348,6 +462,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     const strategies = this.attachedStrategies()
       .filter((document) => isLocallyExecutable(document.rules))
       .map(toAnalysisRequest);
+    const expressions = this.attachedExpressions();
 
     const request: AnalysisRequest = {
       symbol: item.coin,
@@ -361,6 +476,13 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       endTime,
       indicators: active.map((i) => i.request),
       strategies: strategies.length > 0 ? strategies : undefined,
+      // `id` explicite, jamais dérivé côté serveur : voir l'en-tête de
+      // strategy-operands.util.ts. La clé de réponse est celle qu'on a choisie,
+      // donc retrouvable quoi qu'il advienne des défauts du catalogue.
+      expressions:
+        expressions.length > 0
+          ? expressions.map(({ id, operand }) => ({ id, operand }))
+          : undefined,
     };
 
     try {
@@ -380,6 +502,8 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       this.applyIndicatorVisibility();
       this.cacheStrategyResults(res);
       this.applyStrategyVisibility();
+      this.cacheExpressionSeries(res);
+      this.applyExpressionVisibility();
       this.scheduleOverlayDraw();
 
       this.chart?.timeScale().setVisibleRange({
@@ -523,7 +647,9 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     this.renderCandles(candles);
     this.computeStats(candles);
     this.strategySignals.clear();
+    this.expressionsPane.clear();
     this.indicatorSeriesCache.clear();
+    this.expressionSeriesCache.set(new Map());
     this.activeIndicators().forEach((i) => this.indicatorOverlay.remove(i.id));
     this.scheduleOverlayDraw();
   }
@@ -572,6 +698,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     this.indicatorOverlay.attach(this.chart);
     this.strategySignals.attach(this.candleSeries);
     this.strategyPositions.attach(this.chart);
+    this.expressionsPane.attach(this.chart);
 
     this.chart.priceScale('volume').applyOptions({
       scaleMargins: { top: 0.8, bottom: 0 },
@@ -982,6 +1109,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     this.watchlistService.update(item.coin, {
       activeIndicators: this.activeIndicators(),
       strategyRefs: this.strategyRefs(),
+      expressionRefs: this.expressionRefs(),
     });
   }
 
@@ -1050,5 +1178,118 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     this.strategyRefs.update((refs) => refs.filter((ref) => ref.strategyId !== strategyId));
     this.persistIndicators();
     this.applyStrategyVisibility();
+  }
+
+  // ── Expressions ────────────────────────────────────────────────────────────
+
+  /** Chips affichées : les expressions attachées, dans l'ordre où elles sont proposées. */
+  readonly selectedExpressionRows = computed(() =>
+    this.availableExpressions().filter((row) =>
+      this.expressionRefs().some((ref) => ref.id === row.id),
+    ),
+  );
+
+  isExpressionVisible(id: string): boolean {
+    return this.expressionRefs().find((ref) => ref.id === id)?.visible ?? false;
+  }
+
+  /** Masquer ou réafficher une expression déjà demandée — aucun appel réseau. */
+  toggleExpressionVisibility(id: string): void {
+    this.expressionRefs.update((refs) =>
+      refs.map((ref) => (ref.id === id ? { ...ref, visible: !ref.visible } : ref)),
+    );
+    this.persistIndicators();
+    this.applyExpressionVisibility();
+  }
+
+  /**
+   * Trous survenus après le démarrage de la série — l'amorçage d'une fenêtre
+   * glissante n'en fait pas partie (expression-series.util.ts).
+   *
+   * Affiché parce qu'un trou n'est pas un détail de tracé : une condition qui
+   * ne se déclenche jamais peut n'avoir que ce symptôme-là — un z-score sur une
+   * fenêtre d'écart-type nul ne vaut rien, donc ne dépasse aucun seuil.
+   */
+  indeterminateCount(id: string): number {
+    return this.expressionSeriesCache().get(id)?.indeterminate ?? 0;
+  }
+
+  async openExpressionPicker(): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: ExpressionPickerModalComponent,
+      componentProps: {
+        rows: () => this.availableExpressions(),
+        selectedIds: () => this.expressionRefs().map((ref) => ref.id),
+      },
+      breakpoints: [0, 1],
+      initialBreakpoint: 1,
+    });
+    await modal.present();
+
+    const { data, role } = await modal.onWillDismiss<string[]>();
+    if (role !== 'confirm' || !data) return;
+
+    // Les expressions déjà attachées gardent leur visibilité ; les nouvelles
+    // arrivent visibles, sans quoi les cocher n'aurait aucun effet visible.
+    const previous = new Map(this.expressionRefs().map((ref) => [ref.id, ref]));
+    const added = data.some((id) => !previous.has(id));
+
+    this.expressionRefs.set(data.map((id) => previous.get(id) ?? { id, visible: true }));
+    this.persistIndicators();
+
+    // Une expression nouvellement cochée n'a pas de série : elle n'a jamais été
+    // demandée au bot sur cette fenêtre. Retirer, en revanche, se règle sur
+    // place — même raisonnement que pour la visibilité d'une stratégie.
+    if (added) this.loadData();
+    else this.applyExpressionVisibility();
+  }
+
+  removeExpression(id: string): void {
+    this.expressionRefs.update((refs) => refs.filter((ref) => ref.id !== id));
+    this.persistIndicators();
+    this.applyExpressionVisibility();
+  }
+
+  /** Range les séries d'expressions telles quelles, sans les rendre. */
+  private cacheExpressionSeries(res: AnalysisResponse): void {
+    const cache = new Map<string, ExpressionSeries>();
+
+    for (const [id, points] of Object.entries(res.expressions ?? {})) {
+      cache.set(id, toExpressionSeries(points as unknown as RawExpressionPoint[]));
+    }
+
+    this.expressionSeriesCache.set(cache);
+  }
+
+  /**
+   * Dessine les expressions visibles depuis le cache — AUCUN appel réseau.
+   *
+   * Le groupe décide de l'endroit : les niveaux de prix rejoignent les bougies,
+   * le reste obtient un panneau par échelle (`operand-scale.util.ts`).
+   */
+  private applyExpressionVisibility(): void {
+    const collected = new Map(this.collectedExpressions().map((e) => [e.id, e]));
+    const rows = new Map(this.availableExpressions().map((row) => [row.id, row]));
+    const cache = this.expressionSeriesCache();
+
+    const layers = this.expressionRefs()
+      .filter((ref) => ref.visible)
+      .map((ref): ExpressionLayer | undefined => {
+        const expression = collected.get(ref.id);
+        const row = rows.get(ref.id);
+        const series = cache.get(ref.id);
+        if (!expression || !row || !series) return undefined;
+
+        return {
+          id: ref.id,
+          label: row.label,
+          color: row.color,
+          group: isPriceScale(expression.scale) ? PRICE_GROUP : scaleGroupOf(expression.scale),
+          series,
+        };
+      })
+      .filter((layer) => layer !== undefined);
+
+    this.expressionsPane.render(layers);
   }
 }
