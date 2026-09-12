@@ -5,6 +5,27 @@ trading. Elle ne calcule rien : elle affiche et configure ce que des services ma
 exposent. Voir [docs/ecosystem.md](docs/ecosystem.md) avant de supposer qu'une
 fonctionnalité appartient à ce dépôt.
 
+## L'exigence, avant tout le reste
+
+**Cette application servira d'outil de trading, avec de l'argent réel.** Un bug silencieux
+n'y coûte pas un affichage de travers : il coûte une position prise sur une donnée fausse,
+ou pas prise du tout, sans que rien ne le signale. Tout ce qui suit en découle.
+
+- **Aucune défaillance muette.** Si quelque chose ne peut pas être fait, ça doit se voir —
+  un repli sur des bougies nues s'annonce, une valeur indéterminée laisse un trou visible
+  et non un trait interpolé, une série introuvable n'est pas attribuée au hasard.
+- **Toujours pouvoir comprendre ce qui s'est passé.** Un comportement doit être
+  reconstituable après coup : d'où vient cette valeur, qui en fait autorité, quelle
+  version a écrit ce document. C'est aussi à ça que servent les commentaires de ce dépôt.
+- **Anticiper plutôt que subir.** Quand deux sources peuvent diverger, le dire dans le
+  code et choisir laquelle fait autorité — le catalogue du bot, jamais le paquet compilé ;
+  le verdict du serveur, jamais la validation locale.
+- **Pas d'approximation par confort.** Une incertitude se résout ou se documente
+  explicitement (voir les `⚠️` dans `docs/`), elle ne se laisse pas dormir.
+
+En cas de doute, préférer l'option qui échoue **bruyamment et tôt**. Voir
+[docs/conventions.md](docs/conventions.md#exigence-de-robustesse).
+
 ## Règles qui coûtent cher si on les ignore
 
 **Ne jamais committer, tagger ou pousser sans demande explicite**, dans aucun des trois
@@ -51,7 +72,8 @@ seulement », à restaurer.
 | [docs/strategies/overview.md](docs/strategies/overview.md)           | le rule-builder de bout en bout                     |
 | [docs/strategies/rule-model.md](docs/strategies/rule-model.md)       | l'arbre de règles, les chemins, les anomalies       |
 | [docs/watchlist/chart-overlays.md](docs/watchlist/chart-overlays.md) | les couches du chart et les règles de pane          |
-| [docs/conventions.md](docs/conventions.md)                           | usages, tests, formatage, pièges d'outillage        |
+| [docs/conventions.md](docs/conventions.md)                           | exigence, usages, tests, pièges d'outillage         |
+| [docs/roadmap.md](docs/roadmap.md)                                   | ce qui est remis à plus tard, et pourquoi           |
 
 ## Où vivent les choses
 
@@ -85,15 +107,43 @@ se fait une fois, dans `ngOnInit`.
 
 ## Tests
 
+Ils sont la **spécification exécutable** de ce dépôt : ils disent ce qui est attendu,
+empêchent un retour en arrière, et font qu'un échec nomme la règle enfreinte. **Lire les
+specs avant l'implémentation** est le chemin le plus court vers le contrat d'une fonction
+— et le seul qui ne mente pas.
+
+D'où la façon de les écrire : nommer la règle et non la mécanique, un invariant par test,
+commenter l'attendu quand il surprend, couvrir les bords qui définissent le contrat
+(absent, vide, inconnu, plus récent que ce build). Un test qui recopie l'implémentation
+n'apprend rien et fige le bug avec.
+
+Un test de régression **s'éprouve sur le code cassé** : retirer la correction, vérifier
+qu'il tombe, et pour la bonne raison.
+
+**Le domaine d'abord, les services ensuite** — non par ordre d'importance, mais parce
+qu'une décision difficile à tester est une décision au mauvais endroit : la sortir en
+fonction pure. Les services restent la dette de couverture actuelle
+(voir [docs/conventions.md](docs/conventions.md#où-porte-leffort)).
+
 `src/app/shared/testing/ionic-stubs.ts` fournit les doubles Ionic, branchés par un alias
 `resolve` dans `vitest.config.ts` (pas un `vi.mock`). Un symbole Ionic manquant dans un
 spec s'ajoute à ce fichier.
 
 ## Vérifier dans le navigateur
 
-Les URL des services (bot, user-service, gateway) sont **configurées dans l'app** et
-stockées sous `app_hl_config`, pas en dur dans le code. En dev, le bot écoute
-habituellement sur `3001` et le user-service sur `3010`.
+Les URL des services sont **configurées dans l'app** et stockées sous `app_hl_config`,
+pas en dur dans le code. La configuration de développement de l'utilisateur :
+
+| Réglage                    | Valeur                        |
+| -------------------------- | ----------------------------- |
+| User Service URL           | `http://localhost:3010`       |
+| Bot Service URL            | `http://localhost:3001`       |
+| Hyperliquid Gateway URL    | `http://localhost:3005`       |
+| Hyperliquid Public API URL | `https://api.hyperliquid.xyz` |
+
+Pour les semer dans un navigateur piloté, écrire cet objet sous
+`CapacitorStorage.app_hl_config` (clés `userServiceUrl`, `botServiceUrl`,
+`hyperliquidGatewayUrl`, `hyperliquidPublicUrl`).
 
 Une navigation directe vers une URL `/secure/...` renvoie à l'écran de connexion : le
 garde s'exécute avant la restauration de session. Passer par l'interface.

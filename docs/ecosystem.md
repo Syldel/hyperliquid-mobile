@@ -145,6 +145,32 @@ l'écran de configuration et stockées sous `app_hl_config`. Un environnement de
 développement n'est donc pas décrit par un fichier du dépôt : il faut regarder ce que
 l'appareil a enregistré.
 
+## La configuration de développement de l'utilisateur
+
+Celle sur laquelle ce projet est développé au quotidien, et celle à semer dans un
+navigateur piloté pour vérifier quoi que ce soit :
+
+| Réglage                    | Valeur                        |
+| -------------------------- | ----------------------------- |
+| User Service URL           | `http://localhost:3010`       |
+| Bot Service URL            | `http://localhost:3001`       |
+| Hyperliquid Gateway URL    | `http://localhost:3005`       |
+| Hyperliquid Public API URL | `https://api.hyperliquid.xyz` |
+
+```js
+localStorage.setItem(
+  'CapacitorStorage.app_hl_config',
+  JSON.stringify({
+    userServiceUrl: 'http://localhost:3010',
+    botServiceUrl: 'http://localhost:3001',
+    hyperliquidGatewayUrl: 'http://localhost:3005',
+    hyperliquidPublicUrl: 'https://api.hyperliquid.xyz',
+  }),
+);
+```
+
+Le bot doit par ailleurs accepter l'origine de l'app dans son `ALLOWED_ORIGINS`.
+
 ---
 
 # Rule for AI assistants

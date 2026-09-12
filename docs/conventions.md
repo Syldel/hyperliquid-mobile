@@ -8,6 +8,62 @@ demi-heure quand on ne les connaît pas. Les règles impératives tiennent dans
 
 ---
 
+# Exigence de robustesse
+
+Cette application servira d'**outil de trading, avec de l'argent réel**. C'est la
+contrainte qui arbitre tous les choix de ce dépôt, et elle mérite d'être dite avant les
+conventions d'écriture : un bug silencieux n'y coûte pas un affichage de travers, il coûte
+une position prise sur une donnée fausse — ou pas prise du tout, sans que rien ne le
+signale.
+
+La philosophie est donc **robustesse et fiabilité d'abord**, au prix assumé d'un peu de
+confort : peu de place à l'approximation, aucune à l'incertitude qui dort.
+
+## Aucune défaillance muette
+
+Ce qui ne peut pas être fait doit se voir. Les exemples du dépôt valent mieux qu'une
+règle abstraite :
+
+- l'analyse échoue : le chart retombe sur des bougies nues **et le dit** (un toast). Avant,
+  les indicateurs disparaissaient sans un mot, et une panne de service se lisait comme
+  « cet indicateur ne donne rien » — le pire diagnostic possible sur un outil de trading ;
+- une expression n'a pas de valeur à un instant : le trait **s'interrompt**. Filtrer le
+  point relierait les deux bords par une droite qui se lirait comme une valeur ;
+- une série d'indicateur ne se retrouve pas dans la réponse : elle est **abandonnée**, pas
+  attribuée à l'indicateur voisin (elle l'était, par index, en silence) ;
+- un nœud que ce build ne sait pas interpréter s'affiche `Unsupported` en lecture seule,
+  jamais effacé ni deviné.
+
+## Toujours pouvoir reconstituer ce qui s'est passé
+
+Un comportement doit être explicable après coup : d'où vient cette valeur, qui en fait
+autorité, quelle version a écrit ce document. D'où `schemaVersion` sur un
+`StrategyDocument`, le handshake de version avec le bot, les chemins d'anomalie qui
+désignent un nœud précis, et le compte de points indéterminés affiché sur une courbe.
+
+C'est aussi la raison d'être des commentaires : ils enregistrent l'incident, pas
+l'intention.
+
+## Anticiper les divergences plutôt que les subir
+
+Quand deux sources peuvent diverger, le code doit dire **laquelle fait autorité**. Le
+catalogue vient du bot, jamais du paquet compilé
+([ecosystem.md](ecosystem.md#le-catalogue-vient-du-serveur)). Le verdict de validité vient
+du serveur, jamais de la validation locale. Un client ne tranche pas ce qu'il ne peut pas
+savoir — et quand il diffère son jugement, il le dit au lieu de faire comme si tout allait
+bien.
+
+## Une incertitude se résout ou s'écrit
+
+Ce qu'on n'a pas pu vérifier ne se laisse pas dormir : ça s'écrit, en toutes lettres, là
+où quelqu'un le lira au bon moment. Les `⚠️` de ces docs sont exactement ça — un risque
+identifié, non reproduit, avec l'endroit où chercher s'il se manifeste.
+
+En cas de doute, préférer l'option qui échoue **bruyamment et tôt** à celle qui continue
+en apparence.
+
+---
+
 # Écriture
 
 **Commentaires en français, identifiants en anglais, messages de commit en anglais.**
@@ -49,14 +105,99 @@ Hydrater depuis une entrée est un geste **ponctuel** : il se fait dans `ngOnIni
 Dans `domain/`, en fonctions pures et testées. Les composants orchestrent : ils appellent,
 ils affichent, ils ne calculent pas.
 
-Le découpage se voit dans les tests : les 25 fichiers de spec portent presque tous sur du
-domaine ou des utilitaires, jamais sur du rendu Ionic.
+Le découpage se voit dans les tests : ils portent sur du domaine, des utilitaires et des
+services — jamais sur du rendu Ionic.
 
 ---
 
 # Tests
 
 `npx ng test --watch=false` — Vitest via `@angular/build:unit-test`.
+
+## À quoi ils servent ici
+
+Les tests sont la **spécification exécutable** de ce dépôt. Trois rôles, dans cet ordre
+d'importance :
+
+1. **Dire ce qui est attendu.** Un spec se lit avant l'implémentation : c'est le chemin le
+   plus court vers le contrat d'une fonction, et le seul qui ne mente pas — un commentaire
+   peut vieillir, un test vert ne peut pas.
+2. **Empêcher un retour en arrière.** Un défaut corrigé et non verrouillé revient.
+3. **Permettre de se corriger seul.** Un échec doit nommer l'invariant violé, pas
+   seulement signaler que « quelque chose » ne va plus.
+
+Pour un agent qui découvre ce code, le troisième rôle dépend entièrement du premier : un
+test qui décrit une intention apprend quelque chose, un test qui recopie l'implémentation
+n'apprend rien et fige le bug avec.
+
+## Écrire un test qui apprend quelque chose
+
+Ce qui rend un spec utile à quelqu'un — humain ou agent — qui arrive sans le contexte :
+
+- **Nommer la règle, pas la mécanique.** `it('never reports the conditions array as the offending line')`
+  est une phrase de spécification ; `it('works')` n'en est pas une. Le nom seul doit
+  suffire à comprendre ce qui est promis.
+- **Un invariant par test.** Un échec désigne alors exactement la règle enfreinte. Un test
+  qui vérifie dix choses dit seulement qu'une des dix a lâché.
+- **Commenter l'attendu quand il surprend.** Les specs d'ici rappellent l'incident —
+  « `conditions` est un tableau : le retenir signalerait la liste entière ». Cette phrase
+  empêche qu'on « simplifie » plus tard une assertion qui avait une raison d'être.
+- **Couvrir les bords qui définissent le contrat** : absent, vide, inconnu, plus récent
+  que ce build. C'est là que vit l'intention, et c'est ce qu'on ne devine pas en lisant
+  l'implémentation.
+- **Des fixtures réalistes.** Un `StrategyRules` vraisemblable enseigne la forme de la
+  donnée en même temps qu'il teste ; un `{ a: 1 }` n'enseigne rien.
+- **Exprimer l'intention, pas le moyen.** Si refactorer sans changer le comportement casse
+  le test, il testait l'implémentation.
+
+Et la règle de méthode, sur un outil qui engagera de l'argent : **un test de régression
+s'éprouve sur le code cassé.** Retirer la correction, vérifier que le test tombe — et
+qu'il tombe pour la bonne raison, sans emporter les autres. Un test qui passe dans les
+deux cas ne protège de rien et donne une fausse assurance, ce qui est pire que pas de test
+du tout.
+
+## Où porte l'effort
+
+**Le domaine d'abord, les services ensuite** — mais ce n'est pas un classement
+d'importance, c'est une conséquence de conception.
+
+Le domaine est fait de fonctions pures : pas de double, pas d'ordonnancement, une entrée
+et une sortie. C'est là que le rapport entre ce qu'un test coûte et ce qu'il garantit est
+le meilleur, et c'est là que se trouvent les règles métier qu'un agent doit comprendre —
+ce qu'est une stratégie valide, où pointe une anomalie, sur quelle échelle se lit un
+opérande. Un spec de domaine est une définition ; un spec de service est une mise en
+situation.
+
+D'où la règle de construction : **quand une décision est difficile à tester, c'est qu'elle
+est au mauvais endroit.** La sortir en fonction pure et la tester là. C'est exactement ce
+qui s'est passé pour les panneaux du chart — `position-segments`, `expression-series` et
+`strategy-markers` ont été extraits des services qui les utilisaient, et ces services sont
+devenus des enveloppes d'appels à lightweight-charts, que le navigateur vérifie mieux
+qu'un double.
+
+Les services ne disparaissent pas pour autant : ils parlent à l'extérieur, portent l'état,
+orchestrent — et ce sont eux dont une panne muette se paie. C'est la dette actuelle. Le
+domaine est très bien couvert (arbre de règles, chemins, anomalies, échelles, séries) ; la
+couche service beaucoup moins.
+
+Testés : `auth.service`, `bot.service`, `strategy-library.service`, et le
+`strategy-builder.store`.
+
+Pas encore couverts, par ordre de ce que leur défaillance coûterait :
+
+| Service                                      | Ce qu'une panne muette y coûterait                         |
+| -------------------------------------------- | ---------------------------------------------------------- |
+| `user.service`                               | l'écriture de la config de trading sur le compte           |
+| `chart-analysis.service`                     | l'analyse et le backtest, donc toute décision prise dessus |
+| `available-capital.service`                  | le capital auquel un ratio s'applique                      |
+| `storage.service` / `secure.storage.service` | la persistance sous tout le reste                          |
+| `watchlist.service`, `config.service`        | les réglages et la liste suivie                            |
+| `hyperliquid-*`                              | données de marché et statut d'ordre                        |
+
+Les services de pane et d'overlay (`expressions-pane`, `strategy-positions-pane`,
+`indicator-overlay`) sont le cas traité plus haut : leur logique testable est déjà sortie,
+ce qui reste est de l'appel de librairie — c'est là que la vérification dans un navigateur
+reste le bon outil.
 
 ## Les stubs Ionic
 

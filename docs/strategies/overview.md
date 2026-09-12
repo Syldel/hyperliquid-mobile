@@ -157,8 +157,13 @@ les valeurs viennent de la paire.
 
 **La bibliothèque ne survit pas au changement d'appareil.** Elle est locale et partitionnée
 par wallet. Une paire du bot en garde un instantané, donc le bot continue de tourner — mais
-les stratégies elles-mêmes sont perdues. C'est le trou fonctionnel restant ; le combler
-passerait par le service utilisateur.
+les stratégies elles-mêmes sont perdues.
+
+C'est **assumé** : tant qu'il n'y a qu'un utilisateur, l'objectif est de valider
+l'architecture et le rule-builder avant de figer une persistance. La réponse prévue est un
+import/export JSON, qui ouvre en prime l'écriture assistée de stratégies. Voir
+[../roadmap.md](../roadmap.md#décidé--la-bibliothèque-reste-locale) avant d'entreprendre
+quoi que ce soit sur ce sujet.
 
 **Des paires héritées n'ont pas de `shortname`.** Le bot ne peut alors pas les exécuter
 (il aiguille dessus), et le formulaire laisse le sélecteur vide, forçant un nouveau choix
