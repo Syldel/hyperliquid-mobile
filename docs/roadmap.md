@@ -105,13 +105,15 @@ force un nouveau choix — correct, mais silencieux. Un message explicite vaudra
 
 ---
 
-# Risques identifiés, non reproduits
+# Risques identifiés
 
 Ce qui n'a pas pu être vérifié est écrit plutôt que laissé dormir. Chaque `⚠️` des docs
 désigne un risque et l'endroit où chercher s'il se manifeste.
 
-Le seul ouvert à ce jour : les expressions d'une stratégie non exécutable partent quand
-même vers `POST /analysis`, ce qui est voulu — mais si l'échec vient d'un **opérande**
-malformé et non de la structure, la requête entière pourrait être rejetée, emportant aussi
-les indicateurs. Voir
-[watchlist/chart-overlays.md](watchlist/chart-overlays.md#ce-qui-déclenche-un-appel-réseau).
+**Aucun n'est ouvert à ce jour.** Le dernier — une expression malformée faisant rejeter
+toute la requête d'analyse, indicateurs compris — a été reproduit, mesuré et corrigé :
+voir
+[watchlist/chart-overlays.md](watchlist/chart-overlays.md#une-expression-malformée-emportait-tout-le-reste).
+Il vaut d'être relu comme exemple : le risque avait été écrit sans être vérifié, et la
+vérification a montré qu'il était non seulement réel, mais doublé d'un diagnostic faux
+affiché à l'utilisateur.

@@ -179,10 +179,30 @@ Ses expressions, en revanche, partent quand même — déboguer une règle que l
 refuse est précisément le moment où on en a besoin, et l'échec est le plus souvent
 structurel (branche vide, côté absent) alors que les opérandes, eux, sont corrects.
 
-⚠️ Non vérifié : si la stratégie échoue à cause d'un **opérande** malformé,
-`collectExpressionIssues` le rejettera aussi côté serveur, et c'est toute la requête
-d'analyse qui tombe. Le cas n'a pas été reproduit ; si un jour un chart devient muet sur
-une stratégie invalide, chercher là.
+## Une expression malformée emportait tout le reste
+
+Le risque a été reproduit, mesuré, et corrigé. `POST /analysis` valide `expressions[]` en
+bloc (`assertExpressionsAreValid`) et **rejette la requête entière** si un seul opérande
+est incohérent. Une expression fautive faisait donc disparaître les indicateurs du chart,
+qui n'y étaient pour rien — et le repli annonçait « the analysis service did not
+respond », alors que le service avait répondu en nommant le coupable.
+
+Deux garde-fous, parce qu'aucun des deux ne suffit seul.
+
+**Ne pas envoyer ce qu'on sait malformé.** `isOperandLocallySound` applique la même
+partition qu'ailleurs : une valeur _malformée_ (un `number` qui n'en est pas un, un offset
+négatif) est un verdict dont ce build est certain, donc l'opérande n'est pas joint à la
+requête. Une valeur _non reconnue_ ou dépendante du catalogue part quand même — se taire
+là reviendrait à décider à la place du serveur.
+
+L'expression n'est pas escamotée pour autant : elle reste listée, marquée, non cochable,
+avec la raison écrite. Une courbe qui manque sans explication serait le défaut qu'on
+cherche à éviter, pas sa correction.
+
+**Dire la vérité quand le bot refuse.** Un `4xx` porte un rapport d'anomalies ; le repli
+le cite désormais (« the bot refused the request: Unknown indicator … ») au lieu
+d'accuser le réseau. C'est ce qui couvre le cas que la prévention laisse passer
+volontairement — un indicateur inconnu de ce build mais que le bot refuse aussi.
 
 ---
 

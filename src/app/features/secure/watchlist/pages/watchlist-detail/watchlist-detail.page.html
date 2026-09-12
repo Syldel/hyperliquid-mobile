@@ -97,7 +97,9 @@
     <ion-chip [outline]="!isExpressionVisible(row.id)" (click)="toggleExpressionVisibility(row.id)">
       <span class="strategy-dot" [style.background]="row.color"></span>
       <span>{{ row.label }}</span>
-      @if (indeterminateCount(row.id); as gaps) {
+      @if (!row.sound) {
+      <ion-icon name="alert-circle-outline" color="danger" title="Malformed — not sent" />
+      } @if (indeterminateCount(row.id); as gaps) {
       <ion-icon name="alert-circle-outline" color="warning" />
       <span class="expression-gaps">{{ gaps }}</span>
       }

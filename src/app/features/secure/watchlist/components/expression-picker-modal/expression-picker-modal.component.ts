@@ -23,6 +23,8 @@ export interface ExpressionRow {
   detail: string;
   /** Où elle se tracera — sur les bougies ou dans son propre panneau. */
   placement: string;
+  /** `false` si le bot refusera cet opérande : proposé mais pas traçable. */
+  sound: boolean;
   color: string;
 }
 
@@ -71,6 +73,10 @@ export class ExpressionPickerModalComponent implements OnInit {
   }
 
   toggle(id: string): void {
+    // Un opérande que le bot refusera ne se coche pas : `POST /analysis` valide
+    // la liste en bloc, l'envoyer ferait tomber la requête entière.
+    if (this.rows().find((row) => row.id === id)?.sound === false) return;
+
     this.selected.update((current) => {
       const next = new Set(current);
       if (!next.delete(id)) next.add(id);

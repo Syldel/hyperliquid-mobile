@@ -265,3 +265,32 @@ describe('collectStrategyOperands - scale', () => {
     expect(collectStrategyOperands(rules, CATALOGUE, BRANCHES)[1].scale).toEqual({ kind: 'price' });
   });
 });
+
+describe('collectStrategyOperands - soundness', () => {
+  const BRANCHES = [{ id: 'long.entry', label: 'Long entry' }];
+
+  it('marks a well-formed operand as sendable', () => {
+    const rules: StrategyRules = { long: { entry: group(comparison(EMA9, CLOSE)) as never } };
+
+    expect(collectStrategyOperands(rules, CATALOGUE, BRANCHES).map((e) => e.sound)).toEqual([
+      true,
+      true,
+    ]);
+  });
+
+  // Il reste liste - marque, jamais escamote - mais il ne partira pas.
+  it('marks a malformed operand, without dropping it from the list', () => {
+    const rules: StrategyRules = {
+      long: {
+        entry: group(
+          comparison(CLOSE, { type: 'number', value: 'abc' } as unknown as Operand),
+        ) as never,
+      },
+    };
+
+    const collected = collectStrategyOperands(rules, CATALOGUE, BRANCHES);
+
+    expect(collected).toHaveLength(2);
+    expect(collected.map((e) => e.sound)).toEqual([true, false]);
+  });
+});

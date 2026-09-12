@@ -1,5 +1,6 @@
 import {
   collectExecutableStrategyRulesIssues,
+  collectOperandStructureIssues,
   collectStrategyRulesIssues,
   isCatalogDependentIssue,
   type PublicStrategyValidationIssue,
@@ -249,4 +250,27 @@ export function unrecognisedNodeIssues(
   deferred: readonly StrategyValidationIssue[],
 ): StrategyValidationIssue[] {
   return deferred.filter((issue) => UNRECOGNISED_VALUE_ISSUE_CODES.has(issue.code));
+}
+
+/**
+ * `true` si un opérande peut être envoyé au bot dans
+ * `AnalysisRequest.expressions[]`.
+ *
+ * Le besoin vient d'un dégât collatéral mesuré : `POST /analysis` valide la
+ * liste entière (`assertExpressionsAreValid`) et **rejette toute la requête**
+ * si un seul opérande est structurellement incohérent. Une expression
+ * malformée emportait donc les indicateurs du chart, qui n'y étaient pour
+ * rien — et le repli affichait « the analysis service did not respond », alors
+ * que le service avait répondu en nommant le coupable.
+ *
+ * Même partition qu'ailleurs, et pour la même raison : une valeur **malformée**
+ * (un `number` qui n'est pas un nombre, un offset négatif) est un verdict dont
+ * ce build est certain, donc on ne l'envoie pas. Une valeur **non reconnue** ou
+ * dépendante du catalogue (un indicateur que le bot connaît peut-être) part
+ * quand même : c'est au serveur de trancher, et se taire ici reviendrait à
+ * décider à sa place.
+ */
+export function isOperandLocallySound(operand: unknown): boolean {
+  const issues = collectOperandStructureIssues(operand, 'operand');
+  return partitionStrategyIssues(issues).blocking.length === 0;
 }

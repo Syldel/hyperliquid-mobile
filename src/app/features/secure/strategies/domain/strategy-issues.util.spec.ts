@@ -7,6 +7,7 @@ import {
   collectEditorIssues,
   hasUnsupportedNodeAt,
   isLocallyExecutable,
+  isOperandLocallySound,
   partitionStrategyIssues,
 } from './strategy-issues.util';
 
@@ -194,5 +195,44 @@ describe('isLocallyExecutable', () => {
         long: { entry: { type: 'logical', operator: 'AND', conditions: [alien] } },
       }),
     ).toBe(true);
+  });
+});
+
+describe('isOperandLocallySound', () => {
+  it('accepts a well-formed operand', () => {
+    expect(isOperandLocallySound({ type: 'price', field: 'close' })).toBe(true);
+    expect(isOperandLocallySound({ type: 'number', value: 2 })).toBe(true);
+  });
+
+  // Le cas qui a motivé la fonction : `POST /analysis` valide `expressions[]`
+  // en bloc, un seul opérande malformé fait tomber la requête entière.
+  it('refuses a value this build knows is malformed', () => {
+    expect(isOperandLocallySound({ type: 'number', value: 'abc' })).toBe(false);
+    expect(isOperandLocallySound({ type: 'price', field: 'close', offset: -1 })).toBe(false);
+  });
+
+  it('refuses an operand that is not there at all', () => {
+    expect(isOperandLocallySound(undefined)).toBe(false);
+    expect(isOperandLocallySound(null)).toBe(false);
+  });
+
+  // Non reconnu n'est pas malformé : ce build peut simplement être plus vieux
+  // que le bot, et se taire ici reviendrait à décider à sa place.
+  it('lets an unrecognised value through, for the server to judge', () => {
+    expect(isOperandLocallySound({ type: 'price', field: 'nonsense' })).toBe(true);
+    expect(isOperandLocallySound({ type: 'indicator', name: 'brand_new', period: 9 })).toBe(true);
+  });
+
+  it('looks inside a composed operand', () => {
+    const sound = {
+      type: 'arith',
+      operator: 'ADD',
+      left: { type: 'price', field: 'close' },
+      right: { type: 'number', value: 1 },
+    };
+    const rotten = { ...sound, right: { type: 'number', value: 'abc' } };
+
+    expect(isOperandLocallySound(sound)).toBe(true);
+    expect(isOperandLocallySound(rotten)).toBe(false);
   });
 });

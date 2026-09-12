@@ -295,14 +295,25 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       label: formatOperand(expression.operand),
       detail: expression.sources.join(' — '),
       placement: isPriceScale(expression.scale) ? 'On the price chart' : 'Own pane',
+      sound: expression.sound,
       color: strategyColor(expression.id),
     })),
   );
 
-  /** Opérandes à demander au bot : tout ce qui est attaché, visible ou non. */
+  /**
+   * Opérandes à demander au bot : tout ce qui est attaché, visible ou non.
+   *
+   * Les opérandes malformés sont écartés. `POST /analysis` valide
+   * `expressions[]` en bloc et rejette **toute la requête** si l'un d'eux est
+   * incohérent — mesuré : une expression fautive faisait disparaître les
+   * indicateurs du chart, qui n'y étaient pour rien. Ils restent listés et
+   * marqués dans le sélecteur, jamais escamotés.
+   */
   private attachedExpressions() {
     const attached = new Set(this.expressionRefs().map((ref) => ref.id));
-    return this.collectedExpressions().filter((expression) => attached.has(expression.id));
+    return this.collectedExpressions().filter(
+      (expression) => attached.has(expression.id) && expression.sound,
+    );
   }
 
   // ── Overlay internals ──────────────────────────────────────────────────────
@@ -510,23 +521,41 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
         from: Math.floor(displayStartTime / 1000) as Time,
         to: Math.floor(endTime / 1000) as Time,
       });
-    } catch {
+    } catch (error) {
       // Repli ANNONCÉ. Le chart reste utilisable en bougies nues, mais les
       // indicateurs et les signaux disparaissaient jusqu'ici sans un mot : une
       // panne du service d'analyse se lisait comme « cet indicateur ne donne
       // rien », ce qui est le pire diagnostic possible sur un outil de trading.
       await this.fetchViaCandles(item, displayStartTime, endTime);
-      await this.notifyOverlaysUnavailable();
+      await this.notifyOverlaysUnavailable(error);
     }
   }
 
-  private async notifyOverlaysUnavailable(): Promise<void> {
+  /**
+   * Dit pourquoi le chart est nu, et ne se trompe pas de coupable.
+   *
+   * Un refus du bot n'est pas une panne : il répond, et il explique. Annoncer
+   * « the analysis service did not respond » sur un `400` envoyait chercher du
+   * côté du réseau un problème qui était dans la requête — exactement le genre
+   * de diagnostic faux qu'on ne veut pas sur un outil de trading.
+   */
+  private async notifyOverlaysUnavailable(error: unknown): Promise<void> {
     const toast = await this.toastCtrl.create({
-      message: 'Chart loaded without indicators — the analysis service did not respond.',
+      message: `Chart loaded without indicators — ${this.overlayFailureReason(error)}`,
       color: 'warning',
-      duration: 4000,
+      duration: 6000,
     });
     await toast.present();
+  }
+
+  private overlayFailureReason(error: unknown): string {
+    const response = error as { status?: number; error?: { message?: string; issues?: unknown[] } };
+    if (typeof response?.status !== 'number' || response.status < 400 || response.status >= 500) {
+      return 'the analysis service did not respond.';
+    }
+
+    const issue = (response.error?.issues as { message?: string }[] | undefined)?.[0]?.message;
+    return `the bot refused the request: ${issue ?? response.error?.message ?? 'invalid request'}`;
   }
 
   private toCandleSnapshots(candles: AnalysisCandle[]): CandleSnapshot[] {

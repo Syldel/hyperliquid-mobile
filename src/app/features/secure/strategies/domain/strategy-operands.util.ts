@@ -7,6 +7,7 @@ import {
   type OperandScale,
   type ScaleCatalogue,
 } from './operand-scale.util';
+import { isOperandLocallySound } from './strategy-issues.util';
 import { getAtPath } from './strategy-tree.ops';
 
 /**
@@ -48,6 +49,15 @@ export interface StrategyExpression {
    * coûterait plus de complexité que d'exactitude.
    */
   scale: OperandScale;
+  /**
+   * `false` si ce build est certain que le bot refusera cet opérande.
+   *
+   * `POST /analysis` valide `expressions[]` en bloc : un seul opérande
+   * malformé fait rejeter la requête entière, indicateurs compris. On ne
+   * l'envoie donc pas — mais on continue de le lister, marqué, plutôt que de
+   * le faire disparaître sans un mot.
+   */
+  sound: boolean;
 }
 
 /**
@@ -178,7 +188,13 @@ function add(
     sibling ? operandScale(sibling, catalogue) : { kind: 'neutral' },
   );
 
-  found.set(id, { id, operand: stripped, branches: [branchLabel], scale });
+  found.set(id, {
+    id,
+    operand: stripped,
+    branches: [branchLabel],
+    scale,
+    sound: isOperandLocallySound(stripped),
+  });
 }
 
 /** JSON à clés triées, récursivement — voir `expressionId`. */
