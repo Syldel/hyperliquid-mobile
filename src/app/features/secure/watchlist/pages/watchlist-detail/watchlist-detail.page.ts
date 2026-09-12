@@ -111,6 +111,7 @@ import {
   type ExpressionSeries,
   type RawExpressionPoint,
 } from '../../utils/expression-series.util';
+import { overlayFailureReason } from '../../utils/overlay-failure.util';
 import { WatchlistService } from '../../services/watchlist.service';
 import { mapIndicatorSeriesById } from '../../utils/indicator-series-map.util';
 import type { StrategySignalLayer } from '../../utils/strategy-markers.util';
@@ -242,6 +243,10 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
    */
   readonly expressionRefs = signal<ExpressionRef[]>([]);
   private readonly expressionSeriesCache = signal<Map<string, ExpressionSeries>>(new Map());
+
+  /** Dernier motif annoncé, et le toast qui le porte — voir `notifyOverlaysUnavailable`. */
+  private announcedFailure: string | null = null;
+  private failureToast: HTMLIonToastElement | null = null;
 
   /**
    * Ce que le catalogue du bot sait dire de l'échelle d'un opérande — servi par
@@ -422,6 +427,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     // retirer d'un chart qui n'existe plus.
     this.strategyPositions.reset();
     this.expressionsPane.reset();
+    void this.dismissFailureToast();
     this.indicatorSeriesCache.clear();
     this.expressionSeriesCache.set(new Map());
     this.lastCandles = [];
@@ -503,6 +509,10 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
         return;
       }
 
+      // Les surcouches sont revenues : le prochain échec, même identique, aura
+      // de nouveau le droit de se faire entendre.
+      this.announcedFailure = null;
+
       const candles = this.toCandleSnapshots(res.candles);
       this.lastCandles = candles;
       this.displayRangeStart = displayStartTime;
@@ -540,22 +550,37 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
    * de diagnostic faux qu'on ne veut pas sur un outil de trading.
    */
   private async notifyOverlaysUnavailable(error: unknown): Promise<void> {
-    const toast = await this.toastCtrl.create({
-      message: `Chart loaded without indicators — ${this.overlayFailureReason(error)}`,
+    const reason = overlayFailureReason(error);
+
+    // Le même motif ne se réannonce pas. Un refus du bot est un **état** — il
+    // reste vrai tant que la configuration ne change pas — alors qu'un toast
+    // est fait pour un événement. Sans ce garde-fou, chaque rechargement (un
+    // changement d'intervalle, un retour au premier plan) en empilait un de
+    // plus : trois toasts de 6 s présentés à la suite se lisent comme un seul
+    // qui ne part jamais, et finissent par masquer l'app.
+    if (reason === this.announcedFailure) return;
+    this.announcedFailure = reason;
+
+    await this.dismissFailureToast();
+
+    this.failureToast = await this.toastCtrl.create({
+      message: `Chart loaded without indicators — ${reason}`,
       color: 'warning',
       duration: 6000,
     });
-    await toast.present();
+    await this.failureToast.present();
   }
 
-  private overlayFailureReason(error: unknown): string {
-    const response = error as { status?: number; error?: { message?: string; issues?: unknown[] } };
-    if (typeof response?.status !== 'number' || response.status < 400 || response.status >= 500) {
-      return 'the analysis service did not respond.';
-    }
-
-    const issue = (response.error?.issues as { message?: string }[] | undefined)?.[0]?.message;
-    return `the bot refused the request: ${issue ?? response.error?.message ?? 'invalid request'}`;
+  /**
+   * Referme l'annonce en cours.
+   *
+   * Appelé aussi à la destruction : un toast survit à la page qui l'a créé, et
+   * un message sur le chart de BTC n'a rien à faire par-dessus la watchlist.
+   */
+  private async dismissFailureToast(): Promise<void> {
+    const toast = this.failureToast;
+    this.failureToast = null;
+    await toast?.dismiss();
   }
 
   private toCandleSnapshots(candles: AnalysisCandle[]): CandleSnapshot[] {

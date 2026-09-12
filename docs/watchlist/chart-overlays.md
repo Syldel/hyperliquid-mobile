@@ -201,8 +201,29 @@ cherche à éviter, pas sa correction.
 
 **Dire la vérité quand le bot refuse.** Un `4xx` porte un rapport d'anomalies ; le repli
 le cite désormais (« the bot refused the request: Unknown indicator … ») au lieu
-d'accuser le réseau. C'est ce qui couvre le cas que la prévention laisse passer
-volontairement — un indicateur inconnu de ce build mais que le bot refuse aussi.
+d'accuser le réseau. La décision vit dans `overlay-failure.util.ts`, à part et testée : un
+`5xx` ou une absence de réponse ne sont pas des refus, il n'y a rien à corriger dans la
+requête.
+
+C'est ce qui couvre les cas que la prévention laisse passer **volontairement**, et il y en
+a deux — la même raison de part et d'autre. Un indicateur inconnu de ce build part dans
+une expression, parce que le bot le connaît peut-être ; et une stratégie qui le contient
+passe `isLocallyExecutable` pour la même raison, donc part aussi dans `strategies[]` où
+`assertStrategiesAreUnambiguous` la refusera. Dans les deux cas le client a eu raison de
+ne pas trancher, et le message dit ce qui s'est passé.
+
+## Un refus est un état, pas un événement
+
+Il reste vrai tant que la configuration ne change pas, alors qu'un toast est fait pour un
+événement. Sans précaution, chaque rechargement — un changement d'intervalle, un retour au
+premier plan — en empilait un de plus : trois toasts de 6 s présentés à la suite se lisent
+comme un seul qui ne part jamais, et finissent par masquer l'app. Ils survivaient même à la
+navigation, un message sur le chart de BTC restant affiché par-dessus la watchlist.
+
+Le motif n'est donc annoncé qu'**une fois par occurrence** : un motif identique ne se
+réannonce pas, un succès réarme l'annonce, un seul toast existe à la fois, et il est
+refermé en quittant la page. Mesuré : un toast de 0 à 6 s, trois rechargements sans
+nouvelle annonce, puis une annonce de nouveau après un chargement réussi.
 
 ---
 
