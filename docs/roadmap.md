@@ -20,6 +20,21 @@ reste attend — y compris des chantiers qui paraissent plus structurants.
 
 ---
 
+# Prochaines étapes
+
+Dans cet ordre, et pour ces raisons. À distinguer des [limites
+acceptées](#limites-acceptées) plus bas : ce qui suit est en attente, pas arbitré.
+
+1. **Les paires héritées sans `shortname`.** Deux paires du compte portent
+   `{ name: "Neural Momentum Strategy" }` sans `shortname`. Le bot aiguille dessus : il ne
+   peut pas les exécuter. Le formulaire laisse le sélecteur vide et force un nouveau choix,
+   ce qui est correct mais silencieux — un message explicite vaudrait mieux, et le sujet
+   concerne une configuration réelle dès aujourd'hui. Petit, visible.
+2. **Import / export JSON**, détaillé plus bas. C'est la vraie suite : au-delà de la
+   sauvegarde, il ouvre l'écriture assistée de stratégies.
+
+---
+
 # Décidé : la bibliothèque reste locale
 
 La bibliothèque de stratégies vit en stockage local, partitionnée par wallet. Elle ne
@@ -98,10 +113,6 @@ La corriger vraiment veut dire changer la façon dont le chart est dimensionné.
 **Le placement d'une expression ne se surcharge pas à la main.** L'heuristique vient du
 catalogue et se trompe rarement ; ce que ce build ne reconnaît pas obtient son propre
 panneau. Un réglage par expression serait l'échappatoire, s'il manque un jour.
-
-**Deux paires héritées n'ont pas de `shortname`** (`Neural Momentum Strategy`). Le bot
-aiguille dessus : il ne peut pas les exécuter. Le formulaire laisse le sélecteur vide et
-force un nouveau choix — correct, mais silencieux. Un message explicite vaudrait mieux.
 
 ---
 

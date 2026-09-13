@@ -26,6 +26,27 @@ ou pas prise du tout, sans que rien ne le signale. Tout ce qui suit en découle.
 En cas de doute, préférer l'option qui échoue **bruyamment et tôt**. Voir
 [docs/conventions.md](docs/conventions.md#exigence-de-robustesse).
 
+## Comment travailler ici
+
+L'exigence ci-dessus porte sur le produit ; celle-ci porte sur la façon de l'obtenir.
+
+**Proposer avant d'agir.** Sur un chantier un peu large, l'attendu est une analyse, des
+questions s'il en reste, une recommandation — puis on attend le feu vert. Pas un
+enchaînement d'étapes décidées seul.
+
+**Vérifier plutôt que supposer.** Le navigateur interne, les vraies routes du bot, le DOM
+plutôt qu'une capture d'écran. Annoncer qu'une chose fonctionne engage : ça doit avoir été
+mesuré, et le rapport doit dire comment.
+
+**Dire ce qui n'a pas été vérifié.** Une incertitude s'écrit là où quelqu'un la lira au bon
+moment — un `⚠️` dans `docs/`, un commentaire à l'endroit concerné. Le dernier risque écrit
+de cette façon s'est révélé réel _et_ doublé d'un diagnostic faux affiché à l'utilisateur
+(voir [docs/roadmap.md](docs/roadmap.md#risques-identifiés)).
+
+**Rester critique.** Y compris envers une proposition de l'utilisateur, envers le code déjà
+écrit, et envers son propre travail des tours précédents. Un désaccord argumenté est plus
+utile qu'un acquiescement.
+
 ## Règles qui coûtent cher si on les ignore
 
 **Ne jamais committer, tagger ou pousser sans demande explicite**, dans aucun des trois
