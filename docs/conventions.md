@@ -296,7 +296,9 @@ refaire une étape supposée manquante.
 # Vérifier dans un navigateur
 
 L'app tourne sur `http://localhost:4200`. Les URL des services sont saisies dans
-l'application et stockées sous `app_hl_config` — elles ne sont pas dans le dépôt.
+l'application et stockées sous `app_hl_config` ; tant que cette clé est absente, le build
+de développement pré-remplit le formulaire depuis `environment.defaultConfig`
+(voir [ecosystem.md](ecosystem.md#configuration-à-lexécution)).
 
 Deux pièges :
 

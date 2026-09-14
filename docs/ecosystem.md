@@ -139,16 +139,24 @@ trancher.
 
 # Configuration à l'exécution
 
-Aucune URL de service n'est en dur dans le code. Les quatre (`botServiceUrl`,
-`userServiceUrl`, `hyperliquidGatewayUrl`, `hyperliquidPublicUrl`) sont saisies dans
-l'écran de configuration et stockées sous `app_hl_config`. Un environnement de
-développement n'est donc pas décrit par un fichier du dépôt : il faut regarder ce que
-l'appareil a enregistré.
+Aucune URL de service n'est en dur dans le code qui l'utilise. Les quatre
+(`botServiceUrl`, `userServiceUrl`, `hyperliquidGatewayUrl`, `hyperliquidPublicUrl`) sont
+saisies dans l'écran de configuration et stockées sous `app_hl_config` ; c'est cette clé
+qui fait foi, et elle seule. Ce qu'un appareil a enregistré reste donc la source à
+regarder en cas de doute.
+
+Ce qui vient du dépôt, c'est uniquement l'**amorçage** utilisé tant que `app_hl_config`
+est absente : `environment.defaultConfig`, lu une fois par `ConfigService`. En
+développement il porte les valeurs ci-dessous ; en production (`environment.prod.ts`,
+substitué par `fileReplacements`) il ne porte que l'API publique Hyperliquid, les trois
+autres champs restant vides — et donc invalides pour le formulaire, qui force la saisie
+plutôt que de laisser un paquet distribué interroger silencieusement un `localhost`
+inexistant.
 
 ## La configuration de développement de l'utilisateur
 
-Celle sur laquelle ce projet est développé au quotidien, et celle à semer dans un
-navigateur piloté pour vérifier quoi que ce soit :
+Celle sur laquelle ce projet est développé au quotidien, et celle que `ng serve`
+pré-remplit désormais tout seul :
 
 | Réglage                    | Valeur                        |
 | -------------------------- | ----------------------------- |
@@ -157,16 +165,12 @@ navigateur piloté pour vérifier quoi que ce soit :
 | Hyperliquid Gateway URL    | `http://localhost:3005`       |
 | Hyperliquid Public API URL | `https://api.hyperliquid.xyz` |
 
+Dans un navigateur piloté, il n'y a donc plus rien à semer : ouvrir _URL Configuration_
+depuis l'écran de connexion et valider suffit. Pour retrouver ce cas de départ après
+coup, vider la clé enregistrée :
+
 ```js
-localStorage.setItem(
-  'CapacitorStorage.app_hl_config',
-  JSON.stringify({
-    userServiceUrl: 'http://localhost:3010',
-    botServiceUrl: 'http://localhost:3001',
-    hyperliquidGatewayUrl: 'http://localhost:3005',
-    hyperliquidPublicUrl: 'https://api.hyperliquid.xyz',
-  }),
-);
+localStorage.removeItem('CapacitorStorage.app_hl_config');
 ```
 
 Le bot doit par ailleurs accepter l'origine de l'app dans son `ALLOWED_ORIGINS`.

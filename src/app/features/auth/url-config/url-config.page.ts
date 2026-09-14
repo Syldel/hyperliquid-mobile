@@ -46,12 +46,7 @@ type FormConfig = {
   providers: [ModalController],
 })
 export class UrlConfigPage implements OnInit {
-  initialConfig = input<AppConfig>({
-    userServiceUrl: '',
-    hyperliquidPublicUrl: 'https://api.hyperliquid.xyz',
-    hyperliquidGatewayUrl: '',
-    botServiceUrl: '',
-  });
+  initialConfig = input.required<AppConfig>();
 
   configSaved = output<AppConfig>();
 

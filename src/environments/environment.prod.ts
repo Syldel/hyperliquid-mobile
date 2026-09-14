@@ -1,7 +1,12 @@
-export const environment = {
+import { AppConfig } from '@models/app-config.interface';
+
+export const environment: { production: boolean; defaultConfig: AppConfig } = {
   production: true,
 
-  userServiceUrl: 'https://default-user-service.com',
-  hyperliquidPublicUrl: 'https://api.hyperliquid.xyz',
-  hyperliquidGatewayUrl: 'https://default-hyperliquid-gateway.com',
+  defaultConfig: {
+    userServiceUrl: '',
+    hyperliquidPublicUrl: 'https://api.hyperliquid.xyz',
+    hyperliquidGatewayUrl: '',
+    botServiceUrl: '',
+  },
 };

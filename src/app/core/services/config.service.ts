@@ -8,10 +8,7 @@ import { BehaviorSubject, Observable } from 'rxjs';
 export class ConfigService {
   private readonly STORAGE_KEY = 'app_hl_config';
   private readonly _config$ = new BehaviorSubject<AppConfig>({
-    userServiceUrl: '',
-    hyperliquidPublicUrl: environment.hyperliquidPublicUrl,
-    hyperliquidGatewayUrl: '',
-    botServiceUrl: '',
+    ...environment.defaultConfig,
   });
 
   constructor(private readonly storage: StorageService) {}

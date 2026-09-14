@@ -155,8 +155,9 @@ spec s'ajoute à ce fichier.
 
 ## Vérifier dans le navigateur
 
-Les URL des services sont **configurées dans l'app** et stockées sous `app_hl_config`,
-pas en dur dans le code. La configuration de développement de l'utilisateur :
+Les URL des services sont **configurées dans l'app** et stockées sous `app_hl_config`.
+Tant que cette clé est absente, `ConfigService` s'amorce sur
+`environment.defaultConfig` — en développement, la configuration de l'utilisateur :
 
 | Réglage                    | Valeur                        |
 | -------------------------- | ----------------------------- |
@@ -165,9 +166,10 @@ pas en dur dans le code. La configuration de développement de l'utilisateur :
 | Hyperliquid Gateway URL    | `http://localhost:3005`       |
 | Hyperliquid Public API URL | `https://api.hyperliquid.xyz` |
 
-Pour les semer dans un navigateur piloté, écrire cet objet sous
-`CapacitorStorage.app_hl_config` (clés `userServiceUrl`, `botServiceUrl`,
-`hyperliquidGatewayUrl`, `hyperliquidPublicUrl`).
+Un navigateur piloté n'a donc rien à semer : le formulaire d'URL Configuration arrive
+déjà rempli, il suffit de le valider. Le build de production, lui, remplace ce défaut par
+des champs vides (`environment.prod.ts`) — un paquet distribué ne pointe jamais vers une
+machine de développement.
 
 Une navigation directe vers une URL `/secure/...` renvoie à l'écran de connexion : le
 garde s'exécute avant la restauration de session. Passer par l'interface.
