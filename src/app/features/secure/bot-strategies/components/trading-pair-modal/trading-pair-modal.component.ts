@@ -84,6 +84,12 @@ import {
   StrategyLibraryService,
 } from '../../../strategies/services/strategy-library.service';
 import {
+  exchangeCatalogue,
+  judgeableCatalogue,
+  offeredStrategies,
+  resolveStrategyMeta,
+} from '../../domain/exchange-catalogue.util';
+import {
   isKnownUnexecutable,
   pairStrategyStatus,
   type PairStrategyStatus,
@@ -159,16 +165,17 @@ export class TradingPairModalComponent implements OnInit {
 
   isLoadingMetadata = signal(false);
   candleIntervals = signal<ChartInterval[]>([]);
-  strategies = signal<StrategyMeta[]>([]);
   availableExchanges = signal<string[]>([]);
   strategiesByExchange = signal<Record<string, StrategyMeta[]>>({});
   metadataError = signal(false);
   /**
    * Le catalogue a répondu — distinct de « la liste est vide ».
    *
-   * Sans ce drapeau, `filteredStrategies()` rend `[]` avant la réponse, ce
+   * Sans ce drapeau, `strategiesByExchange()` vaut `{}` avant la réponse, ce
    * qu'une lecture naïve prendrait pour « le bot ne propose rien » : toute
-   * paire saine serait signalée comme abandonnée le temps du chargement.
+   * paire saine serait signalée comme abandonnée le temps du chargement. C'est
+   * `catalogueFor` qui le traduit en `null`, le seul état sur lequel ce build
+   * s'interdit de juger.
    */
   metadataLoaded = signal(false);
   exitBehaviors = signal<ExitBehaviorMeta[]>([]);
@@ -197,11 +204,61 @@ export class TradingPairModalComponent implements OnInit {
   //  Computed
   // ------------------------------------------------------------------
 
-  readonly filteredStrategies = computed(() => {
-    const exchangeKey = this.formValue().exchangeKey;
-    if (!exchangeKey) return this.strategies();
-    return this.strategiesByExchange()[exchangeKey] ?? this.strategies();
+  /**
+   * Le catalogue **tel qu'il n'a pas encore répondu**, ou tel qu'il a répondu.
+   *
+   * Nommé plutôt que reconstruit à chaque appel : `exchangeCatalogue` distingue
+   * quatre situations, et les trois consommateurs ci-dessous doivent partir de
+   * la même. C'est ici que `metadataLoaded` se traduit en `null` — « le bot n'a
+   * rien dit », par opposition à « le bot n'a rien à proposer ».
+   */
+  private catalogueFor(exchangeKey: string | undefined) {
+    return exchangeCatalogue(
+      this.metadataLoaded() ? this.strategiesByExchange() : null,
+      exchangeKey,
+    );
+  }
+
+  /** Catalogue de l'exchange **que le formulaire porte en ce moment**. */
+  readonly formCatalogue = computed(() => this.catalogueFor(this.formValue().exchangeKey));
+
+  /**
+   * Catalogue de l'exchange **sous lequel la paire est enregistrée**.
+   *
+   * Distinct du précédent : changer d'exchange dans le formulaire ne change
+   * pas là où la paire dort. Juger la stratégie enregistrée sur le catalogue
+   * du nouvel exchange produirait une accusation fausse au premier changement.
+   */
+  private readonly storedCatalogue = computed(() => this.catalogueFor(this.editExchangeKey()));
+
+  /**
+   * Options du sélecteur de stratégie — celles de cet exchange, et rien
+   * d'autre. Un repli sur le catalogue aplati proposerait les stratégies d'un
+   * autre exchange ; voir `exchange-catalogue.util.ts`.
+   */
+  readonly filteredStrategies = computed(() => offeredStrategies(this.formCatalogue()));
+
+  /**
+   * L'exchange choisi pour lequel le bot ne déclare aucune stratégie, s'il y
+   * en a un. Le sélecteur est alors vide **et le dit** : sans ce message, un
+   * champ sans options serait indiscernable d'un catalogue en cours de
+   * chargement ou d'un bug d'affichage.
+   */
+  readonly undeclaredExchange = computed(() => {
+    const catalogue = this.formCatalogue();
+    return catalogue.state === 'undeclared' ? catalogue.exchangeKey : null;
   });
+
+  /**
+   * La paire enregistrée l'est sur un exchange que le bot ne sert plus.
+   *
+   * `storedStrategyStatus` rend alors `unknown-shortname` — correct quant à
+   * l'exécution, mais « cette stratégie n'est plus proposée » désignerait le
+   * mauvais coupable. La bannière substitue le vrai motif.
+   */
+  readonly storedExchangeUndeclared = computed(
+    () => !!this.editPair() && this.storedCatalogue().state === 'undeclared',
+  );
 
   readonly selectableExchanges = computed(() => {
     const fromApi = this.availableExchanges();
@@ -220,14 +277,20 @@ export class TradingPairModalComponent implements OnInit {
    * Statut de la stratégie **enregistrée** sur la paire éditée, par opposition
    * à celle que le formulaire porte en ce moment.
    *
-   * `unverified` en création comme tant que le catalogue n'a pas répondu : dans
-   * les deux cas il n'y a rien dont ce build puisse juger, et le dire vaut
-   * mieux que rendre un verdict par défaut.
+   * `unverified` en création, et tant que le catalogue n'a pas répondu : il
+   * n'y a rien dont ce build puisse juger, et le dire vaut mieux que rendre un
+   * verdict par défaut. Le tri est délégué à `pairStrategyStatus` plutôt que
+   * gardé ici par `metadataLoaded` — une paire sans `shortname` du tout est
+   * alors signalée sans attendre le réseau, ce qui est certain de toute façon.
+   *
+   * Le catalogue consulté est celui de l'exchange **enregistré**, pas celui du
+   * formulaire : sans quoi changer d'exchange ferait juger la paire sur un
+   * catalogue qui n'est pas le sien.
    */
   readonly storedStrategyStatus = computed<PairStrategyStatus>(() => {
     const pair = this.editPair();
-    if (!pair || !this.metadataLoaded()) return 'unverified';
-    return pairStrategyStatus(pair.strategy, this.filteredStrategies());
+    if (!pair) return 'unverified';
+    return pairStrategyStatus(pair.strategy, judgeableCatalogue(this.storedCatalogue()));
   });
 
   /**
@@ -238,6 +301,21 @@ export class TradingPairModalComponent implements OnInit {
    */
   readonly showStalledStrategy = computed(
     () => isKnownUnexecutable(this.storedStrategyStatus()) && !this.formValue().strategy,
+  );
+
+  /**
+   * Note expliquant un sélecteur vide **par l'exchange choisi**, et non par la
+   * paire enregistrée.
+   *
+   * Elle couvre ce que la bannière ne couvre pas : une création sur un exchange
+   * que le bot ne sert pas, ou un changement d'exchange en cours d'édition.
+   * Effacée quand la bannière dit déjà la même chose, pour ne pas écrire deux
+   * fois le même diagnostic à deux centimètres d'écart.
+   */
+  readonly showUndeclaredExchange = computed(
+    () =>
+      !!this.undeclaredExchange() &&
+      !(this.showStalledStrategy() && this.storedExchangeUndeclared()),
   );
 
   /**
@@ -343,12 +421,9 @@ export class TradingPairModalComponent implements OnInit {
         this.strategiesByExchange.set(meta.strategies);
         this.exitBehaviors.set(meta.globalOptions?.exitBehaviors ?? []);
 
-        const all = Object.values(meta.strategies).flat();
-        this.strategies.set(all);
-
         this.form.controls.strategy.enable();
         this.form.controls.interval.enable();
-        this.resolveEditedStrategy(all);
+        this.resolveEditedStrategy();
       },
       error: () => {
         this.metadataError.set(true);
@@ -372,12 +447,54 @@ export class TradingPairModalComponent implements OnInit {
    * vide plutôt que d'inventer une entrée : le formulaire reste invalide et
    * l'utilisateur doit en choisir une, ce qui vaut mieux qu'enregistrer un
    * `shortname` que le bot n'exécute pas.
+   *
+   * La recherche porte sur le catalogue de **l'exchange de la paire**, pas sur
+   * l'aplatissement de tous les exchanges : celui-ci pouvait charger le
+   * sélecteur d'une valeur absente de ses propres options, et le ferait dès
+   * que le bot en déclarerait un second. La clé est relue sur le formulaire
+   * (`getRawValue`) plutôt que sur `formValue()`, pour ne pas dépendre de
+   * l'ordre d'émission des `valueChanges` d'un contrôle qu'on vient
+   * d'activer.
    */
-  private resolveEditedStrategy(catalogue: StrategyMeta[]): void {
-    const shortname = this.editPair()?.strategy?.shortname;
-    if (!shortname) return;
+  /**
+   * Changer d'exchange abandonne une stratégie que le nouveau ne propose pas.
+   *
+   * Sans cela, le contrôle gardait la `StrategyMeta` de l'exchange précédent :
+   * un `ion-select` portant une valeur absente de ses options, et `submit` qui
+   * écrivait sur la paire un `shortname` que le bot n'aiguille pas sur cet
+   * exchange. Le symptôme est celui du catalogue aplati, atteint sans même
+   * éditer une paire.
+   *
+   * L'abandon est annoncé : vider un champ sans un mot serait la défaillance
+   * muette que ce dépôt refuse. Les règles déjà construites, elles, sont
+   * conservées — elles appartiennent à l'utilisateur, `usesRules()` les exclut
+   * de l'enregistrement tant qu'aucune stratégie ne les réclame, et revenir en
+   * arrière doit les retrouver.
+   *
+   * `not-loaded` ne déclenche rien : effacer un choix sur une absence de
+   * réponse serait un verdict rendu sans autorité.
+   */
+  private dropStrategyNotOfferedBy(exchangeKey: string): void {
+    const selected = this.form.getRawValue().strategy;
+    if (!selected) return;
 
-    const meta = catalogue.find((candidate) => candidate.shortname === shortname);
+    const catalogue = this.catalogueFor(exchangeKey);
+    if (catalogue.state === 'not-loaded') return;
+    if (resolveStrategyMeta(catalogue, selected.shortname)) return;
+
+    this.form.controls.strategy.reset();
+    void this.toast(
+      catalogue.state === 'no-exchange'
+        ? `“${selected.name}” was cleared — pick an exchange first.`
+        : `“${selected.name}” is not offered on ${exchangeKey}.`,
+      'warning',
+    );
+  }
+
+  private resolveEditedStrategy(): void {
+    const catalogue = this.catalogueFor(this.form.getRawValue().exchangeKey);
+    const meta = resolveStrategyMeta(catalogue, this.editPair()?.strategy?.shortname);
+
     if (meta) this.form.patchValue({ strategy: meta });
   }
 
@@ -486,8 +603,9 @@ export class TradingPairModalComponent implements OnInit {
 
     this.form.controls.exchangeKey.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => {
+      .subscribe((exchangeKey) => {
         this.form.controls.pairName.updateValueAndValidity({ emitEvent: false });
+        this.dropStrategyNotOfferedBy(exchangeKey);
       });
 
     this.loadMetadata();

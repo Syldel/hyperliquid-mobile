@@ -4,7 +4,7 @@ import { TradingPair } from '@models/user.interface';
 import { AvailableCapitalService } from '@services/available-capital.service';
 import { BotService } from '@services/bot.service';
 import type { ExchangesMetaResponse, StrategyMeta } from '@syldel/trading-shared-types';
-import { NEVER, of } from 'rxjs';
+import { NEVER, of, type Observable } from 'rxjs';
 import { TradingPairModalComponent } from './trading-pair-modal.component';
 
 /**
@@ -276,5 +276,193 @@ describe('TradingPairModalComponent stalled strategy notice', () => {
     mount(undefined);
 
     expect(component.showStalledStrategy()).toBe(false);
+  });
+});
+
+/**
+ * Une stratégie appartient à un exchange.
+ *
+ * Ce bloc est le seul à déclarer **deux** exchanges, et c'est tout son objet :
+ * le bot n'en sert qu'un, ce qui rendait le catalogue aplati indiscernable du
+ * catalogue correct. `spot-grid` n'existe que sur `binance`, `advanced-rules`
+ * que sur `hyperliquid` — toute confusion entre les deux se voit.
+ */
+describe('TradingPairModalComponent exchange-scoped catalogue', () => {
+  let fixture: ComponentFixture<TradingPairModalComponent>;
+  let component: TradingPairModalComponent;
+
+  const SPOT_GRID: StrategyMeta = { name: 'Spot Grid', shortname: 'spot-grid' };
+
+  const TWO_EXCHANGES = {
+    intervals: ['60', '240'],
+    exchanges: ['hyperliquid', 'binance'],
+    strategies: { hyperliquid: [TOL_LANGIT, ADVANCED_RULES], binance: [SPOT_GRID] },
+    globalOptions: {
+      exitBehaviors: [{ label: 'No Algo Exit', value: 'NO_ALGO_EXIT', description: '' }],
+    },
+  } as unknown as ExchangesMetaResponse;
+
+  function mount(
+    edited: TradingPair | undefined,
+    exchangeKey = 'hyperliquid',
+    metadata: Observable<ExchangesMetaResponse> = of(TWO_EXCHANGES),
+  ): void {
+    TestBed.configureTestingModule({
+      imports: [TradingPairModalComponent],
+      providers: [
+        {
+          provide: BotService,
+          useValue: {
+            getExchangeFormMetadata: () => metadata,
+            indicators: signal([]),
+            transforms: signal([]),
+            validateStrategy: () => of({ valid: true, issues: [] }),
+          },
+        },
+        {
+          provide: AvailableCapitalService,
+          useValue: { getAvailableCapital: () => of(1000) },
+        },
+      ],
+    });
+
+    fixture = TestBed.createComponent(TradingPairModalComponent);
+    component = fixture.componentInstance;
+    if (edited) {
+      fixture.componentRef.setInput('editPair', edited);
+      fixture.componentRef.setInput('editExchangeKey', exchangeKey);
+    }
+    fixture.detectChanges();
+  }
+
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('offers only the strategies of the selected exchange', () => {
+    mount(pair({ strategy: { name: 'Spot Grid', shortname: 'spot-grid' } }), 'binance');
+
+    expect(component.filteredStrategies()).toEqual([SPOT_GRID]);
+  });
+
+  it('resolves the edited pair within its own exchange', () => {
+    // Le défaut reporté : la recherche portait sur
+    // `Object.values(meta.strategies).flat()`, donc `spot-grid` se résolvait
+    // quel que soit l'exchange de la paire.
+    mount(pair({ strategy: { name: 'Spot Grid', shortname: 'spot-grid' } }), 'binance');
+
+    expect(component.form.getRawValue().strategy).toBe(SPOT_GRID);
+  });
+
+  it('refuses to resolve a strategy served by another exchange', () => {
+    // Le symptôme : un `ion-select` portant une valeur absente de ses options.
+    mount(pair({ strategy: { name: 'Spot Grid', shortname: 'spot-grid' } }), 'hyperliquid');
+
+    expect(component.form.getRawValue().strategy).toBeNull();
+    expect(component.filteredStrategies()).not.toContain(SPOT_GRID);
+    expect(component.storedStrategyStatus()).toBe('unknown-shortname');
+    expect(component.showStalledStrategy()).toBe(true);
+  });
+
+  it('resolves a shortname the bot would route despite its casing', () => {
+    // Le moteur compare sur `toLowerCase().trim()` : cette paire tourne. La
+    // résolution comparait en `===` strict, laissant le sélecteur vide — et
+    // le statut valant `ok`, aucune bannière ne l'expliquait.
+    mount(pair({ strategy: { name: 'Advanced', shortname: ' Advanced-Rules ' } }));
+
+    expect(component.storedStrategyStatus()).toBe('ok');
+    expect(component.form.getRawValue().strategy).toBe(ADVANCED_RULES);
+  });
+
+  it('drops a strategy the newly chosen exchange does not offer', () => {
+    mount(pair());
+    expect(component.form.getRawValue().strategy).toBe(TOL_LANGIT);
+
+    component.form.patchValue({ exchangeKey: 'binance' });
+
+    expect(component.form.getRawValue().strategy).toBeNull();
+    expect(component.isValid()).toBe(false);
+  });
+
+  it('keeps a strategy the newly chosen exchange also offers', () => {
+    // Effacer un choix encore valable serait aussi arbitraire que garder un
+    // choix devenu faux.
+    const bothExchanges = {
+      ...TWO_EXCHANGES,
+      strategies: { hyperliquid: [TOL_LANGIT], binance: [TOL_LANGIT] },
+    } as unknown as ExchangesMetaResponse;
+    mount(pair(), 'hyperliquid', of(bothExchanges));
+
+    component.form.patchValue({ exchangeKey: 'binance' });
+
+    expect(component.form.getRawValue().strategy).toBe(TOL_LANGIT);
+  });
+
+  it('keeps the rules built so far when the strategy is dropped', () => {
+    // Les règles appartiennent à l'utilisateur : `usesRules()` les exclut de
+    // l'enregistrement tant qu'aucune stratégie ne les réclame, revenir en
+    // arrière doit les retrouver.
+    mount(
+      pair({
+        strategy: {
+          name: 'Breakout',
+          shortname: 'advanced-rules',
+          rules: { long: { entry: { type: 'logical', operator: 'AND', conditions: [] } } },
+        },
+      } as Partial<TradingPair>),
+    );
+
+    component.form.patchValue({ exchangeKey: 'binance' });
+
+    expect(component.form.getRawValue().strategy).toBeNull();
+    expect(component.ruleDocument()?.name).toBe('Breakout');
+  });
+
+  it('announces an exchange the bot declares nothing for', () => {
+    // Un sélecteur vide sans un mot serait indiscernable d'un chargement ou
+    // d'un bug d'affichage.
+    mount(undefined);
+    component.form.patchValue({ exchangeKey: 'kraken' });
+
+    expect(component.filteredStrategies()).toEqual([]);
+    expect(component.undeclaredExchange()).toBe('kraken');
+    expect(component.showUndeclaredExchange()).toBe(true);
+  });
+
+  it('names the exchange, not the strategy, when the stored exchange is gone', () => {
+    // Le statut reste `unknown-shortname` — la paire ne tourne pas — mais le
+    // motif affiché doit désigner le bon coupable.
+    mount(pair(), 'kraken');
+
+    expect(component.storedStrategyStatus()).toBe('unknown-shortname');
+    expect(component.showStalledStrategy()).toBe(true);
+    expect(component.storedExchangeUndeclared()).toBe(true);
+    // Pas deux fois le même diagnostic à deux centimètres d'écart.
+    expect(component.showUndeclaredExchange()).toBe(false);
+  });
+
+  /**
+   * Le seul invariant de ce fichier qui s'assure sur le DOM, parce que le
+   * défaut n'existait que là : les signaux étaient justes, la phrase affichée
+   * ne l'était plus dès que l'utilisateur quittait l'exchange mort.
+   */
+  it('stops claiming nothing can be picked once the selector fills up', () => {
+    mount(pair(), 'kraken');
+    const text = () => (fixture.nativeElement as HTMLElement).textContent ?? '';
+
+    expect(component.showStalledStrategy()).toBe(true);
+    expect(text()).toContain('No strategy can be picked for the selected exchange');
+
+    component.form.patchValue({ exchangeKey: 'hyperliquid' });
+    fixture.detectChanges();
+
+    expect(component.filteredStrategies().length).toBeGreaterThan(0);
+    expect(text()).toContain('Pick a strategy below');
+    expect(text()).not.toContain('No strategy can be picked');
+  });
+
+  it('accuses nothing while the catalogue has not answered', () => {
+    mount(pair(), 'kraken', NEVER);
+
+    expect(component.storedExchangeUndeclared()).toBe(false);
+    expect(component.showUndeclaredExchange()).toBe(false);
   });
 });

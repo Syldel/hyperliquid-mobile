@@ -105,4 +105,19 @@ ion-item {
     line-height: 1.4;
     color: var(--ion-color-danger-shade);
   }
+
+  /*
+   * Même bloc, ton plus bas : « le bot ne sert pas cet exchange » n'accuse pas
+   * la paire, il constate une absence. Garder le rouge du défaut d'exécution
+   * pour les deux ferait perdre au rouge sa signification.
+   */
+  &--warning {
+    border-color: var(--ion-color-warning);
+    background: rgba(var(--ion-color-warning-rgb), 0.12);
+    color: var(--ion-color-warning-shade);
+
+    .stalled__why {
+      color: var(--ion-color-warning-shade);
+    }
+  }
 }

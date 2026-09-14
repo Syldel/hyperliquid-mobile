@@ -80,7 +80,12 @@ export function isKnownUnexecutable(status: PairStrategyStatus): boolean {
  * l'identique (`toLowerCase().trim()`) plutôt qu'approchée : une paire que le
  * bot exécute grâce à sa tolérance de casse ne doit pas être signalée ici
  * comme inexécutable, et l'inverse encore moins.
+ *
+ * Exportée parce que la ré-association au catalogue (`resolveStrategyMeta`)
+ * doit comparer **exactement** comme le verdict : quand elle comparait en
+ * `===` strict, une paire jugée saine pouvait laisser le sélecteur vide sans
+ * qu'aucune bannière ne l'explique.
  */
-function routingKey(value: string | undefined): string {
+export function routingKey(value: string | undefined): string {
   return (value ?? '').toLowerCase().trim();
 }

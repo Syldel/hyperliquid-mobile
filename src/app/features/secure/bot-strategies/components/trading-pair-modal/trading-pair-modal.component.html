@@ -100,7 +100,9 @@
               }}
             </strong>
             <span class="stalled__why">
-              @if (storedStrategyStatus() === 'missing-shortname') {
+              @if (storedExchangeUndeclared()) {
+                The bot no longer declares any strategy for “{{ editExchangeKey() }}”.
+              } @else if (storedStrategyStatus() === 'missing-shortname') {
                 @if (editPair()?.strategy?.name) {
                   The saved strategy “{{ editPair()?.strategy?.name }}” carries no identifier the
                   bot can route on.
@@ -110,8 +112,27 @@
               } @else {
                 “{{ editPair()?.strategy?.name }}” is no longer offered by the bot.
               }
-              It is skipped on every cycle — no entry, no exit, no signal. Pick a strategy below to
-              make this pair runnable.
+              It is skipped on every cycle — no entry, no exit, no signal.
+              @if (filteredStrategies().length) {
+                Pick a strategy below to make this pair runnable.
+              } @else {
+                No strategy can be picked for the selected exchange — switch exchange, or disable
+                the pair.
+              }
+            </span>
+          </div>
+        </div>
+      }
+      @if (showUndeclaredExchange()) {
+        <div class="stalled stalled--warning">
+          <ion-icon name="alert-circle-outline" aria-hidden="true" />
+          <div class="stalled__text">
+            <strong class="stalled__title">
+              No strategy for “{{ undeclaredExchange() | titlecase }}”
+            </strong>
+            <span class="stalled__why">
+              The bot declares no strategy for this exchange, so there is nothing to pick. Choosing
+              another exchange’s strategy would save a pair the bot cannot route.
             </span>
           </div>
         </div>

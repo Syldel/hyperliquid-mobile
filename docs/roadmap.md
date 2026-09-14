@@ -22,22 +22,35 @@ reste attend — y compris des chantiers qui paraissent plus structurants.
 
 # Prochaines étapes
 
-Dans cet ordre, et pour ces raisons. À distinguer des [limites
-acceptées](#limites-acceptées) plus bas : ce qui suit est en attente, pas arbitré.
+À distinguer des [limites acceptées](#limites-acceptées) plus bas : ce qui suit est en
+attente, pas arbitré.
 
-1. **Import / export JSON**, détaillé plus bas. C'est la vraie suite : au-delà de la
-   sauvegarde, il ouvre l'écriture assistée de stratégies.
-2. **`resolveEditedStrategy` ignore l'exchange de la paire.** Il cherche la stratégie
-   enregistrée dans `Object.values(meta.strategies).flat()`, alors que le sélecteur
-   (`filteredStrategies`) et le statut d'exécutabilité filtrent par exchange. Une paire
-   pourrait donc se voir attribuer une `StrategyMeta` que son propre sélecteur ne propose
-   pas — un `ion-select` portant une valeur absente de ses options. Invisible tant qu'il
-   n'y a qu'un exchange, d'où le report ; **à ne pas oublier** le jour où il y en a deux.
-   Correctif attendu : résoudre par `meta.strategies[exchangeKey]`, avec repli documenté.
+**Import / export JSON**, détaillé plus bas. C'est la vraie suite : au-delà de la
+sauvegarde, il ouvre l'écriture assistée de stratégies.
 
 **Fait** — les paires héritées sans `shortname` sont désormais signalées dans la liste et
 dans le formulaire, et le moteur du bot ne les écarte plus en silence. Voir
 [strategies/overview.md](strategies/overview.md#limites-connues).
+
+**Fait** — le catalogue se lit par exchange. `resolveEditedStrategy` cherchait dans
+`Object.values(meta.strategies).flat()` ; le report tenait à ce que le bot ne déclare
+qu'un exchange, donc que rien ne pouvait diverger. Le traiter a montré que le défaut
+s'était dédoublé, et que l'une de ses variantes était **déjà active** :
+
+- la résolution comparait en `===` strict quand le statut comparait sur
+  `toLowerCase().trim()`, comme le moteur. Une paire que le bot exécute grâce à cette
+  tolérance était jugée saine _et_ laissait le sélecteur vide, sans une ligne pour le
+  dire ;
+- le sélecteur repliait sur le catalogue aplati quand `meta.strategies[exchangeKey]`
+  manquait, et changer d'exchange ne vidait pas la stratégie déjà choisie — deux façons
+  d'enregistrer un `shortname` que le bot n'aiguille pas sur cet exchange.
+
+Les trois règles ont été ramenées à une seule,
+`bot-strategies/domain/exchange-catalogue.util.ts`, qui nomme quatre situations plutôt
+que de replier sur une valeur commode. Le repli annoncé au report n'existe donc plus :
+**un exchange sans stratégie déclarée se dit à l'écran** au lieu d'emprunter la liste
+d'un autre. Voir
+[strategies/overview.md](strategies/overview.md#une-stratégie-appartient-à-un-exchange).
 
 ---
 

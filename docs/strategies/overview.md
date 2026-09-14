@@ -151,6 +151,37 @@ En édition, la paire enregistrée est **re-appariée au catalogue par `shortnam
 (`resolveEditedStrategy`) : le schéma du formulaire vient toujours de `/exchanges/meta`,
 les valeurs viennent de la paire.
 
+## Une stratégie appartient à un exchange
+
+`ExchangesMetaResponse.strategies` est un `Record<string, StrategyMeta[]>` dont la clé est
+l'exchange. L'aplatir revient à proposer les stratégies d'un exchange sur un autre, et le
+bot n'en déclarant qu'un, rien ne pouvait le trahir.
+
+`bot-strategies/domain/exchange-catalogue.util.ts` tient désormais la règle seul, pour les
+trois usages qui en divergeaient : les options du sélecteur, le verdict
+d'exécutabilité, et la ré-association en édition. Il nomme quatre situations plutôt que de
+choisir la plus commode — pas d'exchange choisi, catalogue pas encore arrivé, exchange non
+déclaré, exchange servi — parce que les deux silences du milieu ne veulent pas dire la
+même chose : le premier interdit tout verdict, le second en est un.
+
+Trois conséquences qui se voient à l'écran :
+
+- **le sélecteur ne propose jamais la stratégie d'un autre exchange**, quitte à ne rien
+  proposer. Un exchange pour lequel le bot ne déclare rien le dit en toutes lettres, sous
+  le champ — un sélecteur vide sans explication serait indiscernable d'un chargement ;
+- **changer d'exchange abandonne une stratégie que le nouveau ne propose pas**, avec un
+  message. Les règles déjà construites, elles, sont conservées : elles appartiennent à
+  l'utilisateur, et `usesRules()` les exclut de l'enregistrement tant qu'aucune stratégie
+  ne les réclame ;
+- **la paire enregistrée est jugée sur le catalogue de son propre exchange**, pas sur
+  celui que le formulaire porte à l'instant — sinon changer d'exchange produirait une
+  accusation fausse.
+
+La comparaison passe par le `routingKey` du moteur (`toLowerCase().trim()`) des deux
+côtés. Quand ce n'était pas le cas, une paire que le bot exécutait grâce à sa tolérance de
+casse était jugée saine **et** laissait le sélecteur vide, sans bannière pour l'expliquer :
+un trou muet, et le seul de la série qui était déjà atteignable avec un seul exchange.
+
 ---
 
 # Limites connues
@@ -181,7 +212,8 @@ muettes aussi côté bot, dont la chaîne d'aiguillage sortait sans `return` ni 
 le signalement ouvre le formulaire sur le sélecteur ; **le choix reste à l'utilisateur** —
 désactiver la paire d'office serait intrusif, et inutile puisqu'elle ne fait déjà rien.
 
-⚠️ `resolveEditedStrategy` cherche encore la stratégie enregistrée dans le catalogue
-**aplati de tous les exchanges**, là où le sélecteur et le statut ci-dessus filtrent par
-exchange. Invisible avec un seul exchange, faux dès qu'il y en a deux. Voir
-[../roadmap.md](../roadmap.md#prochaines-étapes).
+**Un exchange que le bot ne déclare plus emporte toutes ses paires.** Le statut vaut alors
+`unknown-shortname` — la paire ne tourne pas, la liste la signale — mais la modale dit le
+vrai motif plutôt que d'accuser la stratégie : c'est l'exchange entier qui n'est plus
+servi, et aucune stratégie ne peut être choisie à la place. Voir
+[une stratégie appartient à un exchange](#une-stratégie-appartient-à-un-exchange).
