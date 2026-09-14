@@ -89,6 +89,26 @@ Les modales Ionic reçoivent leurs entrées via `componentProps: { x: () => vale
 Ionic affecte les `componentProps` directement sur l'instance ; une fonction est donc ce
 qu'un `input()` signal peut consommer de façon interchangeable.
 
+## Une entrée de modale se lit, elle ne se suit pas
+
+L'interchangeabilité ci-dessus vaut pour la **lecture**, pas pour la réactivité. Ionic
+n'alimente pas l'`input()` : il **écrase la propriété** par la closure. Ce qui portait le
+nom d'un signal est devenu une fonction ordinaire, et un `computed` qui la lit n'en dépend
+donc pas — il ne se recalculera que si l'un de ses _autres_ producteurs change, et rendra
+sa valeur mémorisée sinon.
+
+Constaté en pilotant `TradingPairModalComponent` depuis la console pour vérifier un état
+d'affichage : remplacer `editExchangeKey` par une autre closure ne bougeait rien, le
+`computed` rendait imperturbablement la valeur calculée au tour d'avant. Le composant, lui,
+est correct — la valeur d'une entrée de modale ne change pas de sa vie, et les `computed`
+concernés dépendent aussi du catalogue, dont l'arrivée est précisément ce qui doit les
+réveiller.
+
+La règle en découle : dans une modale, **un `computed` ne doit jamais avoir une entrée pour
+seule dépendance changeante**. S'il faut réagir à une entrée, il faut un vrai signal — donc
+ne pas passer par `componentProps`. Et pour piloter une modale depuis une console, forcer
+l'invalidation par un signal réel plutôt que de croire une valeur inchangée.
+
 ## Un effet dérive, il n'hydrate pas
 
 Règle apprise en cassant quelque chose. Le pré-remplissage d'un formulaire en mode édition
