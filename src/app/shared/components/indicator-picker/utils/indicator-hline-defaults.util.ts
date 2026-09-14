@@ -1,4 +1,9 @@
-import { HlineStyle, HlineZoneStyle, IndicatorHlineStyles, LineStyleType } from '../models/indicator.model';
+import {
+  HlineStyle,
+  HlineZoneStyle,
+  IndicatorHlineStyles,
+  LineStyleType,
+} from '../models/indicator.model';
 
 /** Liste figée (volontairement non dérivée d'un registre partagé) des indicateurs
  *  qui affichent l'onglet "Style" avec Levels/Zones dans le picker. */
@@ -17,7 +22,12 @@ export function generateHlineId(): string {
   return `hl_${Date.now().toString(36)}_${idSeq}`;
 }
 
-function line(value: number, visible: boolean, color: string, lineStyle: LineStyleType): HlineStyle {
+function line(
+  value: number,
+  visible: boolean,
+  color: string,
+  lineStyle: LineStyleType,
+): HlineStyle {
   return { id: generateHlineId(), visible, value, color, lineStyle };
 }
 

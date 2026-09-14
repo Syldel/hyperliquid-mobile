@@ -43,10 +43,7 @@ describe('availableOperandTypes', () => {
   // La grammaire vient du serveur : un type qu'on ne connaît pas encore ne doit
   // pas être filtré au hasard.
   it('leaves an unknown future type alone', () => {
-    const withFuture = [
-      ...GRAMMAR,
-      { value: 'quantum' as OperandType, label: 'Quantum Thing' },
-    ];
+    const withFuture = [...GRAMMAR, { value: 'quantum' as OperandType, label: 'Quantum Thing' }];
 
     expect(availableOperandTypes(withFuture, MAX_OPERAND_NESTING).map((o) => o.value)).toContain(
       'quantum',

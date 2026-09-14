@@ -25,7 +25,12 @@ import {
   ModalController,
 } from '@ionic/angular/standalone';
 import { BotService } from '@services/bot.service';
-import type { IndicatorMetadata, Operand, OperandType, PriceField } from '@syldel/trading-shared-types';
+import type {
+  IndicatorMetadata,
+  Operand,
+  OperandType,
+  PriceField,
+} from '@syldel/trading-shared-types';
 import { addIcons } from 'ionicons';
 import { addOutline, closeCircle } from 'ionicons/icons';
 import { availableOperandTypes } from '../../domain/operand-types.util';
@@ -88,7 +93,6 @@ export class OperandEditorModalComponent implements OnInit {
   readonly functions = this.bot.functions;
   readonly priceFields = computed(() => this.bot.ruleBuilderGrammar()?.priceFields ?? []);
   readonly arithOperators = computed(() => this.bot.ruleBuilderGrammar()?.arithOperators ?? []);
-
 
   readonly type = signal<OperandType>('price');
 
@@ -229,7 +233,8 @@ export class OperandEditorModalComponent implements OnInit {
 
     // Un type composé ouvert pour la première fois part sur des valeurs
     // valides : sans ça, `transform` sans `kind` serait immédiatement rejeté.
-    if (value === 'transform' && !this.transformKind()) this.selectTransform(this.transforms()[0]?.kind ?? '');
+    if (value === 'transform' && !this.transformKind())
+      this.selectTransform(this.transforms()[0]?.kind ?? '');
     if (value === 'fn' && !this.fnKind()) this.selectFunction(this.functions()[0]?.kind ?? '');
   }
 

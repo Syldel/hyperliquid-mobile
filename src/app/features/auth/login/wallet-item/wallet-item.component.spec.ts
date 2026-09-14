@@ -15,9 +15,8 @@ describe('WalletItemComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [WalletItemComponent]
-    })
-    .compileComponents();
+      imports: [WalletItemComponent],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(WalletItemComponent);
     component = fixture.componentInstance;
@@ -31,9 +30,7 @@ describe('WalletItemComponent', () => {
 
   it('derives walletName and formattedAddress from the "wallet" input', () => {
     expect(component.walletName()).toBe(mockWallet.name);
-    expect(component.formattedAddress()).toBe(
-      formatEthereumAddress(mockWallet.address, 12, 12),
-    );
+    expect(component.formattedAddress()).toBe(formatEthereumAddress(mockWallet.address, 12, 12));
   });
 
   it('emits "clicked" with the wallet on onClick()', () => {
