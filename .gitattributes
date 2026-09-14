@@ -1,0 +1,31 @@
+# Fins de ligne : LF partout, y compris dans la copie de travail Windows.
+#
+# La règle vit ici et non dans `core.autocrlf` parce qu'une config de machine
+# n'existe pas sur l'autre poste ni sur une CI : le MacBook et le PC doivent se
+# comporter à l'identique sans réglage local, et la règle doit survivre à un
+# clone neuf.
+* text=auto eol=lf
+
+# Prettier écrit déjà en LF (prettier.config.js : `endOfLine: 'lf'`). Sans la
+# ligne ci-dessus, git recochait ces mêmes fichiers en CRLF derrière lui : les
+# deux se repassaient les mêmes fichiers, `prettier --check` déclarait mal
+# formatés des fichiers intacts, et `npm run format` produisait des diffs qui ne
+# contenaient que des fins de ligne.
+
+# Scripts de shell : un CR résiduel derrière le shebang casse l'exécution, en
+# silence et seulement sur la machine qui les lance. Ils étaient bel et bien
+# sortis en CRLF côté Windows.
+*.sh  text eol=lf
+
+# Si un script Windows apparaît un jour, cmd.exe veut du CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binaires : aucune conversion, aucune tentative de diff. Déclarés nommément
+# plutôt que confiés à la détection de contenu de `text=auto`, qui peut se
+# tromper sur un fichier au contenu inhabituel.
+*.png      binary
+*.jpg      binary
+*.ico      binary
+*.jks      binary
+*.keystore binary

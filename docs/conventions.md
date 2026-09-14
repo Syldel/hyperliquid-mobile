@@ -235,19 +235,40 @@ symboles interdits et les exceptions nominatives. Le raisonnement est dans
 
 # Formatage
 
-`npm run format` réécrit **tout** `src/`. Sur Windows avec `core.autocrlf=true`, cela
-reformate les fins de ligne de fichiers qu'on n'a pas touchés, et le diff se remplit de
-bruit.
+## Fins de ligne
 
-Formater **fichier par fichier** :
+**LF partout**, y compris dans la copie de travail Windows. La règle est portée par
+`.gitattributes` (`* text=auto eol=lf`), versionné, et non par `core.autocrlf` : une
+config de machine n'existe ni sur l'autre poste ni sur une CI, et ne survit pas à un
+clone neuf.
+
+Avant ça, git sortait les fichiers en CRLF sur Windows pendant que Prettier les
+réécrivait en LF (`prettier.config.js` : `endOfLine: 'lf'`). Les deux se repassaient les
+mêmes fichiers, avec trois symptômes qui n'avaient pas l'air liés :
+
+- `prettier --check` déclarait mal formatés des fichiers intacts ;
+- `npm run format` remplissait le diff de fichiers qu'on n'avait pas touchés ;
+- `scripts/android/*.sh` se retrouvaient avec un CR derrière le shebang — celui-là ne
+  se voyait que sur la machine qui les exécute, donc jamais depuis Windows.
+
+Si un diff de fins de ligne réapparaît, la cause est locale avant d'être ailleurs :
+
+```bash
+git config core.autocrlf     # doit valoir false dans ce dépôt
+git ls-files --eol <chemin>  # i/ = index, w/ = copie de travail ; les deux en lf
+```
+
+⚠️ La même règle vaut pour `trading-shared-types` et le dépôt du bot, qui n'ont pas
+encore de `.gitattributes` : le problème vient du poste Windows, pas de ce dépôt-ci.
+
+## Prettier
+
+`npm run format` réécrit tout `src/` — sans bruit depuis la normalisation ci-dessus.
+Formater **fichier par fichier** reste possible :
 
 ```bash
 npx prettier --write <chemin> [<chemin>…]
 ```
-
-Et vérifier avec `git diff --numstat <file>` : une sortie vide signifie « fins de ligne
-seulement » — restaurer le fichier (`git checkout --`, qui ne peut rien pour un fichier
-non suivi).
 
 ---
 

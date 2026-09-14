@@ -80,10 +80,13 @@ npx ng build              # build de production
 npx tsc -p tsconfig.app.json --noEmit
 ```
 
-`npm run format` réécrit **tout** `src/` : sur Windows (`core.autocrlf=true`) cela
-reformate les fins de ligne de fichiers non touchés. Formater fichier par fichier, et
-vérifier avec `git diff --numstat <file>` — une sortie vide signifie « fins de ligne
-seulement », à restaurer.
+Les fins de ligne sont **LF partout**, imposées par `.gitattributes` et non par la
+config locale de git : le MacBook, le PC et une CI doivent se comporter à l'identique.
+`npm run format` peut donc réécrire tout `src/` sans bruit — le piège où
+`core.autocrlf=true` et `endOfLine: 'lf'` se repassaient les mêmes fichiers n'existe
+plus. Si un diff de fins de ligne réapparaît, vérifier `git config core.autocrlf`
+(doit valoir `false`) avant de chercher ailleurs. Voir
+[docs/conventions.md](docs/conventions.md#formatage).
 
 ## Documentation
 
