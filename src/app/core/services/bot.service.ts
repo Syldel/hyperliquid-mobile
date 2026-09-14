@@ -6,6 +6,7 @@ import {
   IndicatorMetadata,
   IndicatorRequest,
   PACKAGE_VERSION,
+  StrategyMeta,
   StrategyValidationResult,
 } from '@syldel/trading-shared-types';
 import { map, Observable, of, shareReplay, tap } from 'rxjs';
@@ -71,6 +72,19 @@ export class BotService {
     this.metadataCache.set(null);
     this.metadataCachedAt = null;
   }
+
+  /**
+   * Stratégies servies par le bot, groupées par exchange.
+   *
+   * `null` tant que les métadonnées ne sont pas arrivées, et ce `null` porte
+   * du sens : il distingue « le bot ne propose rien » d'« on ne sait pas
+   * encore ». Renvoyer `{}` confondrait les deux, et ferait accuser d'inconnue
+   * toute stratégie affichée avant la réponse du serveur — voir
+   * `pairStrategyStatus` dans bot-strategies/domain.
+   */
+  readonly strategiesByExchange = computed<Record<string, StrategyMeta[]> | null>(
+    () => this.metadataCache()?.strategies ?? null,
+  );
 
   readonly exitBehaviors = computed(() => this.metadataCache()?.globalOptions.exitBehaviors ?? []);
 

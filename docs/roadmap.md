@@ -25,13 +25,19 @@ reste attend — y compris des chantiers qui paraissent plus structurants.
 Dans cet ordre, et pour ces raisons. À distinguer des [limites
 acceptées](#limites-acceptées) plus bas : ce qui suit est en attente, pas arbitré.
 
-1. **Les paires héritées sans `shortname`.** Deux paires du compte portent
-   `{ name: "Neural Momentum Strategy" }` sans `shortname`. Le bot aiguille dessus : il ne
-   peut pas les exécuter. Le formulaire laisse le sélecteur vide et force un nouveau choix,
-   ce qui est correct mais silencieux — un message explicite vaudrait mieux, et le sujet
-   concerne une configuration réelle dès aujourd'hui. Petit, visible.
-2. **Import / export JSON**, détaillé plus bas. C'est la vraie suite : au-delà de la
+1. **Import / export JSON**, détaillé plus bas. C'est la vraie suite : au-delà de la
    sauvegarde, il ouvre l'écriture assistée de stratégies.
+2. **`resolveEditedStrategy` ignore l'exchange de la paire.** Il cherche la stratégie
+   enregistrée dans `Object.values(meta.strategies).flat()`, alors que le sélecteur
+   (`filteredStrategies`) et le statut d'exécutabilité filtrent par exchange. Une paire
+   pourrait donc se voir attribuer une `StrategyMeta` que son propre sélecteur ne propose
+   pas — un `ion-select` portant une valeur absente de ses options. Invisible tant qu'il
+   n'y a qu'un exchange, d'où le report ; **à ne pas oublier** le jour où il y en a deux.
+   Correctif attendu : résoudre par `meta.strategies[exchangeKey]`, avec repli documenté.
+
+**Fait** — les paires héritées sans `shortname` sont désormais signalées dans la liste et
+dans le formulaire, et le moteur du bot ne les écarte plus en silence. Voir
+[strategies/overview.md](strategies/overview.md#limites-connues).
 
 ---
 

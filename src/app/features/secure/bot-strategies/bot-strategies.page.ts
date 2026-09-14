@@ -25,6 +25,7 @@ import { ExternalUser, IExchange, ProtectiveOrderEntry } from '@syldel/trading-s
 import { addIcons } from 'ionicons';
 import {
   addOutline,
+  alertCircleOutline,
   pencilOutline,
   shieldCheckmarkOutline,
   trashOutline,
@@ -40,6 +41,11 @@ import {
   TradingPairModalComponent,
   TradingPairModalResult,
 } from './components/trading-pair-modal/trading-pair-modal.component';
+import {
+  isKnownUnexecutable,
+  pairStrategyStatus,
+  type PairStrategyStatus,
+} from './domain/pair-strategy-status.util';
 
 @Component({
   selector: 'app-bot-strategies',
@@ -85,6 +91,7 @@ export class BotStrategiesPage extends MenuBasePage {
     super();
     addIcons({
       addOutline,
+      alertCircleOutline,
       pencilOutline,
       trashOutline,
       shieldCheckmarkOutline,
@@ -100,6 +107,45 @@ export class BotStrategiesPage extends MenuBasePage {
         switchMap((data) => this.userService.updateStrategy(data)),
       )
       .subscribe();
+  }
+
+  // ------------------------------------------------------------------ //
+  //  Executability
+  // ------------------------------------------------------------------ //
+
+  /**
+   * Le bot exécutera-t-il cette paire, et peut-on encore le savoir ?
+   *
+   * Le catalogue est déjà chargé par le constructeur — il sert aux libellés
+   * d'`exitBehavior` — donc l'autorité était à portée de main, elle n'était
+   * simplement pas consultée. Tant qu'il n'est pas arrivé, `null` fait rendre
+   * `unverified` et la liste ne signale rien : une coupure du bot ne doit pas
+   * allumer toutes les paires en rouge.
+   *
+   * Un exchange absent du catalogue reçoit `[]`, pas `null` : la liste
+   * `exchanges` servie par le bot est dérivée du même enregistrement, donc un
+   * exchange qui n'y figure pas est un exchange pour lequel il ne propose
+   * rien. C'est une réponse, pas une ignorance.
+   */
+  strategyStatus(exchangeKey: string, pair: TradingPair): PairStrategyStatus {
+    const catalogue = this.botService.strategiesByExchange();
+    return pairStrategyStatus(pair.strategy, catalogue ? (catalogue[exchangeKey] ?? []) : null);
+  }
+
+  /** `true` quand ce build est certain que le bot laisse cette paire de côté. */
+  notRunnable(exchangeKey: string, pair: TradingPair): boolean {
+    return isKnownUnexecutable(this.strategyStatus(exchangeKey, pair));
+  }
+
+  /**
+   * Ouvre la paire fautive sur son formulaire, sans rien décider à sa place :
+   * le sélecteur y est vide et l'enregistrement bloqué tant qu'aucune
+   * stratégie n'est choisie. Désactiver la paire d'office serait à la fois
+   * intrusif et inutile — une paire que le bot ignore ne fait déjà rien.
+   */
+  fixPair(exchangeKey: string, pair: TradingPair, event: Event): void {
+    event.stopPropagation();
+    void this.openEditModal(exchangeKey, pair);
   }
 
   // ------------------------------------------------------------------ //

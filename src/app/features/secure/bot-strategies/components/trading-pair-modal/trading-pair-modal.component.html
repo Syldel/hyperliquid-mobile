@@ -88,6 +88,34 @@
           }
         </ion-select>
       </ion-item>
+      @if (showStalledStrategy()) {
+        <div class="stalled">
+          <ion-icon name="alert-circle-outline" aria-hidden="true" />
+          <div class="stalled__text">
+            <strong class="stalled__title">
+              {{
+                editPair()?.enabled
+                  ? 'Enabled, but the bot is not running this pair'
+                  : 'The bot cannot run this pair as configured'
+              }}
+            </strong>
+            <span class="stalled__why">
+              @if (storedStrategyStatus() === 'missing-shortname') {
+                @if (editPair()?.strategy?.name) {
+                  The saved strategy “{{ editPair()?.strategy?.name }}” carries no identifier the
+                  bot can route on.
+                } @else {
+                  No strategy is saved on this pair.
+                }
+              } @else {
+                “{{ editPair()?.strategy?.name }}” is no longer offered by the bot.
+              }
+              It is skipped on every cycle — no entry, no exit, no signal. Pick a strategy below to
+              make this pair runnable.
+            </span>
+          </div>
+        </div>
+      }
     </ion-list>
 
     <!-- Exit Behavior -->

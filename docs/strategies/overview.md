@@ -165,6 +165,23 @@ import/export JSON, qui ouvre en prime l'écriture assistée de stratégies. Voi
 [../roadmap.md](../roadmap.md#décidé--la-bibliothèque-reste-locale) avant d'entreprendre
 quoi que ce soit sur ce sujet.
 
-**Des paires héritées n'ont pas de `shortname`.** Le bot ne peut alors pas les exécuter
-(il aiguille dessus), et le formulaire laisse le sélecteur vide, forçant un nouveau choix
-avant d'enregistrer. Correct, mais silencieux : un message explicite vaudrait mieux.
+**Une paire que le bot n'exécute pas se signale, elle ne se répare pas toute seule.**
+Deux cas mènent au même résultat — pas de `shortname` du tout (paire héritée), ou un
+`shortname` absent du catalogue servi (stratégie retirée côté bot). Dans les deux cas le
+moteur n'a aucune branche sur quoi aiguiller et écarte la paire de chaque cycle.
+
+`bot-strategies/domain/pair-strategy-status.util.ts` tranche, et son quatrième état est le
+plus important : `unverified`. « Pas de `shortname` » se décide sans catalogue et pour
+toujours ; « `shortname` inconnu » exige le catalogue chargé ; tant qu'il n'a pas répondu,
+**rien n'est accusé** — une coupure du bot n'allume pas la liste en rouge.
+
+Le signalement est délibérément voyant (liste et formulaire), parce que le défaut était
+invisible : deux paires `enabled: true` sur BTC et XRP affichées comme les autres, et
+muettes aussi côté bot, dont la chaîne d'aiguillage sortait sans `return` ni log. Toucher
+le signalement ouvre le formulaire sur le sélecteur ; **le choix reste à l'utilisateur** —
+désactiver la paire d'office serait intrusif, et inutile puisqu'elle ne fait déjà rien.
+
+⚠️ `resolveEditedStrategy` cherche encore la stratégie enregistrée dans le catalogue
+**aplati de tous les exchanges**, là où le sélecteur et le statut ci-dessus filtrent par
+exchange. Invisible avec un seul exchange, faux dès qu'il y en a deux. Voir
+[../roadmap.md](../roadmap.md#prochaines-étapes).

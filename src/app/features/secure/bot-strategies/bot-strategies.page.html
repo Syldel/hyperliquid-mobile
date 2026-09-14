@@ -17,14 +17,43 @@
         />
       </ion-item-divider>
 
-      @for (pair of entry.value.pairs; track pair.name) {
+      @for (pair of entry.value.pairs; track pair.name) { @let status = strategyStatus(entry.key,
+      pair); @let notRunning = notRunnable(entry.key, pair);
       <ion-item-sliding>
-        <ion-item>
+        <ion-item [class.pair--stalled]="notRunning">
           <ion-label>
             <div class="pair-header">
               <strong>{{ pair.name }}</strong>
-              <ion-badge color="primary">{{ pair.strategy?.name }}</ion-badge>
+              <ion-badge [color]="notRunning ? 'danger' : 'primary'">
+                @if (notRunning) {
+                <ion-icon name="alert-circle-outline" aria-hidden="true" />
+                } {{ pair.strategy?.name || 'No strategy' }}
+              </ion-badge>
             </div>
+            @if (notRunning) {
+            <button
+              type="button"
+              class="stalled"
+              (click)="fixPair(entry.key, pair, $event)"
+              [attr.aria-label]="'Fix the strategy of ' + pair.name"
+            >
+              <ion-icon name="alert-circle-outline" aria-hidden="true" />
+              <span class="stalled__text">
+                <strong class="stalled__title">
+                  {{ pair.enabled ? 'Enabled, but the bot is not running it' : 'Not runnable as
+                  configured' }}
+                </strong>
+                <span class="stalled__why">
+                  @if (status === 'missing-shortname') { @if (pair.strategy?.name) { Its saved
+                  strategy “{{ pair.strategy?.name }}” carries no identifier the bot can route on. }
+                  @else { No strategy is saved on this pair. } } @else { “{{ pair.strategy?.name }}”
+                  is no longer offered by the bot. } This pair is skipped on every cycle — no entry,
+                  no exit, no signal.
+                </span>
+                <span class="stalled__cta">Tap to pick a strategy the bot offers</span>
+              </span>
+            </button>
+            }
             <p>
               Ratio: {{ pair.ratio }}% · Interval: {{ pair.interval }} @if (pair.exitBehavior) { ·
               <span class="exit-dot exit-dot--{{ pair.exitBehavior }}" aria-hidden="true"></span>

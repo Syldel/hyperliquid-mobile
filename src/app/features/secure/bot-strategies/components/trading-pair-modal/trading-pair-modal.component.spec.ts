@@ -4,7 +4,7 @@ import { TradingPair } from '@models/user.interface';
 import { AvailableCapitalService } from '@services/available-capital.service';
 import { BotService } from '@services/bot.service';
 import type { ExchangesMetaResponse, StrategyMeta } from '@syldel/trading-shared-types';
-import { of } from 'rxjs';
+import { NEVER, of } from 'rxjs';
 import { TradingPairModalComponent } from './trading-pair-modal.component';
 
 /**
@@ -184,5 +184,97 @@ describe('TradingPairModalComponent prefill', () => {
 
     expect(component.form.getRawValue().pairName).toBe('');
     expect(component.ruleDocument()).toBeNull();
+  });
+});
+
+/**
+ * Le pendant du test « leaves the selector empty » ci-dessus : laisser le
+ * champ vide était correct, mais muet. Ces invariants disent quand la modale
+ * doit parler — et surtout quand elle doit se taire.
+ */
+describe('TradingPairModalComponent stalled strategy notice', () => {
+  let fixture: ComponentFixture<TradingPairModalComponent>;
+  let component: TradingPairModalComponent;
+
+  function mount(edited: TradingPair | undefined, metadata = of(META)): void {
+    TestBed.configureTestingModule({
+      imports: [TradingPairModalComponent],
+      providers: [
+        {
+          provide: BotService,
+          useValue: {
+            getExchangeFormMetadata: () => metadata,
+            indicators: signal([]),
+            transforms: signal([]),
+            validateStrategy: () => of({ valid: true, issues: [] }),
+          },
+        },
+        {
+          provide: AvailableCapitalService,
+          useValue: { getAvailableCapital: () => of(1000) },
+        },
+      ],
+    });
+
+    fixture = TestBed.createComponent(TradingPairModalComponent);
+    component = fixture.componentInstance;
+    if (edited) {
+      fixture.componentRef.setInput('editPair', edited);
+      fixture.componentRef.setInput('editExchangeKey', 'hyperliquid');
+    }
+    fixture.detectChanges();
+  }
+
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('announces a pair the bot cannot route, rather than only emptying the selector', () => {
+    mount(pair({ strategy: { name: 'Neural Momentum Strategy' } } as Partial<TradingPair>));
+
+    expect(component.storedStrategyStatus()).toBe('missing-shortname');
+    expect(component.showStalledStrategy()).toBe(true);
+  });
+
+  it('announces a strategy the catalogue no longer offers', () => {
+    mount(
+      pair({
+        strategy: { name: 'Neural Momentum Strategy', shortname: 'neural-momentum' },
+      } as Partial<TradingPair>),
+    );
+
+    expect(component.storedStrategyStatus()).toBe('unknown-shortname');
+    expect(component.showStalledStrategy()).toBe(true);
+  });
+
+  it('stops announcing once a strategy has been picked', () => {
+    // La bannière explique pourquoi le sélecteur est vide ; la garder affichée
+    // après un choix décrirait un état que l'écran ne montre plus.
+    mount(pair({ strategy: { name: 'Neural Momentum Strategy' } } as Partial<TradingPair>));
+    expect(component.showStalledStrategy()).toBe(true);
+
+    component.form.patchValue({ strategy: ADVANCED_RULES });
+
+    expect(component.showStalledStrategy()).toBe(false);
+  });
+
+  it('says nothing about a pair the catalogue still offers', () => {
+    mount(pair());
+
+    expect(component.storedStrategyStatus()).toBe('ok');
+    expect(component.showStalledStrategy()).toBe(false);
+  });
+
+  it('never accuses a pair while the catalogue has not answered', () => {
+    // Bot injoignable : le sélecteur est vide pour une tout autre raison, et
+    // annoncer « plus proposée par le bot » serait un diagnostic faux.
+    mount(pair(), NEVER);
+
+    expect(component.storedStrategyStatus()).toBe('unverified');
+    expect(component.showStalledStrategy()).toBe(false);
+  });
+
+  it('says nothing when a pair is being created', () => {
+    mount(undefined);
+
+    expect(component.showStalledStrategy()).toBe(false);
   });
 });

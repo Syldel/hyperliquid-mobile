@@ -54,3 +54,64 @@
   font-size: 0.75rem;
   color: var(--ion-color-medium);
 }
+
+/*
+ * Une paire que le bot n'exécute pas doit se voir sans être cherchée : c'est
+ * le défaut qui a coûté le plus cher ici — deux paires `enabled: true` sur BTC
+ * et XRP, affichées exactement comme les paires saines, et muettes des deux
+ * côtés (le moteur ne loguait rien non plus).
+ */
+.pair--stalled {
+  --background: rgba(var(--ion-color-danger-rgb), 0.06);
+  border-left: 4px solid var(--ion-color-danger);
+}
+
+.stalled {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--ion-color-danger);
+  border-radius: 8px;
+  background: rgba(var(--ion-color-danger-rgb), 0.1);
+  color: var(--ion-color-danger);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  > ion-icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+    font-size: 1.05rem;
+  }
+}
+
+.stalled__text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  /* `ion-label` tronque par défaut : sans ça, l'explication tient sur une
+     ligne coupée, ce qui la rend illisible au moment où elle compte. */
+  white-space: normal;
+}
+
+.stalled__title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.stalled__why {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--ion-color-danger-shade);
+}
+
+.stalled__cta {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-decoration: underline;
+}

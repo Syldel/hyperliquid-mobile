@@ -60,6 +60,7 @@ import {
 import { addIcons } from 'ionicons';
 import {
   addOutline,
+  alertCircleOutline,
   checkmarkOutline,
   chevronForwardOutline,
   closeCircle,
@@ -82,6 +83,11 @@ import {
   generateStrategyId,
   StrategyLibraryService,
 } from '../../../strategies/services/strategy-library.service';
+import {
+  isKnownUnexecutable,
+  pairStrategyStatus,
+  type PairStrategyStatus,
+} from '../../domain/pair-strategy-status.util';
 
 interface TradingPairForm {
   exchangeKey: FormControl<string>;
@@ -157,6 +163,14 @@ export class TradingPairModalComponent implements OnInit {
   availableExchanges = signal<string[]>([]);
   strategiesByExchange = signal<Record<string, StrategyMeta[]>>({});
   metadataError = signal(false);
+  /**
+   * Le catalogue a répondu — distinct de « la liste est vide ».
+   *
+   * Sans ce drapeau, `filteredStrategies()` rend `[]` avant la réponse, ce
+   * qu'une lecture naïve prendrait pour « le bot ne propose rien » : toute
+   * paire saine serait signalée comme abandonnée le temps du chargement.
+   */
+  metadataLoaded = signal(false);
   exitBehaviors = signal<ExitBehaviorMeta[]>([]);
 
   /** FormGroup reconstruit dynamiquement à chaque changement de strategy */
@@ -201,6 +215,30 @@ export class TradingPairModalComponent implements OnInit {
   });
 
   readonly isEditMode = computed(() => !!this.editPair());
+
+  /**
+   * Statut de la stratégie **enregistrée** sur la paire éditée, par opposition
+   * à celle que le formulaire porte en ce moment.
+   *
+   * `unverified` en création comme tant que le catalogue n'a pas répondu : dans
+   * les deux cas il n'y a rien dont ce build puisse juger, et le dire vaut
+   * mieux que rendre un verdict par défaut.
+   */
+  readonly storedStrategyStatus = computed<PairStrategyStatus>(() => {
+    const pair = this.editPair();
+    if (!pair || !this.metadataLoaded()) return 'unverified';
+    return pairStrategyStatus(pair.strategy, this.filteredStrategies());
+  });
+
+  /**
+   * La bannière explique **pourquoi le sélecteur est vide** : elle disparaît
+   * donc dès qu'une stratégie est choisie, sans quoi elle décrirait un état
+   * que l'écran ne montre plus. Le formulaire reste invalide tant que rien
+   * n'est choisi — la réparation est proposée, jamais appliquée d'office.
+   */
+  readonly showStalledStrategy = computed(
+    () => isKnownUnexecutable(this.storedStrategyStatus()) && !this.formValue().strategy,
+  );
 
   /**
    * Branches de règles déclarées par la stratégie choisie, telles que servies
@@ -299,6 +337,7 @@ export class TradingPairModalComponent implements OnInit {
 
     this.botService.getExchangeFormMetadata().subscribe({
       next: (meta) => {
+        this.metadataLoaded.set(true);
         this.candleIntervals.set(meta.intervals);
         this.availableExchanges.set(meta.exchanges);
         this.strategiesByExchange.set(meta.strategies);
@@ -425,6 +464,7 @@ export class TradingPairModalComponent implements OnInit {
 
   constructor() {
     addIcons({
+      alertCircleOutline,
       closeOutline,
       checkmarkOutline,
       closeCircle,

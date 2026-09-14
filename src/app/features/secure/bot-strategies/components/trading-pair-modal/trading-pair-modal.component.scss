@@ -64,3 +64,45 @@ ion-item {
     line-height: 1.4;
   }
 }
+
+/*
+ * Même signalement que dans la liste des paires, au moment où l'utilisateur
+ * peut y remédier : il explique pourquoi le sélecteur au-dessus est vide, et
+ * que la paire ne tourne pas pour autant.
+ */
+.stalled {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 4px 0 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--ion-color-danger);
+  border-radius: 8px;
+  background: rgba(var(--ion-color-danger-rgb), 0.1);
+  color: var(--ion-color-danger);
+
+  > ion-icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+    font-size: 1.1rem;
+  }
+
+  &__text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  &__title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  &__why {
+    font-size: 0.78rem;
+    line-height: 1.4;
+    color: var(--ion-color-danger-shade);
+  }
+}
