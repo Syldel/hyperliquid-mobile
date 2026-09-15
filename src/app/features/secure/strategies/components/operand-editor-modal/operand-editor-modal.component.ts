@@ -33,6 +33,10 @@ import type {
 } from '@syldel/trading-shared-types';
 import { addIcons } from 'ionicons';
 import { addOutline, closeCircle } from 'ionicons/icons';
+import {
+  coerceIndicatorParameter,
+  coerceIndicatorParameters,
+} from '../../domain/indicator-parameters.util';
 import { availableOperandTypes } from '../../domain/operand-types.util';
 import { formatOperand } from '../../domain/strategy-format.util';
 
@@ -216,7 +220,15 @@ export class OperandEditorModalComponent implements OnInit {
         };
 
         this.indicatorName.set(name);
-        this.parameters.set(parameters as Record<string, number | string>);
+        // Relire en ramenant chaque paramètre au type que le catalogue
+        // déclare : rouvrir un opérande écrit avant la correction suffit à le
+        // réparer, sans attendre que l'utilisateur retouche le champ.
+        this.parameters.set(
+          coerceIndicatorParameters(
+            parameters,
+            this.indicators().find((indicator) => indicator.name === name)?.parameters,
+          ),
+        );
         this.subField.set(subField ?? '');
         this.offset.set(offset ?? 0);
       }
@@ -250,9 +262,22 @@ export class OperandEditorModalComponent implements OnInit {
     this.subField.set('');
   }
 
+  /**
+   * Un `ion-input` rend une **chaîne**, même en `type="number"`. L'écrire telle
+   * quelle donnait un `period: "20"` que rien ne rattrapait ensuite — ni la
+   * validation partagée, qui ne regarde que `name` et `subField`, ni le bot,
+   * qui calculait alors `2 / "201"`. Voir indicator-parameters.util.ts.
+   *
+   * `null` signifie « ne rien écrire » : un champ vidé en cours de frappe ou
+   * une saisie illisible laisse la valeur précédente en place, plutôt que de
+   * la remplacer par un `NaN` que `JSON.stringify` effacerait.
+   */
   onParameterChange(name: string, value: string | number | null | undefined): void {
-    if (value === null || value === undefined || value === '') return;
-    this.parameters.update((parameters) => ({ ...parameters, [name]: value }));
+    const declared = this.selectedMeta()?.parameters.find((parameter) => parameter.name === name);
+    const coerced = coerceIndicatorParameter(declared, value);
+    if (coerced === null) return;
+
+    this.parameters.update((parameters) => ({ ...parameters, [name]: coerced }));
   }
 
   parameterValue(name: string): number | string {
