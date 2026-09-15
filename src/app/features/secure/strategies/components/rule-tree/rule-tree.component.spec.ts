@@ -165,4 +165,44 @@ describe('RuleTreeComponent', () => {
 
     expect(text()).toContain('No condition yet');
   });
+
+  /**
+   * La liste d'anomalies nomme un chemin ; c'est cette marque-ci qui le rend
+   * lisible. Sans elle, « Empty group » laisse l'utilisateur compter ses
+   * conditions pour deviner laquelle est visée.
+   */
+  describe('marking the line a verdict targets', () => {
+    const withEmptyChild = {
+      long: {
+        entry: {
+          type: 'logical',
+          operator: 'AND',
+          conditions: [comparison(10), { type: 'logical', operator: 'AND', conditions: [] }],
+        },
+      },
+    } as StrategyRules;
+
+    function faultyRows(): number {
+      return fixture.nativeElement.querySelectorAll('.faulty').length;
+    }
+
+    it('marks nothing while the draft is still being built', () => {
+      mount(withEmptyChild);
+
+      expect(faultyRows()).toBe(0);
+    });
+
+    it('marks the offending line once the verdict is reported', () => {
+      mount(withEmptyChild);
+
+      store.noteSaveAttempt();
+      fixture.detectChanges();
+
+      // Le groupe vide lui-même, et lui seul — la condition voisine est saine.
+      expect(faultyRows()).toBe(1);
+      expect(fixture.nativeElement.querySelector('.faulty').textContent).toContain(
+        'No condition yet',
+      );
+    });
+  });
 });

@@ -89,6 +89,33 @@
       </ion-list>
     }
 
+    <!-- Verdict de ce build. Affiché seulement après un enregistrement : un
+         groupe vide est l'état de départ normal d'une branche, et l'accuser
+         pendant la construction rendrait le signalement inaudible. -->
+    @if (store.localIssues().length > 0) {
+      <ion-list inset>
+        <ion-item lines="none">
+          <ion-label>
+            <h3>These rules cannot run yet</h3>
+            <p>Saved as a draft. The bot was not asked — this build is sure of these.</p>
+          </ion-label>
+        </ion-item>
+        @for (issue of store.localIssues(); track issue.path + issue.code) {
+          <ion-item [button]="canReveal(issue)" (click)="revealIssue(issue)">
+            <ion-label class="ion-text-wrap">
+              <ion-text color="danger">
+                <p>{{ issuePath(issue) }}</p>
+              </ion-text>
+              <p>{{ issue.message }}</p>
+            </ion-label>
+            @if (canReveal(issue)) {
+              <ion-icon slot="end" name="chevron-forward-outline" color="medium" />
+            }
+          </ion-item>
+        }
+      </ion-list>
+    }
+
     @if (serverIssues().length > 0) {
       <ion-list inset>
         <ion-item lines="none">

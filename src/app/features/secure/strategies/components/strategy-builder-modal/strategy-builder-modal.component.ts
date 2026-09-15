@@ -140,12 +140,25 @@ export class StrategyBuilderModalComponent implements OnInit {
     if (!document || !this.store.canSave()) return;
 
     this.saving.set(true);
+    this.store.noteSaveAttempt();
     this.store.setServerIssues([]);
 
     try {
       const saved = await this.library.save(document);
 
+      // Anomalies dont ce build est certain : il y a un rapport à lire, donc la
+      // modale reste ouverte — exactement le précédent du refus serveur.
+      // Interroger le bot n'apprendrait rien, il répéterait ces anomalies de
+      // structure. Mais fermer sans un mot laissait croire qu'il avait validé.
+      if (this.store.localIssues().length > 0) {
+        await this.toast('Saved as a draft — fix the issues below before it can run.', 'warning');
+        return;
+      }
+
+      // Pas de rapport à lire, juste un fait : aucun côté à évaluer. On le dit
+      // et on ferme, plutôt que de retenir l'utilisateur devant une liste vide.
       if (!this.store.canAttach()) {
+        await this.toast('Saved as a draft — no side to evaluate yet.', 'medium');
         await this.modalCtrl.dismiss(saved, 'confirm');
         return;
       }

@@ -65,6 +65,18 @@ export class StrategyBuilderStore {
   private readonly _focusedPath = signal<string | null>(null);
   private readonly _serverIssues = signal<PublicStrategyValidationIssue[]>([]);
 
+  /**
+   * `true` dès que l'utilisateur a demandé un enregistrement.
+   *
+   * Sépare « ce build est certain que ces règles ne tourneront pas » de « il
+   * est temps de le dire ». Un groupe logique vide est l'état de départ normal
+   * d'une branche : l'accuser pendant la construction ferait crier l'éditeur
+   * sur un brouillon en cours, et rendrait le signalement inaudible au moment
+   * où il compte. Enregistrer, c'est déclarer avoir fini — c'est là que le
+   * verdict devient un reproche.
+   */
+  private readonly _saveAttempted = signal(false);
+
   readonly document = this._document.asReadonly();
   readonly name = this._name.asReadonly();
   readonly rules = this._rules.asReadonly();
@@ -105,6 +117,52 @@ export class StrategyBuilderStore {
   /** Anomalies dont ce build est certain — elles seules empêchent la mise en service. */
   readonly blockingIssues = computed(() => this.issues().blocking);
 
+  /**
+   * Le verdict local tel qu'il doit être **montré** : pendant de
+   * `serverIssues`, et affiché par la même liste.
+   *
+   * Deux différences avec `blockingIssues`, chacune motivée :
+   *
+   * - il ne dit rien tant que l'utilisateur n'a pas enregistré (voir
+   *   `_saveAttempted`) ;
+   * - il juge les règles **élaguées**, c'est-à-dire celles qui viennent d'être
+   *   écrites dans la bibliothèque, et non le brouillon à l'écran. Sans ça, une
+   *   branche vide que `pruneEmptyRuleBranches` retire serait reprochée alors
+   *   que le document enregistré ne la porte pas — on demanderait de corriger
+   *   un nœud qui n'existe plus.
+   *
+   * Recalculé à chaque changement : une correction fait disparaître la ligne
+   * sans qu'il faille réenregistrer pour s'en rendre compte.
+   */
+  readonly localIssues = computed(() =>
+    this._saveAttempted()
+      ? collectEditorIssues(pruneEmptyRuleBranches(this._rules()), this._editedPaths()).blocking
+      : [],
+  );
+
+  /**
+   * Lignes de l'arbre visées par le verdict local.
+   *
+   * Même raison que `serverIssuePaths` : « Empty group » ou « Missing operand »
+   * ne dit rien tant qu'on ne sait pas laquelle des douze conditions il
+   * désigne. Les chemins sont situés dans l'arbre **courant**, pas dans sa
+   * version élaguée : c'est celui-là que l'utilisateur voit.
+   */
+  readonly localIssuePaths = computed(() => {
+    const rules = this._rules();
+
+    return new Set(
+      this.localIssues()
+        .map((issue) => locateIssue(rules, issue.path)?.nodePath)
+        .filter((path) => path !== undefined),
+    );
+  });
+
+  /** L'utilisateur vient de demander un enregistrement : le verdict local devient visible. */
+  noteSaveAttempt(): void {
+    this._saveAttempted.set(true);
+  }
+
   /** Nœuds hérités que ce build ne sait pas interpréter : affichés en lecture seule. */
   readonly deferredIssues = computed(() => this.issues().deferred);
 
@@ -133,7 +191,15 @@ export class StrategyBuilderStore {
    */
   readonly canAttach = computed(() => {
     const rules = pruneEmptyRuleBranches(this._rules());
-    return this.blockingIssues().length === 0 && (!!rules.long || !!rules.short);
+
+    // Le verdict porte sur les règles élaguées de bout en bout. Juger l'arbre
+    // à l'écran refusait une stratégie longue parfaitement valide parce qu'un
+    // « Add » resté vide traînait du côté short — branche que l'enregistrement
+    // retire, et que le bot ne verrait donc jamais.
+    return (
+      collectEditorIssues(rules, this._editedPaths()).blocking.length === 0 &&
+      (!!rules.long || !!rules.short)
+    );
   });
 
   open(document: StrategyDocument): void {
@@ -144,6 +210,7 @@ export class StrategyBuilderStore {
     this._history.set([]);
     this._focusedPath.set(null);
     this._serverIssues.set([]);
+    this._saveAttempted.set(false);
   }
 
   /** Enregistre le verdict du bot. Un tableau vide efface le précédent. */

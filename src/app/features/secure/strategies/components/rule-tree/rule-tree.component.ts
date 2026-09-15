@@ -76,6 +76,18 @@ export class RuleTreeComponent {
    */
   readonly faulty = computed(() => this.store.serverIssuePaths().has(this.path()));
 
+  /**
+   * `true` si le verdict de ce build vise cette ligne.
+   *
+   * Distinct de `faulty` et pas fusionné avec lui : `faulty` signifie « le bot
+   * a tranché », et c'est ce qui fait passer la puce d'un nœud illisible de
+   * « newer version » à « rejected ». Un nœud hérité portant par ailleurs une
+   * anomalie locale afficherait alors « rejected » sans qu'aucun bot n'ait
+   * rien rejeté. Même marque visuelle, deux provenances, que les deux listes
+   * de la modale distinguent.
+   */
+  readonly blocking = computed(() => this.store.localIssuePaths().has(this.path()));
+
   readonly isNegation = computed(
     () => (this.node() as { type?: unknown } | undefined)?.type === 'not',
   );

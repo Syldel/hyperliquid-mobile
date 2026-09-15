@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ModalController } from '@ionic/angular/standalone';
+import { ModalController, ToastController } from '@ionic/angular/standalone';
 import { BotService } from '@services/bot.service';
 import type {
   IExchangeStrategy,
@@ -50,6 +50,7 @@ describe('StrategyBuilderModalComponent save flow', () => {
   let fixture: ComponentFixture<StrategyBuilderModalComponent>;
   let component: StrategyBuilderModalComponent;
   let modalCtrl: { dismissed: { data: unknown; role?: string }[] };
+  let toastCtrl: { messages: string[] };
   let validated: IExchangeStrategy[];
   let saved: StrategyDocument[];
   let validationResult: StrategyValidationResult;
@@ -99,6 +100,9 @@ describe('StrategyBuilderModalComponent save flow', () => {
 
     modalCtrl = TestBed.inject(ModalController) as unknown as typeof modalCtrl;
     modalCtrl.dismissed.length = 0;
+
+    toastCtrl = TestBed.inject(ToastController) as unknown as typeof toastCtrl;
+    toastCtrl.messages.length = 0;
   });
 
   // Décision « brouillon autorisé » : enregistrer ne dépend jamais du verdict.
@@ -162,6 +166,50 @@ describe('StrategyBuilderModalComponent save flow', () => {
 
     expect(saved).toHaveLength(1);
     expect(modalCtrl.dismissed.at(-1)?.role).toBe('confirm');
+  });
+
+  /**
+   * Le trou que ces deux tests ferment : la modale se fermait sans un mot sur
+   * une stratégie que ce build savait inexécutable, et sans interroger le bot.
+   * L'utilisateur ne pouvait pas distinguer « le bot a validé » de « on n'a
+   * même pas demandé ».
+   */
+  describe('when this build is sure the rules will not run', () => {
+    // Une entrée vide que l'élagage conserve, parce que la sortie a du contenu.
+    const emptyEntryWithExit = {
+      long: {
+        entry: { type: 'logical', operator: 'AND', conditions: [] },
+        exit: filledGroup,
+      },
+    } as StrategyRules;
+
+    // Même précédent que le refus du serveur : il y a un rapport à lire, donc
+    // la modale reste ouverte plutôt que de l'emporter en se fermant.
+    it('saves, reports, and stays open without asking the bot', async () => {
+      mount(emptyEntryWithExit);
+
+      await component.save();
+
+      expect(saved).toHaveLength(1);
+      expect(validated).toEqual([]);
+      expect(modalCtrl.dismissed).toEqual([]);
+      expect(component.store.localIssues()).toHaveLength(1);
+      expect(toastCtrl.messages.at(-1)).toContain('draft');
+    });
+
+    // Rien à évaluer n'est pas un rapport à lire, c'est un fait : on le dit et
+    // on ferme, sans retenir l'utilisateur devant une liste vide.
+    it('closes with a word when there is simply nothing to evaluate', async () => {
+      mount({ long: { entry: { type: 'logical', operator: 'AND', conditions: [] } } });
+
+      await component.save();
+
+      expect(saved).toHaveLength(1);
+      expect(validated).toEqual([]);
+      expect(component.store.localIssues()).toEqual([]);
+      expect(modalCtrl.dismissed.at(-1)?.role).toBe('confirm');
+      expect(toastCtrl.messages.at(-1)).toContain('draft');
+    });
   });
 
   it('does nothing without a name', async () => {

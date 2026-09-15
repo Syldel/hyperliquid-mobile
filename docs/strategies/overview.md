@@ -86,8 +86,19 @@ une chaîne d'événements à travers un composant récursif.
 Deux verdicts distincts, à ne pas confondre :
 
 - `canSave` — le nom est renseigné. C'est tout ce qu'exige un brouillon.
-- `canAttach` — aucune anomalie bloquante **et** au moins un côté à évaluer. Le verdict
-  serveur reste requis par-dessus.
+- `canAttach` — aucune anomalie bloquante **et** au moins un côté à évaluer, le tout jugé
+  sur les règles **élaguées**. Le verdict serveur reste requis par-dessus.
+
+L'élagage n'est pas un détail : juger l'arbre à l'écran refusait une stratégie longue
+parfaitement valide parce qu'un « Add » resté vide traînait du côté short — branche que
+l'enregistrement retire, et que le bot ne verrait donc jamais.
+
+`localIssues` est le pendant de `serverIssues` : le verdict de `blockingIssues`, à deux
+différences près. Il ne dit rien tant que l'utilisateur n'a pas enregistré (un
+groupe vide est l'état de départ normal d'une branche ; l'accuser pendant la construction
+rendrait le signalement inaudible au moment où il compte), et il juge les règles élaguées,
+c'est-à-dire celles qui viennent d'être écrites. `localIssuePaths` marque les lignes
+visées, comme `serverIssuePaths` le fait pour le verdict du bot.
 
 ## Composants
 
@@ -120,6 +131,21 @@ L'ordre du builder est délibéré : **l'enregistrement ne dépend jamais de la 
 ouverte pour que le rapport soit lu plutôt qu'emporté par la fermeture. Interroger le
 serveur sur une stratégie que la validation locale sait déjà incomplète n'apprendrait
 rien : il répéterait les mêmes anomalies de structure.
+
+Ce qui vaut pour le verdict du serveur vaut pour celui-ci : **un rapport se lit**. Trois
+issues à un enregistrement, et une seule ferme sans rien montrer :
+
+| Situation                           | Ce qui se passe                                                |
+| ----------------------------------- | -------------------------------------------------------------- |
+| anomalies dont ce build est certain | enregistré, rapport affiché, modale ouverte, bot non interrogé |
+| rien à évaluer (aucun côté)         | enregistré, un mot le dit, modale fermée                       |
+| rien à redire localement            | le bot tranche ; il ne ferme que s'il valide                   |
+
+La deuxième ligne n'a pas de rapport à lire, seulement un fait à énoncer — retenir
+l'utilisateur devant une liste vide n'apporterait rien. La première en a un, et le taire
+était le défaut corrigé : la modale se fermait sans un mot sur une stratégie que ce build
+savait inexécutable, et sans interroger le bot. Rien ne distinguait « le bot a validé » de
+« on n'a même pas demandé ».
 
 Bot injoignable : on avertit et on laisse passer. La stratégie est locale de toute façon,
 et bloquer la configuration parce que le service tousse coûterait plus que de laisser le

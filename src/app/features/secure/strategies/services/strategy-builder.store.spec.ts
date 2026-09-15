@@ -276,3 +276,107 @@ describe('StrategyBuilderStore - server issues', () => {
     expect(store.serverIssues()).toEqual([]);
   });
 });
+
+/**
+ * Le verdict local existait déjà (`blockingIssues`) mais n'était affiché nulle
+ * part : une stratégie incomplète s'enregistrait en silence, et cessait
+ * simplement d'être attachable sans qu'un écran le dise.
+ *
+ * Ce que ces tests fixent, c'est le **moment** où ce verdict devient un
+ * reproche. Pas pendant la construction — un groupe vide est l'état de départ
+ * normal d'une branche — mais quand l'utilisateur déclare avoir fini, en
+ * enregistrant.
+ */
+describe('StrategyBuilderStore - local verdict', () => {
+  let store: StrategyBuilderStore;
+
+  /** Un côté long complet, et un short dont l'entrée est restée vide. */
+  const halfBuilt = (): StrategyRules => ({
+    long: { entry: filledEntry },
+    short: { entry: createLogicalGroup() },
+  });
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [StrategyBuilderStore] });
+    store = TestBed.inject(StrategyBuilderStore);
+  });
+
+  it('says nothing while the draft is still being built', () => {
+    store.open(document({ long: { entry: createLogicalGroup(), exit: filledEntry } }));
+
+    // L'anomalie est bien connue...
+    expect(store.blockingIssues().length).toBeGreaterThan(0);
+    // ...mais elle n'est pas encore un reproche.
+    expect(store.localIssues()).toEqual([]);
+    expect(store.localIssuePaths().size).toBe(0);
+  });
+
+  it('reports the verdict once the user asks to save', () => {
+    store.open(document({ long: { entry: createLogicalGroup(), exit: filledEntry } }));
+
+    store.noteSaveAttempt();
+
+    expect(store.localIssues().map((issue) => issue.code)).toEqual(['EMPTY_LOGICAL_CONDITIONS']);
+  });
+
+  /**
+   * Le rapport doit décrire **ce qui a été enregistré**, pas le brouillon à
+   * l'écran. `pruneEmptyRuleBranches` retire les branches restées vides : les
+   * accuser reviendrait à exiger la correction d'un nœud que le document ne
+   * porte pas.
+   */
+  it('judges the rules as they are saved, not as they are drawn', () => {
+    store.open(document(halfBuilt()));
+    store.noteSaveAttempt();
+
+    expect(store.localIssues()).toEqual([]);
+  });
+
+  // Corollaire du test précédent, côté verdict d'attachement : un long complet
+  // reste exécutable, qu'un short vide traîne à l'écran ou non.
+  it('allows attaching a complete side despite an empty one that will be pruned', () => {
+    store.open(document(halfBuilt()));
+
+    expect(store.canAttach()).toBe(true);
+  });
+
+  // Même besoin que pour le verdict serveur : « Empty group » ne dit rien tant
+  // qu'on ne sait pas laquelle des douze conditions il désigne.
+  it('points at the line each reported issue targets', () => {
+    store.open(
+      document({
+        long: {
+          entry: {
+            type: 'logical',
+            operator: 'AND',
+            conditions: [createConstant(true), createLogicalGroup()],
+          },
+        },
+      }),
+    );
+    store.noteSaveAttempt();
+
+    expect([...store.localIssuePaths()]).toEqual(['rules.long.entry.conditions[1]']);
+  });
+
+  it('stops reporting once the issue is fixed, without being asked again', () => {
+    store.open(document({ long: { entry: createLogicalGroup(), exit: filledEntry } }));
+    store.noteSaveAttempt();
+    expect(store.localIssues().length).toBe(1);
+
+    store.setBranch('rules.long.entry', filledEntry);
+
+    expect(store.localIssues()).toEqual([]);
+  });
+
+  // Un autre document rouvre sur un brouillon propre : le reproche ne se
+  // transporte pas d'une édition à l'autre.
+  it('forgets the save attempt when another document is opened', () => {
+    store.open(document({ long: { entry: createLogicalGroup(), exit: filledEntry } }));
+    store.noteSaveAttempt();
+
+    store.open(document({ long: { entry: createLogicalGroup(), exit: filledEntry } }));
+
+    expect(store.localIssues()).toEqual([]);
+  });
+});
