@@ -73,7 +73,7 @@ import { firstValueFrom } from 'rxjs';
 import { IndicatorOverlayService } from '@shared/components/indicator-picker/services/indicator-overlay.service';
 import { formatIndicatorLabel } from '@shared/components/indicator-picker/utils/indicator-label.util';
 import { strategyColor } from '../../../strategies/domain/strategy-color.util';
-import { isLocallyExecutable } from '../../../strategies/domain/strategy-issues.util';
+import { partitionAttachedStrategies } from '../../utils/attached-strategies.util';
 import { toAnalysisRequest } from '../../../strategies/models/strategy-document.model';
 import {
   collectStrategyOperands,
@@ -475,10 +475,10 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     // Une stratégie sans côté à évaluer fait rejeter la requête d'analyse
     // ENTIÈRE (`collectExecutableStrategyRulesIssues` côté serveur), donc
     // emporterait aussi les indicateurs. On ne joint que celles qui passent la
-    // validation locale ; les autres restent attachées, simplement pas envoyées.
-    const strategies = this.attachedStrategies()
-      .filter((document) => isLocallyExecutable(document.rules))
-      .map(toAnalysisRequest);
+    // validation locale — et les autres sont **marquées** dans la bande de
+    // puces, depuis la même partition (attached-strategies.util.ts) : elles
+    // restaient jusqu'ici attachées, pas envoyées, et sans un mot.
+    const strategies = this.attachedPartition().evaluated.map(toAnalysisRequest);
     const expressions = this.attachedExpressions();
 
     const request: AnalysisRequest = {
@@ -1183,6 +1183,34 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   strategyName(strategyId: string): string {
     return this.strategyLibrary.getById(strategyId)?.name ?? 'Unavailable';
   }
+
+  /**
+   * Ce qui part au backtest et ce qui reste à quai, d'un seul appel.
+   *
+   * La marque affichée et la liste envoyée sortent de la même partition : deux
+   * prédicats à deux endroits auraient fini par ne plus dire la même chose, et
+   * c'est cet écart-là qui produit un affichage faux.
+   */
+  private readonly attachedPartition = computed(() =>
+    partitionAttachedStrategies(this.attachedStrategies()),
+  );
+
+  /** `true` si cette stratégie est attachée au chart mais jamais évaluée. */
+  isUnevaluated(strategyId: string): boolean {
+    return this.attachedPartition().skipped.some((document) => document.id === strategyId);
+  }
+
+  /**
+   * Noms des stratégies attachées qu'aucun backtest n'évalue.
+   *
+   * Affichés sous la bande, parce que l'icône seule ne porte pas le motif : un
+   * `title` est un survol, donc rien sur un téléphone.
+   */
+  readonly unevaluatedNames = computed(() =>
+    this.attachedPartition()
+      .skipped.map((document) => document.name)
+      .join(', '),
+  );
 
   strategyColorOf(strategyId: string): string {
     return strategyColor(strategyId);

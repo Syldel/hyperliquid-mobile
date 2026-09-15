@@ -78,6 +78,9 @@
     <ion-chip [outline]="!ref.visible" (click)="toggleStrategyVisibility(ref.strategyId)">
       <span class="strategy-dot" [style.background]="strategyColorOf(ref.strategyId)"></span>
       <span>{{ strategyName(ref.strategyId) }}</span>
+      @if (isUnevaluated(ref.strategyId)) {
+      <ion-icon name="alert-circle-outline" color="danger" title="Not evaluated — not sent" />
+      }
       <ion-icon
         name="close-circle"
         (click)="detachStrategy(ref.strategyId); $event.stopPropagation()"
@@ -89,6 +92,14 @@
       <span>Strategy</span>
     </ion-chip>
   </div>
+
+  <!-- Le motif, sous la bande : l'icône marque la puce, mais un `title` est un
+       survol — donc rien sur un téléphone, là où se lit ce chart. -->
+  @if (unevaluatedNames()) {
+  <p class="strip-note">
+    Not evaluated on this chart: {{ unevaluatedNames() }}. Edit it in Strategies to get signals.
+  </p>
+  }
 
   <!-- Opérandes tracés sous le chart : débogage visuel d'une règle. -->
   @if (availableExpressions().length > 0) {
