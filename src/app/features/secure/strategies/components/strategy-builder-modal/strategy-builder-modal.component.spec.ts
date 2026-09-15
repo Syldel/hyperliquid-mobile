@@ -55,6 +55,7 @@ describe('StrategyBuilderModalComponent save flow', () => {
   let saved: StrategyDocument[];
   let validationResult: StrategyValidationResult;
   let validationFails: boolean;
+  let saveFails: boolean;
 
   function mount(rules: StrategyRules): void {
     fixture = TestBed.createComponent(StrategyBuilderModalComponent);
@@ -68,6 +69,7 @@ describe('StrategyBuilderModalComponent save flow', () => {
     saved = [];
     validationResult = { valid: true, issues: [] };
     validationFails = false;
+    saveFails = false;
 
     TestBed.configureTestingModule({
       imports: [StrategyBuilderModalComponent],
@@ -90,6 +92,7 @@ describe('StrategyBuilderModalComponent save flow', () => {
           provide: StrategyLibraryService,
           useValue: {
             save: async (doc: StrategyDocument) => {
+              if (saveFails) throw new Error('no wallet');
               saved.push(doc);
               return doc;
             },
@@ -166,6 +169,28 @@ describe('StrategyBuilderModalComponent save flow', () => {
 
     expect(saved).toHaveLength(1);
     expect(modalCtrl.dismissed.at(-1)?.role).toBe('confirm');
+    // Le document rendu à l'appelant est celui que la bibliothèque a écrit,
+    // horodatage compris — pas une reconstruction du brouillon à l'écran.
+    expect(modalCtrl.dismissed.at(-1)?.data).toBe(saved[0]);
+  });
+
+  /**
+   * Le `catch` couvrait l'enregistrement **et** la validation, et annonçait
+   * toujours « Saved. The bot could not be reached ». Quand c'était l'écriture
+   * qui avait échoué, le message affirmait exactement le contraire de ce qui
+   * venait de se passer — et la modale se fermait, emportant le travail que
+   * la bibliothèque n'avait pas pris.
+   */
+  it('says nothing was written when saving fails, and keeps the work on screen', async () => {
+    saveFails = true;
+    mount({ long: { entry: filledGroup } });
+
+    await component.save();
+
+    expect(validated).toEqual([]);
+    expect(modalCtrl.dismissed).toEqual([]);
+    expect(toastCtrl.messages.at(-1)).toMatch(/not saved/i);
+    expect(component.saving()).toBe(false);
   });
 
   /**

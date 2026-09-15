@@ -1,6 +1,7 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { AuthService } from '@auth/auth.service';
 import { StorageService } from '@storage/storage.service';
+import { filter, firstValueFrom } from 'rxjs';
 import type { StrategyRules } from '@syldel/trading-shared-types';
 import { pruneEmptyRuleBranches } from '../domain/strategy-tree.ops';
 import {
@@ -37,12 +38,33 @@ export class StrategyLibraryService {
 
   private readonly STORAGE_KEY = 'strategy_library';
 
-  async load(): Promise<StrategyDocument[]> {
-    const all = (await this.storage.get<StrategyLibraryStorage>(this.STORAGE_KEY)) ?? {};
-    const address = this.auth.currentAddress();
-    if (!address) return [];
+  /**
+   * Adresse du wallet une fois la session restaurée.
+   *
+   * `currentAddress()` vaut `null` dans deux situations qui n'ont rien à voir :
+   * la restauration n'a pas encore eu lieu (`AuthService.restoreSession` lit le
+   * stockage de façon asynchrone), ou personne n'est connecté. Les confondre
+   * faisait répondre « aucune stratégie » pendant le battement qui suit une
+   * reprise de session — un mensonge qui ressemble à une réponse, et qu'aucun
+   * écran ne pouvait distinguer d'une bibliothèque réellement vide.
+   *
+   * Même distinction que `pair-strategy-status.util.ts` fait entre « pas de
+   * shortname » et « catalogue pas encore arrivé » : tant que la source n'a pas
+   * répondu, on ne conclut pas.
+   */
+  private async walletAddress(): Promise<string | null> {
+    await firstValueFrom(this.auth.ready$.pipe(filter(Boolean)));
+    return this.auth.currentAddress();
+  }
 
-    const documents = all[address] ?? [];
+  async load(): Promise<StrategyDocument[]> {
+    const address = await this.walletAddress();
+    const all = (await this.storage.get<StrategyLibraryStorage>(this.STORAGE_KEY)) ?? {};
+
+    // Pas de wallet : il n'y a pas de bibliothèque à montrer, et surtout pas
+    // celle du wallet précédent — sortir sans toucher à `_documents` la
+    // laissait affichée, et `getById` continuait de la servir à la watchlist.
+    const documents = address ? (all[address] ?? []) : [];
     this._documents.set(documents);
     return documents;
   }
@@ -146,14 +168,30 @@ export class StrategyLibraryService {
     await this.persist(this._documents().filter((document) => document.id !== id));
   }
 
+  /**
+   * Écrit la bibliothèque du wallet courant, ou **lève**.
+   *
+   * Sortir en silence faute de wallet laissait `save` rendre un document que
+   * l'appelant annonçait comme enregistré, et qui n'existait nulle part. Dans
+   * une app qui finit par confier ces règles à un bot, une écriture qui
+   * n'arrive pas doit se voir tout de suite — au moment où l'utilisateur peut
+   * encore réessayer, pas quand la stratégie a disparu.
+   *
+   * `_documents` n'est mis à jour qu'**après** l'écriture : annoncer en mémoire
+   * un changement que le stockage n'a pas pris serait le même mensonge, en
+   * plus discret. `getById` sert la watchlist depuis cette liste.
+   */
   private async persist(documents: StrategyDocument[]): Promise<void> {
-    const all = (await this.storage.get<StrategyLibraryStorage>(this.STORAGE_KEY)) ?? {};
-    const address = this.auth.currentAddress();
-    if (!address) return;
+    const address = await this.walletAddress();
+    if (!address) {
+      throw new Error('No wallet selected: the strategy library has nowhere to write.');
+    }
 
+    const all = (await this.storage.get<StrategyLibraryStorage>(this.STORAGE_KEY)) ?? {};
     all[address] = documents;
-    this._documents.set(documents);
+
     await this.storage.set(this.STORAGE_KEY, all);
+    this._documents.set(documents);
   }
 }
 

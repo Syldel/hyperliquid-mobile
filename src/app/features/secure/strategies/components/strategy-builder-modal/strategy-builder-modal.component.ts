@@ -144,7 +144,21 @@ export class StrategyBuilderModalComponent implements OnInit {
     this.store.setServerIssues([]);
 
     try {
-      const saved = await this.library.save(document);
+      // L'écriture et le verdict échouent pour des raisons sans rapport, et
+      // seule la première fait perdre du travail. Les couvrir d'un même `catch`
+      // faisait annoncer « Saved. The bot could not be reached » alors que
+      // rien n'avait été écrit — l'exact contraire de ce qui venait de se
+      // passer, et la modale se fermait par-dessus.
+      let saved: StrategyDocument;
+
+      try {
+        saved = await this.library.save(document);
+      } catch {
+        // Modale laissée ouverte : la bibliothèque n'a pas pris le brouillon,
+        // le fermer le perdrait.
+        await this.toast('Not saved — the library could not be written.', 'danger');
+        return;
+      }
 
       // Anomalies dont ce build est certain : il y a un rapport à lire, donc la
       // modale reste ouverte — exactement le précédent du refus serveur.
@@ -163,19 +177,23 @@ export class StrategyBuilderModalComponent implements OnInit {
         return;
       }
 
-      const result = await firstValueFrom(this.bot.validateStrategy(toExchangeStrategy(saved)));
+      try {
+        const result = await firstValueFrom(this.bot.validateStrategy(toExchangeStrategy(saved)));
 
-      if (result.valid) {
+        if (result.valid) {
+          await this.modalCtrl.dismiss(saved, 'confirm');
+          return;
+        }
+
+        this.store.setServerIssues(result.issues);
+        await this.toast('Saved, but the bot rejected these rules — see below.', 'warning');
+      } catch {
+        // La stratégie est écrite : seul le verdict manque. On rend le document
+        // que la bibliothèque a écrit, horodatage compris — pas une
+        // reconstruction du brouillon à l'écran.
+        await this.toast('Saved. The bot could not be reached to validate it.', 'warning');
         await this.modalCtrl.dismiss(saved, 'confirm');
-        return;
       }
-
-      this.store.setServerIssues(result.issues);
-      await this.toast('Saved, but the bot rejected these rules — see below.', 'warning');
-    } catch {
-      // La stratégie est enregistrée quoi qu'il arrive : seul le verdict manque.
-      await this.toast('Saved. The bot could not be reached to validate it.', 'warning');
-      await this.modalCtrl.dismiss(this.store.toDocument(), 'confirm');
     } finally {
       this.saving.set(false);
     }

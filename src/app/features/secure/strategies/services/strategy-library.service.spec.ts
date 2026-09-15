@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { AuthService } from '@auth/auth.service';
+import { BehaviorSubject } from 'rxjs';
 import { StorageService } from '@storage/storage.service';
 import type { LogicalGroup, StrategyRules } from '@syldel/trading-shared-types';
 import { StrategyLibraryService } from './strategy-library.service';
@@ -39,16 +40,18 @@ describe('StrategyLibraryService', () => {
   let service: StrategyLibraryService;
   let storage: StorageStub;
   let address: string | null;
+  let ready$: BehaviorSubject<boolean>;
 
   beforeEach(() => {
     storage = new StorageStub();
     address = WALLET_A;
+    ready$ = new BehaviorSubject(true);
 
     TestBed.configureTestingModule({
       providers: [
         StrategyLibraryService,
         { provide: StorageService, useValue: storage },
-        { provide: AuthService, useValue: { currentAddress: () => address } },
+        { provide: AuthService, useValue: { currentAddress: () => address, ready$ } },
       ],
     });
 
@@ -79,11 +82,72 @@ describe('StrategyLibraryService', () => {
     expect((await service.load()).map((d) => d.name)).toEqual(['For A']);
   });
 
-  it('persists nothing when no wallet is selected', async () => {
+  /**
+   * Ce test disait l'inverse : il actait qu'une écriture sans wallet ne faisait
+   * rien, **en silence**. `create` rendait alors un document que l'appelant
+   * annonçait comme enregistré, et qui n'existait nulle part. Ce qui n'a pas
+   * changé, c'est que rien n'est écrit ; ce qui change, c'est qu'on le dit.
+   */
+  it('refuses to write when no wallet is selected, rather than pretending', async () => {
     address = null;
-    await service.create('Orphan');
 
+    await expect(service.create('Orphan')).rejects.toThrow(/wallet/i);
     expect(storage.store.size).toBe(0);
+  });
+
+  // Corollaire : la liste en mémoire ne doit pas annoncer un changement que le
+  // stockage n'a pas pris. Elle est la source de `getById`, donc de ce que la
+  // watchlist affiche.
+  it('does not report in memory a change it could not persist', async () => {
+    const created = await service.create('Breakout');
+    address = null;
+
+    await expect(service.save({ ...created, name: 'Renamed' })).rejects.toThrow();
+
+    expect(service.documents().map((document) => document.name)).toEqual(['Breakout']);
+  });
+
+  /**
+   * `currentAddress()` vaut `null` dans deux situations sans rapport : la
+   * session n'est pas encore restaurée, ou personne n'est connecté. Répondre
+   * « aucune stratégie » dans le premier cas est un mensonge qui ressemble à
+   * une réponse — la bibliothèque paraissait vide le temps d'un battement,
+   * juste après une reprise de session.
+   */
+  it('waits for the session to be restored before answering', async () => {
+    await service.create('Breakout');
+
+    ready$.next(false);
+    address = null;
+
+    let answered = false;
+    const pending = service.load().then((documents) => {
+      answered = true;
+      return documents;
+    });
+
+    // Laisse tourner la file de micro-tâches : sans attente, `load` aurait
+    // déjà répondu « aucune stratégie » ici.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(answered).toBe(false);
+
+    // La restauration aboutit : l'adresse arrive, et la réponse avec elle.
+    address = WALLET_A;
+    ready$.next(true);
+
+    expect((await pending).map((document) => document.name)).toEqual(['Breakout']);
+  });
+
+  // Session restaurée et toujours pas de wallet : il n'y a pas de bibliothèque
+  // à montrer — surtout pas celle du wallet précédent.
+  it('drops the documents of the previous wallet when none is selected', async () => {
+    await service.create('Breakout');
+    expect(service.documents()).toHaveLength(1);
+
+    address = null;
+
+    expect(await service.load()).toEqual([]);
+    expect(service.documents()).toEqual([]);
   });
 
   it('updates an existing document in place and bumps updatedAt', async () => {
@@ -175,7 +239,10 @@ describe('StrategyLibraryService.importMissing', () => {
       providers: [
         StrategyLibraryService,
         { provide: StorageService, useValue: storage },
-        { provide: AuthService, useValue: { currentAddress: () => WALLET_A } },
+        {
+          provide: AuthService,
+          useValue: { currentAddress: () => WALLET_A, ready$: new BehaviorSubject(true) },
+        },
       ],
     });
 

@@ -9,6 +9,7 @@ import {
   IonList,
   IonNote,
   ModalController,
+  ToastController,
 } from '@ionic/angular/standalone';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import { addIcons } from 'ionicons';
@@ -46,6 +47,7 @@ export class StrategiesPage {
   private readonly library = inject(StrategyLibraryService);
   private readonly modalCtrl = inject(ModalController);
   private readonly actionSheetCtrl = inject(ActionSheetController);
+  private readonly toastCtrl = inject(ToastController);
 
   readonly documents = signal<StrategyDocument[]>([]);
   readonly fetchFn = signal(() => this.library.load());
@@ -63,9 +65,18 @@ export class StrategiesPage {
     return summariseBranches(document.rules);
   }
 
+  /**
+   * La création écrit **avant** d'ouvrir l'éditeur : si la bibliothèque ne peut
+   * pas prendre le document, ouvrir une modale sur un brouillon qui n'existe
+   * nulle part ne ferait que retarder la mauvaise nouvelle.
+   */
   async create(): Promise<void> {
-    const document = await this.library.create('New strategy');
-    await this.openBuilder(document);
+    try {
+      const document = await this.library.create('New strategy');
+      await this.openBuilder(document);
+    } catch {
+      await this.toast('Could not create the strategy — the library could not be written.');
+    }
   }
 
   async openBuilder(document: StrategyDocument): Promise<void> {
@@ -93,9 +104,22 @@ export class StrategiesPage {
     await sheet.present();
 
     const { role } = await sheet.onDidDismiss();
-    if (role === 'duplicate') await this.library.duplicate(document.id);
-    if (role === 'destructive') await this.library.remove(document.id);
+
+    try {
+      if (role === 'duplicate') await this.library.duplicate(document.id);
+      if (role === 'destructive') await this.library.remove(document.id);
+    } catch {
+      // Sans ça, la liste se redessinait inchangée et le geste paraissait
+      // simplement ignoré — le pire des deux, puisqu'une suppression qui semble
+      // avoir eu lieu se refait.
+      await this.toast('Nothing changed — the library could not be written.');
+    }
 
     this.onDataLoaded(this.library.documents());
+  }
+
+  private async toast(message: string): Promise<void> {
+    const toast = await this.toastCtrl.create({ message, color: 'danger', duration: 4000 });
+    await toast.present();
   }
 }
