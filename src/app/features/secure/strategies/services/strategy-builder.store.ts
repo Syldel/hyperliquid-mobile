@@ -284,6 +284,25 @@ export class StrategyBuilderStore {
     this.pushHistory();
     this._rules.set(next);
     this._editedPaths.set(kept);
+
+    // Le verdict du bot visait un nœud qui n'existe plus ici : le garder ferait
+    // chercher une condition absente.
+    this.dropServerIssuesUnder(path);
+
+    // Et si c'était un élément de tableau, les index suivants ont glissé. Un
+    // verdict mémorisé sur `conditions[2]` désigne alors le nœud qui était en
+    // `conditions[3]` — l'éditeur accuserait une condition saine, avec le
+    // message d'une autre. Les oublier fait perdre le reste du rapport de ce
+    // groupe, mais dans le sens sûr : le prochain enregistrement en redemande
+    // un, alors qu'une accusation fausse, elle, reste à l'écran.
+    //
+    // Même arbitrage que pour `editedPaths` ci-dessus, et pour la même raison.
+    // Ré-indexer les chemins serait plus fin, mais tiendrait sur l'hypothèse
+    // qu'on sait rectifier n'importe quelle forme de chemin sans se tromper —
+    // une hypothèse dont l'échec serait, précisément, une accusation fausse.
+    if (parent && Array.isArray(getAtPath(rules, parent))) {
+      this.dropServerIssuesUnder(parent);
+    }
   }
 
   undo(): void {

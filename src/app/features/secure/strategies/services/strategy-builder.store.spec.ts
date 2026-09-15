@@ -275,6 +275,106 @@ describe('StrategyBuilderStore - server issues', () => {
 
     expect(store.serverIssues()).toEqual([]);
   });
+
+  /**
+   * Une suppression décale les index suivants du tableau. Un verdict mémorisé
+   * sur `conditions[2]` désigne alors le nœud qui était en `conditions[3]` —
+   * et l'éditeur accuse une condition parfaitement saine, avec le message
+   * d'une autre. C'est le pire des cas du dépôt : non pas un silence, mais une
+   * affirmation fausse sur des règles de trading.
+   *
+   * `commit` s'en protégeait déjà pour les éditions ; `removeNode` le
+   * court-circuite et n'en bénéficiait pas.
+   */
+  describe('after a removal shifts the indexes that follow', () => {
+    /** Quatre conditions reconnaissables : les valeurs 1 à 4. */
+    const four = (): StrategyRules => ({
+      long: {
+        entry: {
+          type: 'logical',
+          operator: 'AND',
+          conditions: [1, 2, 3, 4].map((value) => ({
+            type: 'comparison' as const,
+            left: { type: 'price' as const, field: 'close' as const },
+            operator: 'GT' as const,
+            right: { type: 'number' as const, value },
+          })),
+        },
+      },
+    });
+
+    function valueAt(index: number): number {
+      const group = getAtPath(store.rules(), 'rules.long.entry') as {
+        conditions: { right: { value: number } }[];
+      };
+      return group.conditions[index].right.value;
+    }
+
+    beforeEach(() => {
+      store.open(document(four()));
+    });
+
+    it('never leaves a verdict pointing at the node that slid into its place', () => {
+      store.setServerIssues([issue('strategy.rules.long.entry.conditions[2].right')]);
+      expect([...store.serverIssuePaths()]).toEqual(['rules.long.entry.conditions[2]']);
+
+      store.removeNode('rules.long.entry.conditions[0]');
+
+      // La condition en [2] est désormais celle qui valait 4 : l'innocente.
+      expect(valueAt(2)).toBe(4);
+      expect(store.serverIssuePaths().size).toBe(0);
+      expect(store.serverIssues()).toEqual([]);
+    });
+
+    // Les index d'un AUTRE groupe n'ont pas bougé : leur verdict tient encore.
+    it('keeps the verdict of a group the removal did not touch', () => {
+      store.open(
+        document({
+          ...four(),
+          short: {
+            entry: { type: 'logical', operator: 'AND', conditions: [createConstant(true)] },
+          },
+        }),
+      );
+      store.setServerIssues([
+        issue('strategy.rules.long.entry.conditions[2].right'),
+        issue('strategy.rules.short.entry.conditions[0]'),
+      ]);
+
+      store.removeNode('rules.long.entry.conditions[0]');
+
+      expect(store.serverIssues().map((i) => i.path)).toEqual([
+        'strategy.rules.short.entry.conditions[0]',
+      ]);
+    });
+  });
+
+  /**
+   * Retirer une clé d'objet ne décale rien : seul le sous-arbre supprimé
+   * devient introuvable. Le verdict qui le visait décrivait un nœud qui
+   * n'existe plus, et le laisser dans la liste ferait chercher une condition
+   * absente — mais les autres branches restent parfaitement valables.
+   */
+  it('drops only the verdict of a removed branch, not that of its sibling', () => {
+    store.open(
+      document({
+        long: {
+          entry: { type: 'logical', operator: 'AND', conditions: [createConstant(true)] },
+          exit: { type: 'logical', operator: 'AND', conditions: [createConstant(false)] },
+        },
+      }),
+    );
+    store.setServerIssues([
+      issue('strategy.rules.long.exit.conditions[0]'),
+      issue('strategy.rules.long.entry.conditions[0]'),
+    ]);
+
+    store.removeNode('rules.long.exit');
+
+    expect(store.serverIssues().map((i) => i.path)).toEqual([
+      'strategy.rules.long.entry.conditions[0]',
+    ]);
+  });
 });
 
 /**
