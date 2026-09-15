@@ -2,6 +2,7 @@ import { inject, Injectable, signal } from '@angular/core';
 import { AuthService } from '@auth/auth.service';
 import { StorageService } from '@storage/storage.service';
 import { CandleInterval } from '@syldel/hl-shared-types';
+import { filter, firstValueFrom } from 'rxjs';
 import { migrateLegacyWatchlistStrategies } from '../../strategies/domain/legacy-strategy-migration.util';
 import { StrategyLibraryService } from '../../strategies/services/strategy-library.service';
 import { WatchlistItem } from '../models/watchlist-item.model';
@@ -19,10 +20,31 @@ export class WatchlistService {
 
   private readonly STORAGE_KEY = 'watchlist_items';
 
+  /**
+   * Adresse du wallet une fois la session restaurée.
+   *
+   * `currentAddress()` vaut `null` dans deux situations qui n'ont rien à voir :
+   * la restauration n'a pas encore eu lieu, ou personne n'est connecté. Les
+   * confondre faisait répondre « aucune paire » pendant le battement qui suit
+   * une reprise de session. Même raisonnement, et même correctif, que
+   * `StrategyLibraryService` — les deux partagent ce patron de stockage.
+   */
+  private async walletAddress(): Promise<string | null> {
+    await firstValueFrom(this.auth.ready$.pipe(filter(Boolean)));
+    return this.auth.currentAddress();
+  }
+
   async load(): Promise<WatchlistItem[]> {
+    const address = await this.walletAddress();
     const all = (await this.storage.get<WatchlistStorage>(this.STORAGE_KEY)) ?? {};
-    const address = this.auth.currentAddress();
-    if (!address) return [];
+
+    // Pas de wallet : pas de watchlist à montrer, et surtout pas celle du
+    // wallet précédent — sortir sans toucher à `_items` la laissait affichée.
+    if (!address) {
+      this._items.set([]);
+      return [];
+    }
+
     const stored = all[address] ?? [];
 
     // Reprise ponctuelle des charts qui portaient encore une copie complète de
@@ -69,12 +91,29 @@ export class WatchlistService {
     return this._items().find((i) => i.coin === coin);
   }
 
+  /**
+   * Écrit la watchlist du wallet courant, ou **lève**.
+   *
+   * Sortir en silence laissait `add` rendre la main comme si la paire avait
+   * été ajoutée — la page annonçait alors « BTC added to watchlist » sur une
+   * écriture qui n'avait pas eu lieu. La watchlist ne porte pas de règles de
+   * trading, mais elle porte les stratégies attachées à chaque chart : la
+   * perdre sans un mot, c'est rouvrir l'app devant un chart qu'on croyait
+   * configuré.
+   *
+   * `_items` n'est mis à jour qu'**après** l'écriture : c'est cette liste que
+   * le chart relit pour savoir ce qui lui est attaché.
+   */
   private async persist(items: WatchlistItem[]): Promise<void> {
+    const address = await this.walletAddress();
+    if (!address) {
+      throw new Error('No wallet selected: the watchlist has nowhere to write.');
+    }
+
     const all = (await this.storage.get<WatchlistStorage>(this.STORAGE_KEY)) ?? {};
-    const address = this.auth.currentAddress();
-    if (!address) return;
     all[address] = items;
-    this._items.set(items);
+
     await this.storage.set(this.STORAGE_KEY, all);
+    this._items.set(items);
   }
 }

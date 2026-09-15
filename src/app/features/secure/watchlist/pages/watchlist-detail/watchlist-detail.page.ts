@@ -249,6 +249,18 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   private failureToast: HTMLIonToastElement | null = null;
 
   /**
+   * Même garde-fou, pour un état distinct : la configuration du chart ne
+   * s'enregistre plus.
+   *
+   * Un drapeau séparé de `announcedFailure` et non partagé avec lui : les deux
+   * états peuvent être vrais en même temps, et les confondre ferait taire l'un
+   * parce que l'autre vient de parler. Remis à faux dès qu'une écriture passe,
+   * pour qu'une panne ultérieure ait de nouveau le droit de se faire entendre.
+   */
+  private announcedSaveFailure = false;
+  private saveToast: HTMLIonToastElement | null = null;
+
+  /**
    * Ce que le catalogue du bot sait dire de l'échelle d'un opérande — servi par
    * `/exchanges/meta`, jamais dérivé d'un registre compilé.
    */
@@ -428,6 +440,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     this.strategyPositions.reset();
     this.expressionsPane.reset();
     void this.dismissFailureToast();
+    void this.dismissSaveToast();
     this.indicatorSeriesCache.clear();
     this.expressionSeriesCache.set(new Map());
     this.lastCandles = [];
@@ -1157,14 +1170,59 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     return (preferred ? styles[preferred]?.color : undefined) ?? '#888';
   }
 
+  /**
+   * Enregistre la configuration du chart — indicateurs, stratégies attachées,
+   * visibilités.
+   *
+   * Appelée depuis une dizaine de gestes, sans être attendue : c'est voulu, un
+   * basculement de visibilité ne doit pas attendre le stockage. Mais une
+   * promesse rejetée qu'on ne regarde pas est une écriture perdue en silence —
+   * et on rouvrirait l'app devant un chart qu'on croyait configuré. L'échec est
+   * donc annoncé, une seule fois (voir `announceLayoutNotSaved`).
+   */
   private persistIndicators(): void {
     const item = this.item();
     if (!item || !this.watchlistService.getByCoin(item.coin)) return;
-    this.watchlistService.update(item.coin, {
-      activeIndicators: this.activeIndicators(),
-      strategyRefs: this.strategyRefs(),
-      expressionRefs: this.expressionRefs(),
+
+    void this.watchlistService
+      .update(item.coin, {
+        activeIndicators: this.activeIndicators(),
+        strategyRefs: this.strategyRefs(),
+        expressionRefs: this.expressionRefs(),
+      })
+      .then(() => {
+        this.announcedSaveFailure = false;
+      })
+      .catch(() => this.announceLayoutNotSaved());
+  }
+
+  /**
+   * Dit que la configuration n'est plus enregistrée, **une fois**.
+   *
+   * Même raison que pour le repli en bougies nues : c'est un état, pas un
+   * événement. Il reste vrai tant que la cause dure, et chaque bascule de
+   * visibilité rappellerait la méthode — trois toasts de 6 s présentés à la
+   * suite se lisent comme un seul qui ne part jamais.
+   */
+  private async announceLayoutNotSaved(): Promise<void> {
+    if (this.announcedSaveFailure) return;
+    this.announcedSaveFailure = true;
+
+    await this.dismissSaveToast();
+
+    this.saveToast = await this.toastCtrl.create({
+      message: 'Chart layout not saved — it will be lost when you reopen this chart.',
+      color: 'danger',
+      duration: 6000,
     });
+    await this.saveToast.present();
+  }
+
+  /** Referme l'annonce en cours — voir `dismissFailureToast` pour le pourquoi. */
+  private async dismissSaveToast(): Promise<void> {
+    const toast = this.saveToast;
+    this.saveToast = null;
+    await toast?.dismiss();
   }
 
   /**

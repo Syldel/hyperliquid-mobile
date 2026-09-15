@@ -64,23 +64,47 @@ export class WatchlistPage {
     await modal.present();
 
     const { data, role } = await modal.onDidDismiss<{ coin: string; interval: any }>();
-    if (role === 'confirm' && data) {
+    if (role !== 'confirm' || !data) return;
+
+    // Le succès s'annonçait avant d'être acquis : sans wallet, l'écriture
+    // sortait en silence et « added to watchlist » s'affichait quand même.
+    try {
       await this.watchlistService.add(data.coin, data.interval);
-      this.fetchFn.set(this.buildFetchFn());
-      this.showToast(`${data.coin} added to watchlist`);
+    } catch {
+      await this.showToast('Could not add the pair — nothing was written.', 'danger');
+      return;
     }
+
+    this.fetchFn.set(this.buildFetchFn());
+    this.showToast(`${data.coin} added to watchlist`);
   }
 
   async onRemove(coin: string): Promise<void> {
     const item = this.watchlistService.getByCoin(coin);
-    await this.watchlistService.remove(coin);
+
+    try {
+      await this.watchlistService.remove(coin);
+    } catch {
+      // Sans ça, la liste se redessinait inchangée et le geste paraissait
+      // ignoré — une suppression qui semble ne pas avoir pris se refait.
+      await this.showToast('Could not remove the pair — nothing was written.', 'danger');
+      return;
+    }
+
     this.fetchFn.set(this.buildFetchFn());
     if (item) this.showToast(`${item.coin} removed`);
   }
 
   async onItemUpdated(data: { coin: string } & Partial<WatchlistItem>): Promise<void> {
     const { coin, ...changes } = data;
-    await this.watchlistService.update(coin, changes);
+
+    try {
+      await this.watchlistService.update(coin, changes);
+    } catch {
+      await this.showToast('Change not saved — nothing was written.', 'danger');
+      return;
+    }
+
     this.fetchFn.set(this.buildFetchFn());
   }
 
@@ -91,12 +115,12 @@ export class WatchlistPage {
     };
   }
 
-  private async showToast(message: string): Promise<void> {
+  private async showToast(message: string, color: 'success' | 'danger' = 'success'): Promise<void> {
     const toast = await this.toastCtrl.create({
       message,
-      duration: 2000,
+      duration: color === 'danger' ? 4000 : 2000,
       position: 'bottom',
-      color: 'success',
+      color,
     });
     await toast.present();
   }
