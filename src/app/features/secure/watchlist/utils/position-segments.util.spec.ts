@@ -77,7 +77,7 @@ describe('buildPositionSegments', () => {
 });
 
 describe('buildPositionBars', () => {
-  const colors = { long: '#0f0', short: '#f00' };
+  const colors = { long: '#0f0', short: '#f00', overlap: '#fa0' };
   const candles = [1000, 2000, 3000, 4000, 5000];
 
   it('fills every candle covered by a segment, in seconds', () => {
@@ -103,6 +103,44 @@ describe('buildPositionBars', () => {
   it('colours by side', () => {
     const bars = buildPositionBars([{ side: 'SHORT', from: 1000, to: 3000 }], candles, 0, colors);
     expect(bars.every((b) => b.color === '#f00')).toBe(true);
+  });
+
+  // Le bot ne tient qu'une position par paire : là où le simulateur tient les
+  // deux, la bande doit le montrer au lieu de n'en dessiner qu'un.
+  it('marks the candles where long and short are both open, and only those', () => {
+    const bars = buildPositionBars(
+      [
+        { side: 'LONG', from: 1000, to: 4000 },
+        { side: 'SHORT', from: 2000, to: null },
+      ],
+      candles,
+      0,
+      colors,
+    );
+
+    expect(bars.map((b) => [b.time, b.color])).toEqual([
+      [1, '#0f0'],
+      [2, '#fa0'],
+      [3, '#fa0'],
+      [4, '#f00'],
+      [5, '#f00'],
+    ]);
+  });
+
+  // Sortir du long et entrer short à la même bougie, c'est ce que le bot sait
+  // faire. Même règle que le rapport : la bougie de sortie ne compte pas.
+  it('does not mark a reversal on the same candle as an overlap', () => {
+    const bars = buildPositionBars(
+      [
+        { side: 'LONG', from: 1000, to: 3000 },
+        { side: 'SHORT', from: 3000, to: 5000 },
+      ],
+      candles,
+      0,
+      colors,
+    );
+
+    expect(bars.map((b) => b.color)).toEqual(['#0f0', '#0f0', '#f00', '#f00']);
   });
 
   it('places each strategy on its own row', () => {

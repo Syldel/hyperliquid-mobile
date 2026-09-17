@@ -181,7 +181,13 @@ Ce que le rapport garantit, et que l'écran respecte :
   −8 % puis refermé à +1 % a bien exposé à −8 % ;
 - **pas de total quand long et short se chevauchent** — le rapport renvoie `total: null`,
   le bloc et la modale disent pourquoi (le bot ne tient qu'une position par paire), et
-  aucune somme n'est tracée ;
+  aucune somme n'est tracée. Sur le chart, **la bande de positions colore ces bougies en
+  ambre** (`POSITION_COLORS.overlap`, la couleur d'avertissement d'Ionic), avec la même règle
+  que le rapport : la bougie de sortie ne compte pas, un retournement sur une même bougie
+  n'est donc pas un chevauchement. Vérifié : 4 bougies ambre dans la fenêtre pour 4
+  bougies de chevauchement rapportées, même première bougie. La bande dessine aussi
+  l'amorçage, où un chevauchement peut apparaître en ambre sans être compté par le
+  rapport — c'est la fenêtre qui décide des chiffres, pas du dessin ;
 - **les anomalies de timeline sont listées**, jamais corrigées en silence.
 
 Les côtés affichés sont ceux que la stratégie définit (`definedSides`) : « Short 0 trade »

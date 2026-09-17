@@ -62,15 +62,6 @@ cohérent** :
 5. **C — import / export JSON**, détaillé plus bas. Au-delà de la sauvegarde, il ouvre
    l'écriture assistée de stratégies.
 
-## La bande de positions tait un chevauchement long / short
-
-**⚠️ Ouvert, constaté le 2026-09-17** en vérifiant l'étape B. `buildPositionBars`
-(`watchlist/utils/position-segments.util.ts`) retient, pour chaque bougie, le **premier**
-segment qui la couvre (`segments.find`) : quand long et short sont ouverts ensemble, la
-bande n'en dessine qu'un, et le chevauchement ne se voit pas sur le chart. Le rapport le dit
-(total refusé, avertissement), la bande non — deux lectures du même backtest qui ne
-racontent pas la même chose.
-
 ## Plus tard : simuler `latent` et `protective`
 
 Le backtest n'évalue que les règles d'entrée et de sortie. Les ordres latents, les
@@ -81,6 +72,14 @@ se passe à l'intérieur d'une bougie (un stop touché avant ou après le take-p
 qu'aucune bougie seule ne dit.
 
 ## Traité récemment
+
+**Fait** — la bande de positions ne tait plus un chevauchement long / short. Constaté en
+vérifiant l'étape B : `buildPositionBars` retenait le premier segment couvrant chaque
+bougie, si bien que le chart taisait ce que le rapport annonçait. Ces bougies sont
+désormais en ambre, et l'avertissement du rapport renvoie à cette couleur. Choix
+délibéré contre deux couloirs par stratégie : le chevauchement est un cas que le bot ne
+peut pas reproduire, il se signale plutôt qu'il ne se détaille. Voir
+[watchlist/chart-overlays.md](watchlist/chart-overlays.md#le-rapport-de-backtest).
 
 **Fait** — les paires héritées sans `shortname` sont désormais signalées dans la liste et
 dans le formulaire, et le moteur du bot ne les écarte plus en silence. Voir

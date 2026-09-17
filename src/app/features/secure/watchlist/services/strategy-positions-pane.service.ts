@@ -53,8 +53,13 @@ const DESIRED_PANE_INDEX = 1;
  * partout ailleurs sur un chart. La couleur propre à chaque stratégie reste
  * portée par ses marqueurs et sa puce, pas par ce panneau. Réutilisées par la
  * courbe de performance du rapport, pour que le côté se lise de la même façon.
+ *
+ * L'ambre marque les bougies où long et short sont ouverts ensemble — ce que le
+ * bot ne peut pas faire. C'est la couleur d'avertissement d'Ionic (`warning`),
+ * celle du texte qui annonce ce chevauchement sous le chart et dans le rapport :
+ * l'avertissement écrit et la bougie colorée se désignent l'un l'autre.
  */
-export const POSITION_COLORS = { long: '#2dd36f', short: '#eb445a' } as const;
+export const POSITION_COLORS = { long: '#2dd36f', short: '#eb445a', overlap: '#ffc409' } as const;
 
 @Injectable()
 export class StrategyPositionsPaneService {

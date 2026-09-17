@@ -77,25 +77,39 @@ const BAR_HEIGHT = 0.8;
  *
  * La bougie de sortie est exclue (`time < to`) : à cet instant la position est
  * refermée, la colorer laisserait croire qu'elle court encore.
+ *
+ * **Une bougie où long et short sont ouverts ensemble prend la couleur
+ * `overlap`.** Le simulateur évalue les deux côtés indépendamment, le bot ne
+ * tient qu'une position par paire : ce chevauchement est précisément ce que le
+ * rapport refuse d'additionner (`BacktestReport.total === null`). La bande
+ * retenait jusqu'ici le premier segment trouvé, et taisait ce que le rapport
+ * annonçait. Même règle d'ouverture que le rapport — la bougie de sortie ne
+ * compte pas —, si bien qu'un retournement sur une même bougie n'est pas un
+ * chevauchement, ici comme là.
  */
 export function buildPositionBars(
   segments: readonly PositionSegment[],
   candleTimesMs: readonly number[],
   row: number,
-  colors: { long: string; short: string },
+  colors: { long: string; short: string; overlap: string },
 ): PositionBar[] {
   const bars: PositionBar[] = [];
 
   for (const time of [...candleTimesMs].sort((a, b) => a - b)) {
-    const segment = segments.find(
-      (candidate) => candidate.from <= time && (candidate.to === null || time < candidate.to),
+    const openSides = new Set(
+      segments
+        .filter(
+          (candidate) => candidate.from <= time && (candidate.to === null || time < candidate.to),
+        )
+        .map((segment) => segment.side),
     );
-    if (!segment) continue;
+    if (openSides.size === 0) continue;
 
     bars.push({
       time: Math.floor(time / 1000),
       value: row + BAR_HEIGHT,
-      color: segment.side === 'SHORT' ? colors.short : colors.long,
+      color:
+        openSides.size > 1 ? colors.overlap : openSides.has('SHORT') ? colors.short : colors.long,
     });
   }
 

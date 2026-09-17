@@ -201,7 +201,8 @@
       } @else {
       <!-- Le rapport refuse le total : le bot ne tient qu'une position par paire. -->
       <div class="backtest-block__warning">
-        Long and short overlap — no total, the bot holds one position per pair.
+        Long and short overlap (amber in the positions band) — no total, the bot holds one position
+        per pair.
       </div>
       } @if (sides.length > 1 || report.total === null) {
       <div class="backtest-block__sides">
