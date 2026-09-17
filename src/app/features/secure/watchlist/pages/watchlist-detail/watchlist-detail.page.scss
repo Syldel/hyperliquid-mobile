@@ -263,34 +263,60 @@
   padding: 8px 16px 0;
 }
 
-.backtest-card {
+// Un bouton, parce que tout le bloc ouvre le rapport détaillé : une cible large
+// sur un téléphone plutôt qu'un chevron minuscule.
+.backtest-block {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  font-size: 12px;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
   padding: 6px 10px;
+  border: 0;
   border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  color: inherit;
   background: var(--ion-color-step-100, #1c1c1c);
+
+  &__head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
 
   &__name {
     font-weight: 600;
   }
 
-  &__stat {
+  &__more {
+    margin-left: auto;
     color: var(--ion-color-medium);
   }
 
-  &__pnl {
-    margin-left: auto;
-    font-weight: 600;
+  &__line,
+  &__sides {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    color: var(--ion-color-medium);
+    font-variant-numeric: tabular-nums;
+  }
 
-    &--up {
+  &__pnl {
+    font-weight: 600;
+    color: var(--ion-text-color);
+
+    &.up {
       color: var(--ion-color-success, #2dd36f);
     }
-    &--down {
+    &.down {
       color: var(--ion-color-danger, #eb445a);
     }
+  }
+
+  &__warning {
+    color: var(--ion-color-warning-shade);
   }
 }
 

@@ -51,9 +51,10 @@ const DESIRED_PANE_INDEX = 1;
 /**
  * Vert et rouge, délibérément : ce sont les couleurs du long et du short
  * partout ailleurs sur un chart. La couleur propre à chaque stratégie reste
- * portée par ses marqueurs et sa puce, pas par ce panneau.
+ * portée par ses marqueurs et sa puce, pas par ce panneau. Réutilisées par la
+ * courbe de performance du rapport, pour que le côté se lise de la même façon.
  */
-const POSITION_COLORS = { long: '#2dd36f', short: '#eb445a' } as const;
+export const POSITION_COLORS = { long: '#2dd36f', short: '#eb445a' } as const;
 
 @Injectable()
 export class StrategyPositionsPaneService {

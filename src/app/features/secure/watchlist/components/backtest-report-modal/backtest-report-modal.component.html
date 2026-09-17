@@ -1,0 +1,227 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="close()">Close</ion-button>
+    </ion-buttons>
+    <ion-title>
+      <span class="strategy-dot" [style.background]="color()"></span>
+      {{ name() }}
+    </ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <p class="window">
+    Visible range: {{ report().from | date: 'MMM d, HH:mm' }}
+    @if (report().to !== null) {
+      → {{ report().to | date: 'MMM d, HH:mm' }}
+    }
+  </p>
+
+  <!-- Le rapport refuse un total quand les deux côtés se chevauchent : le dire,
+       sinon l'absence de colonne se lirait comme un oubli. -->
+  @if (report().total === null) {
+    <p class="warning">
+      Long and short positions overlap on {{ report().overlap.candles }}
+      {{ report().overlap.candles === 1 ? 'candle' : 'candles' }}
+      @if (report().overlap.firstTime !== null) {
+        (first at {{ report().overlap.firstTime | date: 'MMM d, HH:mm' }})
+      }
+    </p>
+    <p class="warning">
+      The bot holds one position per pair, so it cannot get both: no total is shown.
+    </p>
+  }
+
+  @if (report().anomalies.length > 0) {
+    <ion-list inset class="anomalies">
+      <ion-item lines="none">
+        <ion-label>
+          <ion-text color="danger"><h3>The bot's timeline is inconsistent</h3></ion-text>
+          <p>These signals were set aside, not corrected.</p>
+        </ion-label>
+      </ion-item>
+      @for (anomaly of report().anomalies; track $index) {
+        <ion-item lines="none">
+          <ion-label class="ion-text-wrap">
+            <p>{{ anomaly.message }}</p>
+          </ion-label>
+        </ion-item>
+      }
+    </ion-list>
+  }
+
+  <table class="stats">
+    <thead>
+      <tr>
+        <th></th>
+        @for (column of columns(); track column.label) {
+          <th>{{ column.label }}</th>
+        }
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th>Trades</th>
+        @for (column of columns(); track column.label) {
+          <td>{{ column.stats.trades }}</td>
+        }
+      </tr>
+      <tr>
+        <th>Win rate</th>
+        @for (column of columns(); track column.label) {
+          <td>
+            {{
+              column.stats.winRatePercent === null
+                ? '—'
+                : column.stats.winRatePercent.toFixed(0) + '%'
+            }}
+          </td>
+        }
+      </tr>
+      <tr>
+        <th>Realized</th>
+        @for (column of columns(); track column.label) {
+          <td
+            [class.up]="percentTone(column.stats.realizedPercent) === 'up'"
+            [class.down]="percentTone(column.stats.realizedPercent) === 'down'"
+          >
+            {{ formatPercent(column.stats.realizedPercent) }}
+          </td>
+        }
+      </tr>
+      <tr>
+        <th>Open</th>
+        @for (column of columns(); track column.label) {
+          <td>{{ formatPercent(column.stats.unrealizedPercent) }}</td>
+        }
+      </tr>
+      <tr>
+        <th>Max drawdown</th>
+        @for (column of columns(); track column.label) {
+          <td [class.down]="column.stats.maxDrawdown.depthPercent > 0">
+            {{ formatPercent(-column.stats.maxDrawdown.depthPercent) }}
+          </td>
+        }
+      </tr>
+    </tbody>
+  </table>
+
+  @if (report().equity.length > 0) {
+    <h2>Performance</h2>
+    <app-equity-curve [lines]="curve()" />
+    <div class="legend">
+      @for (line of curve(); track line.id) {
+        <span>
+          <span class="strategy-dot" [style.background]="line.color"></span>
+          {{ lineLabel(line.id) }}
+        </span>
+      }
+    </div>
+    <p class="note">
+      Cumulated at each candle close, open positions included — the drawdown is measured on this
+      curve.
+    </p>
+    @if (lastPointProvisional()) {
+      <p class="note note--provisional">
+        The last point sits on a candle that had not closed yet: it may still move.
+      </p>
+    }
+  }
+
+  @if (report().openPositions.length > 0) {
+    <h2>Still open</h2>
+    <ion-list inset>
+      @for (position of report().openPositions; track position.entryTime + position.side) {
+        <ion-item
+          button
+          detail="false"
+          (click)="focus({ entryTime: position.entryTime, exitTime: null })"
+        >
+          <span slot="start" class="side" [style.background]="sideColor(position.side)">
+            {{ sideLabel(position.side) }}
+          </span>
+          <ion-label>
+            <h3>Since {{ position.entryTime | date: 'MMM d, HH:mm' }}</h3>
+            <p>
+              {{ formatPrice(position.entryPrice) }}
+              @if (position.markPrice !== null) {
+                → {{ formatPrice(position.markPrice) }}
+              }
+            </p>
+          </ion-label>
+          <ion-note slot="end">
+            {{
+              position.unrealizedPercent === null ? '—' : formatPercent(position.unrealizedPercent)
+            }}
+          </ion-note>
+        </ion-item>
+      }
+    </ion-list>
+  }
+
+  @if (report().carriedIn.length > 0) {
+    <h2>Opened before the visible range</h2>
+    <p class="note">Not counted in any figure: their entry is outside what you see.</p>
+    <ion-list inset>
+      @for (position of report().carriedIn; track position.entryTime + position.side) {
+        <ion-item
+          button
+          detail="false"
+          (click)="focus({ entryTime: position.entryTime, exitTime: position.exitTime })"
+        >
+          <span slot="start" class="side" [style.background]="sideColor(position.side)">
+            {{ sideLabel(position.side) }}
+          </span>
+          <ion-label>
+            <h3>
+              {{ position.entryTime | date: 'MMM d, HH:mm' }} →
+              {{
+                position.exitTime === null
+                  ? 'still open'
+                  : (position.exitTime | date: 'MMM d, HH:mm')
+              }}
+            </h3>
+          </ion-label>
+        </ion-item>
+      }
+    </ion-list>
+  }
+
+  <h2>Trades</h2>
+  @if (tradesNewestFirst().length === 0) {
+    <p class="note">No trade opened and closed on the visible range.</p>
+  } @else {
+    <p class="note">Newest first. Tap one to see it on the chart.</p>
+    <ion-list inset>
+      @for (trade of tradesNewestFirst(); track trade.entryTime + trade.side) {
+        <ion-item button detail="false" (click)="focus(trade)">
+          <span slot="start" class="side" [style.background]="sideColor(trade.side)">
+            {{ sideLabel(trade.side) }}
+          </span>
+          <ion-label>
+            <h3>
+              {{ trade.entryTime | date: 'MMM d, HH:mm' }} →
+              {{ trade.exitTime | date: 'MMM d, HH:mm' }}
+            </h3>
+            <p>{{ formatPrice(trade.entryPrice) }} → {{ formatPrice(trade.exitPrice) }}</p>
+          </ion-label>
+          <ion-note
+            slot="end"
+            [class.up]="percentTone(trade.returnPercent) === 'up'"
+            [class.down]="percentTone(trade.returnPercent) === 'down'"
+          >
+            {{ formatPercent(trade.returnPercent) }}
+          </ion-note>
+          <ion-icon slot="end" name="locate-outline" color="medium" />
+        </ion-item>
+      }
+    </ion-list>
+  }
+
+  <ul class="limits">
+    @for (limit of limits; track limit) {
+      <li>{{ limit }}</li>
+    }
+  </ul>
+</ion-content>

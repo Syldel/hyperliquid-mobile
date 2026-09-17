@@ -40,12 +40,12 @@ cohérent** :
    live). Rejeu cycle par cycle, bougie en cours comprise, comparé à une décision par bougie
    close : `docs/trading/forming-candle-replay.md` dans nest-trading-bot, résumé dans les
    [risques identifiés](#risques-identifiés).
-3. **B — le rapport de simulation** : trades (entrée, sortie, côté, %), courbe de
-   performance et pire drawdown **à chaque bougie**, pertes latentes comprises ; long,
-   short et total. Seuls comptent les trades dont l'entrée tombe dans la fenêtre affichée,
-   une position héritée de l'amorçage se signale à part. Si long et short se chevauchent,
-   le rapport le dit — le bot ne peut pas tenir les deux — et peut taire le total. Le
-   calcul va dans `trading-shared-types`, pour que le bot le serve ensuite sans le réécrire.
+3. **Fait — B, le rapport de simulation**, en rupture coordonnée sur les trois dépôts.
+   `TimelineSignal` est typé strictement (`side`, `price`) ; `buildBacktestReport`
+   (trading-shared-types) remplace le `summary` et tourne **dans le bot**, sur la fenêtre
+   demandée ; l'app affiche un bloc compact et un rapport détaillé (côtés, courbe à chaque
+   bougie, drawdown, trades cliquables qui recentrent le chart), sans rien recalculer. Voir
+   [watchlist/chart-overlays.md](watchlist/chart-overlays.md#le-rapport-de-backtest).
 4. **Étapes 1 à 3 côté bot**, chacune annoncée avant d'être commencée : décider sur des
    bougies closes uniquement, traiter chaque bougie une seule fois — avec une marge après
    la clôture, une bougie n'étant pas définitive à l'instant où elle se ferme —, et simuler
@@ -225,16 +225,16 @@ points à ne pas oublier (ATR et ancres latentes/protectrices sur la même fenê
 En attendant, le chart dit qu'un signal sur la bougie en cours est provisoire
 (`watchlist/utils/forming-candle.util.ts`).
 
-## Le `summary` du bot ne décrit pas la fenêtre affichée
+## Le `summary` du bot ne décrivait pas la fenêtre affichée
 
-**⚠️ Ouvert.** `AnalysisResponse.strategies[].summary` couvre **toute** la fenêtre
-calculée, amorçage compris. Mesuré sur BTC 1h, 72 h, `close > EMA(50)` : 148 bougies dont
+**Fermé** par l'étape B : le `summary` n'existe plus, remplacé par un rapport calculé par
+le bot sur la fenêtre demandée. Le constat, gardé pour mémoire : il couvrait **toute** la
+fenêtre calculée, amorçage compris. Mesuré sur BTC 1h, 72 h, `close > EMA(50)` : 148 bougies dont
 76 d'amorçage, 3 signaux sur 8 hors de l'écran, un bilan de −0,84 % sur 4 trades quand les
 sorties visibles à l'écran totalisent −0,12 %. Il additionne aussi long et short, y compris quand les deux se chevauchent.
 
-Tant que l'étape B n'est pas faite, le bandeau affiche ce chiffre **avec** ses limites
-écrites dessous. B cesse de l'afficher ; corriger le calcul côté bot attend les étapes 1 à
-3, qui changent de toute façon les signaux et le prix des trades.
+Le prix d'exécution simulé (clôture de la bougie du signal) reste, lui, l'affaire de
+l'étape 3 ; le rapport le suivra sans changement, puisqu'il lit les prix des signaux.
 
 ## Précédent
 

@@ -158,26 +158,64 @@ suffisaient à rendre le chart illisible.
 
 ---
 
-# Ce que le backtest ne dit pas
+# Le rapport de backtest
 
-Le bilan sous le chart vient de `POST /analysis`, qui fait tourner le **même** moteur que
-le bot en live (`StrategyEngineService.execute`). Les signaux sont donc bien ceux que le bot
-produirait sur ces bougies. Ce qui en est tiré, en revanche, s'écarte du live sur plusieurs
-points, tous écrits sous les chiffres parce qu'ils se lisent sinon comme « ce que la
-stratégie aurait rapporté » :
+Sous le chart, le bouton « Backtest » ouvre un bloc compact par stratégie visible ; toucher
+un bloc ouvre le rapport détaillé (`BacktestReportModalComponent`) : chiffres par côté, courbe
+de performance, positions ouvertes, positions héritées, liste des trades.
+
+**L'app ne calcule rien.** Le rapport est `AnalysisResponse.strategies[].report`, produit par
+`buildBacktestReport` (trading-shared-types) **dans le bot**, sur la fenêtre demandée.
+`watchlist/utils/backtest-display.util.ts` ne fait que choisir quoi montrer et arrondir pour
+l'affichage — un chiffre recalculé ici pourrait diverger du bot en silence, un chiffre
+arrondi ne le peut pas.
+
+Ce que le rapport garantit, et que l'écran respecte :
+
+- **la fenêtre affichée, rien d'autre** — un trade ouvert dans l'amorçage n'est pas
+  compté ; une position ouverte avant la fenêtre et encore ouverte à son début est listée à
+  part (« carried in ») et n'entre dans aucun chiffre ;
+- **aucun arrondi au calcul** — rendement de chaque trade recalculé depuis les prix ;
+- **taille constante, rendements additionnés** — ni levier, ni réinvestissement ;
+- **courbe et drawdown à chaque bougie, pertes latentes comprises** — un trade descendu à
+  −8 % puis refermé à +1 % a bien exposé à −8 % ;
+- **pas de total quand long et short se chevauchent** — le rapport renvoie `total: null`,
+  le bloc et la modale disent pourquoi (le bot ne tient qu'une position par paire), et
+  aucune somme n'est tracée ;
+- **les anomalies de timeline sont listées**, jamais corrigées en silence.
+
+Les côtés affichés sont ceux que la stratégie définit (`definedSides`) : « Short 0 trade »
+sur une stratégie purement longue laisserait croire à un côté qui ne produit rien.
+
+**Toucher un trade** referme la modale et recentre le chart principal dessus
+(`tradeFocusRange` : la moitié de la durée du trade de chaque côté, au moins dix bougies),
+là où ses bougies, ses marqueurs et sa bande de position se lisent ensemble. La plage peut
+remonter dans l'amorçage pour une position héritée : ces bougies sont dessinées, seulement
+hors de la fenêtre par défaut.
+
+La courbe vit dans un petit chart à part (`EquityCurveComponent`), pas dans un pane du chart
+principal, dont la hauteur est déjà rationnée. Son dernier point est signalé provisoire
+quand il tombe sur la bougie en cours.
+
+## Ce que le backtest ne dit pas
+
+Le rapport vient de `POST /analysis`, qui fait tourner le **même** moteur que le bot en live
+(`StrategyEngineService.execute`). Les signaux sont donc bien ceux que le bot produirait sur
+ces bougies. La simulation s'écarte pourtant du live sur plusieurs points, écrits sous les
+chiffres (`BACKTEST_LIMITS`) parce qu'ils se lisent sinon comme « ce que la stratégie
+aurait rapporté » :
 
 | Écart                                                            | D'où il vient                                                  |
 | ---------------------------------------------------------------- | -------------------------------------------------------------- |
 | trades au prix de clôture de la bougie du signal                 | le moteur ; un live ne peut pas traiter à une clôture déjà vue |
-| ni frais, ni funding, ni slippage                                | `BacktestSummary`, chiffres bruts                              |
+| ni frais, ni funding, ni slippage                                | la simulation, chiffres bruts                                  |
 | TP/SL (`protective`), ordres latents, `exitBehavior` non simulés | `/analysis` ne reçoit que les règles                           |
-| long et short simulés indépendamment                             | le moteur ; le bot, lui, ne tient qu'une position par paire    |
-| performances additionnées, non composées                         | `summarizeBacktestSignals`                                     |
-| trades de l'amorçage comptés                                     | le `summary` couvre toute la fenêtre calculée                  |
+| taille constante, rendements additionnés                         | le rapport ; ni levier ni réinvestissement                     |
 
-Les deux dernières lignes disparaîtront avec le rapport de simulation (étape B du
-[roadmap](../roadmap.md#rendre-la-simulation-digne-de-confiance)) ;
-les autres tiennent au moteur ou à la portée de la simulation.
+Les deux écarts que corrigeait l'étape B — trades de l'amorçage comptés, long et short
+additionnés alors que le bot ne peut pas tenir les deux — sont traités par le rapport
+lui-même. Le prix d'exécution relève de l'étape 3 côté bot (voir le
+[roadmap](../roadmap.md#rendre-la-simulation-digne-de-confiance)).
 
 ## Un signal sur la bougie en cours est provisoire
 

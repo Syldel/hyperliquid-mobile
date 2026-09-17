@@ -1,0 +1,99 @@
+.strategy-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+h2 {
+  margin: 20px 0 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.window,
+.note {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--ion-color-medium);
+}
+
+.note--provisional {
+  color: var(--ion-color-warning-shade);
+}
+
+.warning {
+  margin: 8px 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ion-color-warning-shade);
+}
+
+// Un tableau plutôt qu'une liste : la lecture utile est en colonnes — comparer
+// long, short et total sur une même ligne.
+.stats {
+  width: 100%;
+  margin-top: 8px;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+
+  th,
+  td {
+    padding: 4px 6px;
+    text-align: right;
+  }
+
+  thead th {
+    font-weight: 600;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+  }
+
+  tbody th {
+    text-align: left;
+    font-weight: 400;
+    color: var(--ion-color-medium);
+  }
+}
+
+.up {
+  color: var(--ion-color-success);
+}
+
+.down {
+  color: var(--ion-color-danger);
+}
+
+.legend {
+  display: flex;
+  gap: 12px;
+  margin: 4px 0;
+  font-size: 12px;
+}
+
+ion-note.up,
+ion-note.down {
+  font-variant-numeric: tabular-nums;
+}
+
+// Mêmes couleurs que la bande de positions (`POSITION_COLORS`), passées en style
+// depuis le composant : une seule source pour le vert du long et le rouge du short.
+.side {
+  min-width: 44px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  color: #fff;
+}
+
+.limits {
+  margin: 20px 0 0;
+  padding-left: 16px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--ion-color-medium);
+}

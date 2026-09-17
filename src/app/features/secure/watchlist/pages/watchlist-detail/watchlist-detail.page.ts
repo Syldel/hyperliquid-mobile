@@ -43,8 +43,9 @@ import {
   AnalysisCandle,
   AnalysisRequest,
   AnalysisResponse,
-  BacktestSummary,
+  BacktestReport,
   IndicatorMetadata,
+  PositionSide,
 } from '@syldel/trading-shared-types';
 import { toChartInterval } from '@utils/hl-interval.utils';
 import { addIcons } from 'ionicons';
@@ -54,6 +55,7 @@ import {
   calendarOutline,
   closeCircle,
   createOutline,
+  chevronForwardOutline,
   chevronUpOutline,
   receiptOutline,
   refreshOutline,
@@ -118,12 +120,25 @@ import {
 } from '../../utils/forming-candle.util';
 import { overlayFailureReason } from '../../utils/overlay-failure.util';
 import { WatchlistService } from '../../services/watchlist.service';
+import {
+  BacktestReportModalComponent,
+  type BacktestFocus,
+} from '../../components/backtest-report-modal/backtest-report-modal.component';
+import {
+  BACKTEST_LIMITS,
+  definedSides,
+  formatPercent,
+  percentTone,
+  statsOf,
+  tradeFocusRange,
+} from '../../utils/backtest-display.util';
 import { mapIndicatorSeriesById } from '../../utils/indicator-series-map.util';
 import type { StrategySignalLayer } from '../../utils/strategy-markers.util';
 
-/** Une stratégie backtestée sur la fenêtre courante : ses marqueurs, plus son bilan. */
+/** Une stratégie backtestée sur la fenêtre courante : ses marqueurs, plus son rapport. */
 interface StrategyRunResult extends StrategySignalLayer {
-  summary: BacktestSummary;
+  /** Calculé par le bot sur la fenêtre affichée — jamais recalculé ici. */
+  report: BacktestReport;
 }
 
 @Component({
@@ -372,6 +387,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       closeCircle,
       createOutline,
       statsChartOutline,
+      chevronForwardOutline,
       chevronUpOutline,
       alertCircleOutline,
     });
@@ -660,7 +676,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
             name: result.name,
             color: strategyColor(result.id),
             signals: result.signals,
-            summary: result.summary,
+            report: result.report,
           },
         ]),
       ),
@@ -1311,6 +1327,58 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
 
   strategyColorOf(strategyId: string): string {
     return strategyColor(strategyId);
+  }
+
+  // ── Backtest report ────────────────────────────────────────────────────────
+
+  readonly backtestLimits = BACKTEST_LIMITS;
+  readonly formatPercent = formatPercent;
+  readonly percentTone = percentTone;
+  readonly statsOf = statsOf;
+
+  /** Les côtés que la stratégie évalue, lus dans le document de la bibliothèque. */
+  sidesOf(strategyId: string): PositionSide[] {
+    return definedSides(this.strategyLibrary.getById(strategyId)?.rules);
+  }
+
+  sideLabel(side: PositionSide): string {
+    return side === 'LONG' ? 'Long' : 'Short';
+  }
+
+  async openBacktestReport(result: StrategyRunResult): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: BacktestReportModalComponent,
+      componentProps: {
+        name: () => result.name,
+        color: () => result.color,
+        report: () => result.report,
+        sides: () => this.sidesOf(result.strategyId),
+        formingOpenTime: () => this.formingOpenTime(),
+      },
+    });
+    await modal.present();
+
+    const { data, role } = await modal.onWillDismiss<BacktestFocus>();
+    if (role === 'focus' && data) this.focusChartOn(data, result.report);
+  }
+
+  /**
+   * Recentre le chart principal sur un trade touché dans le rapport : c'est là
+   * que ses bougies, ses marqueurs et sa bande de position se lisent ensemble.
+   *
+   * La plage peut remonter dans l'amorçage (position héritée) : ces bougies sont
+   * bien dessinées, seulement hors de la fenêtre affichée par défaut.
+   */
+  private focusChartOn(focus: BacktestFocus, report: BacktestReport): void {
+    const lastCandleTime = report.to ?? this.lastCandles.at(-1)?.t;
+    if (!this.chart || lastCandleTime === undefined) return;
+
+    const intervalMs = CANDLE_INTERVAL_MINUTES[this.selectedInterval()] * 60_000;
+    const { from, to } = tradeFocusRange(focus, intervalMs, lastCandleTime);
+    this.chart.timeScale().setVisibleRange({
+      from: Math.floor(from / 1000) as Time,
+      to: Math.floor(to / 1000) as Time,
+    });
   }
 
   async openStrategyPicker(): Promise<void> {

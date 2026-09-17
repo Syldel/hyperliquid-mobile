@@ -1,12 +1,8 @@
 import type { TimelineSignal } from '@syldel/trading-shared-types';
 import { buildPositionBars, buildPositionSegments } from './position-segments.util';
 
-function signal(time: number, kind: 'ENTER' | 'EXIT', side?: 'LONG' | 'SHORT'): TimelineSignal {
-  return {
-    time,
-    signal: kind,
-    metadata: { price: 1, cumulativeProfitPercent: 0, ...(side ? { side } : {}) },
-  };
+function signal(time: number, kind: 'ENTER' | 'EXIT', side: 'LONG' | 'SHORT'): TimelineSignal {
+  return { time, signal: kind, side, price: 1 };
 }
 
 describe('buildPositionSegments', () => {
@@ -53,12 +49,6 @@ describe('buildPositionSegments', () => {
     ]);
 
     expect(segments).toEqual([{ side: 'LONG', from: 100, to: 200 }]);
-  });
-
-  it('treats a missing side as long', () => {
-    expect(buildPositionSegments([signal(100, 'ENTER'), signal(200, 'EXIT')])).toEqual([
-      { side: 'LONG', from: 100, to: 200 },
-    ]);
   });
 
   it('handles unordered input', () => {

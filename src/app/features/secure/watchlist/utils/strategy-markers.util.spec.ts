@@ -1,12 +1,12 @@
 import type { TimelineSignal } from '@syldel/trading-shared-types';
 import { buildStrategyMarkers, type StrategySignalLayer } from './strategy-markers.util';
 
-function signal(time: number, kind: 'ENTER' | 'EXIT', side?: string): TimelineSignal {
-  return {
-    time,
-    signal: kind,
-    metadata: { price: 1, cumulativeProfitPercent: 0, ...(side ? { side } : {}) },
-  };
+function signal(
+  time: number,
+  kind: 'ENTER' | 'EXIT',
+  side: TimelineSignal['side'] = 'LONG',
+): TimelineSignal {
+  return { time, signal: kind, side, price: 1 };
 }
 
 function layer(
@@ -67,12 +67,12 @@ describe('buildStrategyMarkers', () => {
   });
 
   it('does not look at the side at all — the positions band carries it', () => {
-    const withSide = buildStrategyMarkers([
+    const short = buildStrategyMarkers([
       layer('s1', 'A', '#111', [signal(1000, 'ENTER', 'SHORT')]),
     ]);
-    const withoutSide = buildStrategyMarkers([layer('s1', 'A', '#111', [signal(1000, 'ENTER')])]);
+    const long = buildStrategyMarkers([layer('s1', 'A', '#111', [signal(1000, 'ENTER', 'LONG')])]);
 
-    expect(withSide).toEqual(withoutSide);
+    expect(short).toEqual(long);
   });
 
   it('returns nothing for no layers, or for layers without signals', () => {

@@ -21,10 +21,11 @@ export interface PositionSegment {
  * d'une stratégie sont indépendantes, elles peuvent donc être ouvertes en même
  * temps, et une stratégie peut parfaitement n'en exploiter qu'une.
  *
- * Tolérant par conception, parce que la donnée vient d'un moteur : un `EXIT`
- * sans `ENTER` correspondant est ignoré plutôt que de produire un segment qui
- * commencerait nulle part, et un `ENTER` jamais refermé donne un segment
- * ouvert (`to: null`) — c'est le `openPositionAtEnd` du bilan, rendu visible.
+ * Tolérant pour le dessin : un `EXIT` sans `ENTER` correspondant est ignoré
+ * plutôt que de produire un segment qui commencerait nulle part, et un `ENTER`
+ * jamais refermé donne un segment ouvert (`to: null`). Tolérer ici ne tait
+ * rien : ces incohérences sont listées par le rapport du bot
+ * (`BacktestReport.anomalies`), et affichées avec le bilan.
  * ============================================================================
  */
 export function buildPositionSegments(signals: readonly TimelineSignal[]): PositionSegment[] {
@@ -33,7 +34,7 @@ export function buildPositionSegments(signals: readonly TimelineSignal[]): Posit
   const segments: PositionSegment[] = [];
 
   for (const signal of ordered) {
-    const side = sideOf(signal);
+    const side = signal.side;
 
     if (signal.signal === 'ENTER') {
       // Un second ENTER sans sortie ne rouvre rien : la position est déjà
@@ -54,11 +55,6 @@ export function buildPositionSegments(signals: readonly TimelineSignal[]): Posit
   }
 
   return segments.sort((a, b) => a.from - b.from);
-}
-
-/** Un côté absent vaut LONG — le défaut du moteur, cohérent avec les marqueurs. */
-function sideOf(signal: TimelineSignal): 'LONG' | 'SHORT' {
-  return signal.metadata?.['side'] === 'SHORT' ? 'SHORT' : 'LONG';
 }
 
 /** Un point de la bande de positions, au format attendu par un histogramme. */

@@ -11,7 +11,7 @@ const HOUR = 3_600_000;
 const OPEN = 1_789_639_200_000; // une bougie 1h ouverte à 17:00
 
 function signal(time: number, kind: TimelineSignal['signal'] = 'ENTER'): TimelineSignal {
-  return { time, signal: kind, metadata: { price: 1, cumulativeProfitPercent: 0 } };
+  return { time, signal: kind, side: 'LONG', price: 1 };
 }
 
 describe('formingCandleOpenTime', () => {

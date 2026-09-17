@@ -162,40 +162,65 @@
   </div>
   } @if (visibleStrategyResults().length > 0 && showBacktest()) {
   <div class="backtest-strip">
-    @for (result of visibleStrategyResults(); track result.strategyId) {
-    <div class="backtest-card">
-      <span class="strategy-dot" [style.background]="result.color"></span>
-      <span class="backtest-card__name">{{ result.name }}</span>
-      <span class="backtest-card__stat">{{ result.summary.totalTrades }} trades</span>
-      @if (result.summary.winRatePercent !== null) {
-      <span class="backtest-card__stat">{{ result.summary.winRatePercent }}% win</span>
+    @for (result of visibleStrategyResults(); track result.strategyId) { @let report =
+    result.report; @let sides = sidesOf(result.strategyId);
+    <!-- Un bloc compact par stratégie : le rapport complet (côtés, courbe,
+         trades) s'ouvre dans une modale. Tous les chiffres viennent du bot. -->
+    <button type="button" class="backtest-block" (click)="openBacktestReport(result)">
+      <div class="backtest-block__head">
+        <span class="strategy-dot" [style.background]="result.color"></span>
+        <span class="backtest-block__name">{{ result.name }}</span>
+        @if (report.openPositions.length > 0) {
+        <ion-badge color="medium">open</ion-badge>
+        } @if (report.carriedIn.length > 0) {
+        <ion-badge color="medium">carried in</ion-badge>
+        } @if (report.anomalies.length > 0) {
+        <ion-badge color="danger">
+          {{ report.anomalies.length }} {{ report.anomalies.length === 1 ? 'anomaly' : 'anomalies'
+          }}
+        </ion-badge>
+        }
+        <ion-icon name="chevron-forward-outline" class="backtest-block__more" />
+      </div>
+
+      @if (report.total; as total) {
+      <div class="backtest-block__line">
+        <span
+          class="backtest-block__pnl"
+          [class.up]="percentTone(total.realizedPercent) === 'up'"
+          [class.down]="percentTone(total.realizedPercent) === 'down'"
+        >
+          {{ formatPercent(total.realizedPercent) }}
+        </span>
+        <span>{{ total.trades }} {{ total.trades === 1 ? 'trade' : 'trades' }}</span>
+        @if (total.winRatePercent !== null) {
+        <span>{{ total.winRatePercent.toFixed(0) }}% win</span>
+        }
+        <span>DD {{ formatPercent(-total.maxDrawdown.depthPercent) }}</span>
+      </div>
+      } @else {
+      <!-- Le rapport refuse le total : le bot ne tient qu'une position par paire. -->
+      <div class="backtest-block__warning">
+        Long and short overlap — no total, the bot holds one position per pair.
+      </div>
+      } @if (sides.length > 1 || report.total === null) {
+      <div class="backtest-block__sides">
+        @for (side of sides; track side) { @let stats = statsOf(report, side);
+        <span>
+          {{ sideLabel(side) }} {{ formatPercent(stats.realizedPercent) }} · {{ stats.trades }}
+        </span>
+        }
+      </div>
       }
-      <span
-        class="backtest-card__pnl"
-        [class.backtest-card__pnl--up]="result.summary.cumulativeProfitPercent >= 0"
-        [class.backtest-card__pnl--down]="result.summary.cumulativeProfitPercent < 0"
-      >
-        {{ result.summary.cumulativeProfitPercent >= 0 ? '+' : '' }}{{
-        result.summary.cumulativeProfitPercent }}%
-      </span>
-      @if (result.summary.openPositionAtEnd) {
-      <ion-badge color="medium">open</ion-badge>
-      }
-    </div>
+    </button>
     }
     <!-- Ces chiffres se lisent spontanément comme « ce que la stratégie aurait
-         rapporté ». Ils ne le sont pas, et chaque ligne ci-dessous nomme un écart
-         réel avec le bot — voir docs/watchlist/chart-overlays.md. -->
+         rapporté ». Ils ne le sont pas, et chaque ligne nomme un écart réel avec
+         le bot — voir docs/watchlist/chart-overlays.md. -->
     <ul class="backtest-limits">
-      <li>Simplified simulation — not what the bot would have earned.</li>
-      <li>Trades fill at the signal candle's close, with no fees, funding or slippage.</li>
-      <li>
-        Take-profit / stop-loss, latent orders and the pair's exit behaviour are not simulated yet.
-      </li>
-      <li>Long and short are simulated independently; the bot cannot hold both at once.</li>
-      <li>
-        Returns are added, not compounded, and include warm-up candles before the visible range.
-      </li>
+      @for (limit of backtestLimits; track limit) {
+      <li>{{ limit }}</li>
+      }
     </ul>
   </div>
   }
