@@ -22,7 +22,8 @@ import {
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { HLPerpDex, HLPerpMeta } from '@syldel/hl-shared-types';
 import { addIcons } from 'ionicons';
-import { checkmarkCircle, closeOutline, searchOutline } from 'ionicons/icons';
+import { alertCircleOutline, checkmarkCircle, closeOutline, searchOutline } from 'ionicons/icons';
+import { marketSource, refusalMessage } from './market-source.util';
 
 export type MarketType = 'perp' | 'spot' | 'hip3';
 
@@ -67,6 +68,13 @@ export class MarketPickerModalComponent implements OnInit {
 
   readonly initialValue = input<string | undefined>();
 
+  /**
+   * L'exchange pour lequel on choisit un marché. Sans lui, ce sélecteur n'a
+   * rien de fiable à proposer : il ne connaît que les marchés Hyperliquid.
+   * Volontairement non défaulté — voir `market-source.util.ts`.
+   */
+  readonly exchangeKey = input<string | undefined>();
+
   // ------------------------------------------------------------------
   //  State
   // ------------------------------------------------------------------
@@ -82,6 +90,10 @@ export class MarketPickerModalComponent implements OnInit {
   private dexMeta = signal<HLPerpMeta | null>(null);
 
   readonly dexNames = computed(() => this.perpDexs().map((d) => d.name));
+
+  readonly source = computed(() => marketSource(this.exchangeKey()));
+  readonly canList = computed(() => this.source().state === 'listable');
+  readonly refusal = computed(() => refusalMessage(this.source()));
 
   readonly filteredMarkets = computed((): MarketEntry[] => {
     let assets: string[];
@@ -111,7 +123,9 @@ export class MarketPickerModalComponent implements OnInit {
   //  Lifecycle
   // ------------------------------------------------------------------
   ngOnInit(): void {
-    addIcons({ closeOutline, searchOutline, checkmarkCircle });
+    addIcons({ closeOutline, searchOutline, checkmarkCircle, alertCircleOutline });
+
+    if (!this.canList()) return;
 
     this.loadMarkets();
 
@@ -199,6 +213,8 @@ export class MarketPickerModalComponent implements OnInit {
   //  Modal actions
   // ------------------------------------------------------------------
   select(name: string): void {
+    if (!this.canList()) return;
+
     this.modalCtrl.dismiss(name, 'confirm');
   }
 

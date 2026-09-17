@@ -30,6 +30,7 @@ import { HyperliquidGatewayService } from '@services/hyperliquid-gateway.service
 import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { MarketPickerModalComponent } from '@shared/components/market-picker-modal/market-picker-modal.component';
+import { LISTABLE_EXCHANGE } from '@shared/components/market-picker-modal/market-source.util';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import {
   HlActiveAssetData,
@@ -401,6 +402,7 @@ export class OrderFormComponent implements OnInit {
     const modal = await this.modalCtrl.create({
       component: MarketPickerModalComponent,
       componentProps: {
+        exchangeKey: () => LISTABLE_EXCHANGE,
         initialValue: () => this.selectedCoin(),
       },
       breakpoints: [0, 1],

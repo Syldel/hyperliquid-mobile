@@ -668,11 +668,10 @@ export class TradingPairModalComponent implements OnInit {
   // ------------------------------------------------------------------
 
   async openMarketPicker(): Promise<void> {
-    // TODO: Should depend on the selected exchange
     const modal = await this.modalCtrl.create({
       component: MarketPickerModalComponent,
       componentProps: {
-        exchange: () => this.form.controls.exchangeKey.value,
+        exchangeKey: () => this.form.controls.exchangeKey.value,
         initialValue: () => this.form.controls.pairName.value,
       },
       breakpoints: [0, 1],

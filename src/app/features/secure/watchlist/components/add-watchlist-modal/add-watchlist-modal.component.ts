@@ -16,6 +16,7 @@ import {
   IonToolbar,
   ModalController,
 } from '@ionic/angular/standalone';
+import { LISTABLE_EXCHANGE } from '@shared/components/market-picker-modal/market-source.util';
 import { CANDLE_INTERVALS, CandleInterval } from '@syldel/hl-shared-types';
 import { addIcons } from 'ionicons';
 import { chevronForwardOutline } from 'ionicons/icons';
@@ -86,6 +87,7 @@ export class AddWatchlistModalComponent implements OnInit {
     const modal = await this.modalCtrl.create({
       component: MarketPickerModalComponent,
       componentProps: {
+        exchangeKey: () => LISTABLE_EXCHANGE,
         initialValue: () => this.form.value.coin,
       },
       breakpoints: [0, 1],

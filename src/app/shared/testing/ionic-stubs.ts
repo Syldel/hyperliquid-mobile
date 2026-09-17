@@ -349,6 +349,14 @@ export class IonSegmentButtonStub {
   @Input() value: unknown;
 }
 
+@Component({ selector: 'ion-searchbar', standalone: true, template: '' })
+export class IonSearchbarStub {
+  @Input() value: unknown;
+  @Input() placeholder?: string;
+  @Input() animated?: boolean | string;
+  @Output() ionInput = new EventEmitter<{ detail: { value: string | null } }>();
+}
+
 /**
  * ============================================================================
  * Ré-exports sous les noms réels d'Ionic.
@@ -384,6 +392,7 @@ export {
   IonListStub as IonList,
   IonNoteStub as IonNote,
   IonRangeStub as IonRange,
+  IonSearchbarStub as IonSearchbar,
   IonSegmentStub as IonSegment,
   IonSegmentButtonStub as IonSegmentButton,
   IonSelectStub as IonSelect,
