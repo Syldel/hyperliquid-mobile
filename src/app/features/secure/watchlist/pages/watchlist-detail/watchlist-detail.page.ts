@@ -32,6 +32,7 @@ import { IndicatorPickerComponent } from '@shared/components/indicator-picker/in
 import { ActiveIndicator } from '@shared/components/indicator-picker/models/indicator.model';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import {
+  CANDLE_INTERVAL_MINUTES,
   CANDLE_INTERVALS,
   CandleInterval,
   CandleSnapshot,
@@ -111,6 +112,10 @@ import {
   type ExpressionSeries,
   type RawExpressionPoint,
 } from '../../utils/expression-series.util';
+import {
+  formingCandleOpenTime,
+  strategiesSignallingOnFormingCandle,
+} from '../../utils/forming-candle.util';
 import { overlayFailureReason } from '../../utils/overlay-failure.util';
 import { WatchlistService } from '../../services/watchlist.service';
 import { mapIndicatorSeriesById } from '../../utils/indicator-series-map.util';
@@ -226,6 +231,21 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       .map((ref) => results.get(ref.strategyId))
       .filter((result) => result !== undefined);
   });
+
+  /**
+   * `openTime` de la dernière bougie du backtest si elle était encore en cours
+   * au retour de la réponse — voir forming-candle.util.ts. Figé à ce moment : si
+   * la bougie se ferme pendant que la page reste ouverte, le signalement persiste
+   * jusqu'au rechargement suivant, ce qui pèche du côté sûr.
+   */
+  private readonly formingOpenTime = signal<number | null>(null);
+
+  /** Stratégies visibles dont un signal tombe sur cette bougie en cours. */
+  readonly provisionalSignalNames = computed(() =>
+    strategiesSignallingOnFormingCandle(this.visibleStrategyResults(), this.formingOpenTime()).join(
+      ', ',
+    ),
+  );
   indicatorsMeta = signal<IndicatorMetadata[]>([]);
   private indicatorSeriesCache = new Map<string, { time: number; value: number }[]>();
 
@@ -493,10 +513,13 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     // restaient jusqu'ici attachées, pas envoyées, et sans un mot.
     const strategies = this.attachedPartition().evaluated.map(toAnalysisRequest);
     const expressions = this.attachedExpressions();
+    // Lu une fois : la bougie en cours se juge sur l'intervalle demandé, pas sur
+    // celui qu'un changement pendant l'appel aurait mis à la place.
+    const interval = this.selectedInterval();
 
     const request: AnalysisRequest = {
       symbol: item.coin,
-      interval: toChartInterval(this.selectedInterval()),
+      interval: toChartInterval(interval),
       // Début de la fenêtre à AFFICHER, jamais une valeur pré-paddée : le
       // serveur recule lui-même `startTime` du warm-up nécessaire
       // (`AnalysisService.padStartTimeForWarmup`), en s'appuyant sur un registre
@@ -534,6 +557,13 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       this.computeStats(candles.filter((c) => c.t >= displayStartTime));
       this.cacheIndicatorSeries(res, active);
       this.applyIndicatorVisibility();
+      this.formingOpenTime.set(
+        formingCandleOpenTime(
+          res.candles.at(-1)?.time,
+          CANDLE_INTERVAL_MINUTES[interval] * 60_000,
+          Date.now(),
+        ),
+      );
       this.cacheStrategyResults(res);
       this.applyStrategyVisibility();
       this.cacheExpressionSeries(res);

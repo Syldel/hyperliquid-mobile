@@ -318,4 +318,21 @@
   font-size: 12px;
   line-height: 1.4;
   color: var(--ion-color-danger);
+
+  // Un signal provisoire n'est pas une panne : rien n'a échoué, la donnée n'est
+  // simplement pas encore définitive. La teinte foncée reste lisible sur fond
+  // clair, là où le jaune de base ne l'est pas.
+  &--provisional {
+    color: var(--ion-color-warning-shade);
+  }
+}
+
+// Ce que la simulation ne reproduit pas du bot. Discret mais toujours affiché
+// avec les chiffres : ils ne se lisent jamais sans.
+.backtest-limits {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--ion-color-medium);
 }

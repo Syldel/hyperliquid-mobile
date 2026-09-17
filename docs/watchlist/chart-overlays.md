@@ -158,6 +158,49 @@ suffisaient à rendre le chart illisible.
 
 ---
 
+# Ce que le backtest ne dit pas
+
+Le bilan sous le chart vient de `POST /analysis`, qui fait tourner le **même** moteur que
+le bot en live (`StrategyEngineService.execute`). Les signaux sont donc bien ceux que le bot
+produirait sur ces bougies. Ce qui en est tiré, en revanche, s'écarte du live sur plusieurs
+points, tous écrits sous les chiffres parce qu'ils se lisent sinon comme « ce que la
+stratégie aurait rapporté » :
+
+| Écart                                                            | D'où il vient                                                  |
+| ---------------------------------------------------------------- | -------------------------------------------------------------- |
+| trades au prix de clôture de la bougie du signal                 | le moteur ; un live ne peut pas traiter à une clôture déjà vue |
+| ni frais, ni funding, ni slippage                                | `BacktestSummary`, chiffres bruts                              |
+| TP/SL (`protective`), ordres latents, `exitBehavior` non simulés | `/analysis` ne reçoit que les règles                           |
+| long et short simulés indépendamment                             | le moteur ; le bot, lui, ne tient qu'une position par paire    |
+| performances additionnées, non composées                         | `summarizeBacktestSignals`                                     |
+| trades de l'amorçage comptés                                     | le `summary` couvre toute la fenêtre calculée                  |
+
+Les deux dernières lignes disparaîtront avec le rapport de simulation (étape B du
+[roadmap](../roadmap.md#rendre-la-simulation-digne-de-confiance)) ;
+les autres tiennent au moteur ou à la portée de la simulation.
+
+## Un signal sur la bougie en cours est provisoire
+
+La dernière bougie reçue n'est généralement pas close : son `close` est le dernier prix
+échangé. Une condition vraie à cet instant peut ne plus l'être dix minutes plus tard, et
+le marqueur disparaître au rafraîchissement suivant — sans rien pour le distinguer d'un
+signal acquis.
+
+`forming-candle.util.ts` le détecte (une bougie ouverte à `t` est close dès que
+`now ≥ t + intervalle`) et la page nomme, sous la bande de puces, les stratégies qui ont un
+signal dessus. Le jugement est figé au retour de la réponse : si la bougie se ferme pendant
+que la page reste ouverte, l'avertissement persiste jusqu'au rechargement suivant, ce qui
+pèche du côté sûr.
+
+⚠️ `now` est l'horloge de l'appareil. En avance, elle ferait juger close une bougie qui ne
+l'est pas, et tairait l'avertissement. `AnalysisCandle` ne porte pas d'heure de clôture
+servie par le bot qui permettrait de s'en passer.
+
+Le défaut de fond est côté bot, qui décide lui aussi sur cette bougie — voir
+[roadmap.md](../roadmap.md#le-bot-décide-sur-une-bougie-qui-nest-pas-close).
+
+---
+
 # Ce qui déclenche un appel réseau
 
 Le patron est le même pour les indicateurs, les stratégies et les expressions :

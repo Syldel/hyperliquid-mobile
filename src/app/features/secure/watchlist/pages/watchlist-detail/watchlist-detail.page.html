@@ -101,6 +101,15 @@
   </p>
   }
 
+  <!-- La dernière bougie n'est pas close : un signal posé dessus peut disparaître
+       au rafraîchissement suivant. Voir forming-candle.util.ts. -->
+  @if (provisionalSignalNames()) {
+  <p class="strip-note strip-note--provisional">
+    Provisional signal on the last candle, which has not closed yet: {{ provisionalSignalNames() }}.
+    It may change or disappear.
+  </p>
+  }
+
   <!-- Opérandes tracés sous le chart : débogage visuel d'une règle. -->
   @if (availableExpressions().length > 0) {
   <div class="expressions-strip">
@@ -174,6 +183,20 @@
       }
     </div>
     }
+    <!-- Ces chiffres se lisent spontanément comme « ce que la stratégie aurait
+         rapporté ». Ils ne le sont pas, et chaque ligne ci-dessous nomme un écart
+         réel avec le bot — voir docs/watchlist/chart-overlays.md. -->
+    <ul class="backtest-limits">
+      <li>Simplified simulation — not what the bot would have earned.</li>
+      <li>Trades fill at the signal candle's close, with no fees, funding or slippage.</li>
+      <li>
+        Take-profit / stop-loss, latent orders and the pair's exit behaviour are not simulated yet.
+      </li>
+      <li>Long and short are simulated independently; the bot cannot hold both at once.</li>
+      <li>
+        Returns are added, not compounded, and include warm-up candles before the visible range.
+      </li>
+    </ul>
   </div>
   }
 </app-refreshable-layout>
