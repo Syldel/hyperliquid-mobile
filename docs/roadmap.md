@@ -62,6 +62,15 @@ cohérent** :
 5. **C — import / export JSON**, détaillé plus bas. Au-delà de la sauvegarde, il ouvre
    l'écriture assistée de stratégies.
 
+## La bande de positions tait un chevauchement long / short
+
+**⚠️ Ouvert, constaté le 2026-09-17** en vérifiant l'étape B. `buildPositionBars`
+(`watchlist/utils/position-segments.util.ts`) retient, pour chaque bougie, le **premier**
+segment qui la couvre (`segments.find`) : quand long et short sont ouverts ensemble, la
+bande n'en dessine qu'un, et le chevauchement ne se voit pas sur le chart. Le rapport le dit
+(total refusé, avertissement), la bande non — deux lectures du même backtest qui ne
+racontent pas la même chose.
+
 ## Plus tard : simuler `latent` et `protective`
 
 Le backtest n'évalue que les règles d'entrée et de sortie. Les ordres latents, les
