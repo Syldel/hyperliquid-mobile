@@ -27,10 +27,59 @@ export function filledBranches(
 ): StrategyBranch[] {
   if (!rules) return [];
 
-  return branches.filter((branch) => {
-    const group = getAtPath(rules, `rules.${branch.id}`);
-    return isLogicalGroup(group) && group.conditions.length > 0;
-  });
+  return branches.filter((branch) => hasConditions(rules, branch.id));
+}
+
+/**
+ * Branches sous lesquelles dire qu'un côté **sort dès que son entrée cesse
+ * d'être vraie**.
+ *
+ * C'est ce que fait le moteur du bot quand un côté n'a pas de sortie :
+ * `isExit = config.exit ? … : !isEntry` (`StrategyEngineService.executeAdvancedRules`,
+ * nest-trading-bot), en backtest comme en live. Sur une condition d'état
+ * (`close > EMA(50)`), c'est cohérent : on tient tant que c'est vrai. Sur un
+ * événement qui ne dure qu'une bougie (`close crosses above EMA(50)`), chaque
+ * trade est refermé à la bougie suivante — et rien ne le laissait deviner.
+ *
+ * Une sortie créée mais vide compte comme absente : l'enregistrement la retire
+ * (`pruneEmptyRuleBranches`), c'est donc bien ce comportement que le bot
+ * appliquera.
+ *
+ * La note se pose sur la branche de sortie quand l'appelant l'affiche, sinon sur
+ * celle d'entrée : une stratégie du catalogue peut ne déclarer que des entrées,
+ * et le comportement vaut quand même — le taire parce que la branche n'est pas
+ * proposée serait précisément le silence qu'on corrige.
+ *
+ * ⚠️ Ce comportement est une décision du moteur, pas une donnée du catalogue :
+ * rien ne le sert à ce build. Si le moteur change, cette note ment — voir
+ * docs/strategies/rule-model.md.
+ */
+export function implicitExitBranchIds(
+  rules: StrategyRules | undefined | null,
+  branches: readonly StrategyBranch[] = DEFAULT_STRATEGY_BRANCHES,
+): string[] {
+  if (!rules) return [];
+
+  const offered = new Set(branches.map((branch) => branch.id));
+  const annotated: string[] = [];
+
+  // `SideRules` est un type fermé du paquet partagé : c'est de la grammaire,
+  // pas du catalogue — les deux côtés ne se découvrent pas à l'exécution.
+  for (const side of ['long', 'short'] as const) {
+    const entryId = `${side}.entry`;
+    const exitId = `${side}.exit`;
+    if (!hasConditions(rules, entryId) || hasConditions(rules, exitId)) continue;
+
+    if (offered.has(exitId)) annotated.push(exitId);
+    else if (offered.has(entryId)) annotated.push(entryId);
+  }
+
+  return annotated;
+}
+
+function hasConditions(rules: StrategyRules, branchId: string): boolean {
+  const group = getAtPath(rules, `rules.${branchId}`);
+  return isLogicalGroup(group) && group.conditions.length > 0;
 }
 
 /** Résumé sur une ligne : `Long entry · Long exit`, ou `emptyLabel` si rien n'est renseigné. */

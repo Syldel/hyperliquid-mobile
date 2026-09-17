@@ -36,6 +36,26 @@ une `entry` vide. Cette entrée vide est structurellement valide ; seule la vali
 signale. `pruneEmptyRuleBranches` nettoie à l'enregistrement, mais conserve une `entry`
 vide si `exit` a du contenu — sans quoi la branche voulue disparaîtrait avec elle.
 
+## Une sortie absente n'est pas « jamais »
+
+Sans `exit`, le moteur du bot **ressort dès que l'entrée cesse d'être vraie** :
+`isExit = config.exit ? … : !isEntry` (`StrategyEngineService.executeAdvancedRules`,
+nest-trading-bot), en backtest comme en live.
+
+- Sur une condition d'état — `close > EMA(50)` —, c'est cohérent : la position est tenue
+  tant que la condition l'est.
+- Sur un événement qui ne dure qu'une bougie — `close crosses above EMA(50)` —, chaque
+  trade est refermé **à la bougie suivante**.
+
+Choix confirmé le 2026-09-17 : garder ce comportement et le dire. Le builder l'annonce sous
+la branche de sortie (sous l'entrée si la stratégie ne propose pas de sortie), dès que
+l'entrée porte une condition et la sortie aucune — `implicitExitBranchIds`,
+`domain/strategy-summary.util.ts`. Une sortie créée mais vide compte comme absente, puisque
+l'enregistrement la retire.
+
+⚠️ Rien du catalogue ne sert ce comportement : c'est une décision du moteur, écrite à la
+main dans la note. Si le moteur change, la note ment — la relire en même temps.
+
 Les identifiants de branche (`long.entry`, `short.exit`) ne sont pas inventés ici : ce
 sont les `id` des paramètres `rule-builder` que le catalogue déclare pour la stratégie
 (`ruleBranchesOf`). `DEFAULT_STRATEGY_BRANCHES` n'est qu'un défaut pour la bibliothèque

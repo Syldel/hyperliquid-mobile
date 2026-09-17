@@ -246,4 +246,35 @@ describe('StrategyBuilderModalComponent save flow', () => {
     expect(saved).toEqual([]);
     expect(modalCtrl.dismissed).toEqual([]);
   });
+
+  /**
+   * Le moteur sort d'un côté sans sortie dès que son entrée cesse d'être vraie.
+   * La règle elle-même est testée dans strategy-summary.util.spec.ts ; ce qui se
+   * vérifie ici, c'est que la note est posée sous la bonne branche et qu'elle
+   * suit l'édition — une note figée à l'ouverture mentirait dès la première
+   * condition de sortie ajoutée.
+   */
+  describe('implicit exit note', () => {
+    function notedBranches(): string[] {
+      const host = fixture.nativeElement as HTMLElement;
+      return [...host.querySelectorAll('.branch')]
+        .filter((branch) => branch.querySelector('.implicit-exit'))
+        .map((branch) => branch.querySelector('h2')?.textContent?.trim() ?? '');
+    }
+
+    it('sits under the exit of a side that has none', () => {
+      mount({ long: { entry: filledGroup } });
+
+      expect(notedBranches()).toEqual(['Long exit']);
+    });
+
+    it('goes away once the exit carries a condition', () => {
+      mount({ long: { entry: filledGroup } });
+
+      component.store.setBranch('rules.long.exit', filledGroup);
+      fixture.detectChanges();
+
+      expect(notedBranches()).toEqual([]);
+    });
+  });
 });

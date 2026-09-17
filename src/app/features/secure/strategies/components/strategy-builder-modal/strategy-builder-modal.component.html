@@ -72,8 +72,17 @@
 
         @if (branchGroup(branch)) {
           <app-rule-tree [path]="branchPath(branch)" [depth]="0" />
-        } @else {
+        } @else if (!hasImplicitExit(branch)) {
           <p class="empty">Not used by this strategy.</p>
+        }
+
+        <!-- Le moteur ne lit pas une sortie absente comme « jamais » : il sort
+             dès que l'entrée cesse d'être vraie. Voir implicitExitBranchIds. -->
+        @if (hasImplicitExit(branch)) {
+          <p class="implicit-exit">
+            No exit rules: the position closes on the first candle where the entry rules are no
+            longer true. With a one-candle event such as a crossover, that is the very next candle.
+          </p>
         }
       </div>
     }

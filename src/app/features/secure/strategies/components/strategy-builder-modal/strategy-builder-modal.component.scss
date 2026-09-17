@@ -36,3 +36,13 @@ ion-item {
   font-size: 0.8rem;
   color: var(--ion-color-medium);
 }
+
+// Pas une alerte : un comportement légitime qu'il faut connaître. D'où la
+// couleur d'avertissement sur le seul liseré, pas sur le texte.
+.implicit-exit {
+  margin: 0.25rem 0 0;
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--ion-color-warning);
+  font-size: 0.8rem;
+  color: var(--ion-color-medium);
+}

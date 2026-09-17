@@ -1,6 +1,6 @@
 import type { LogicalGroup, RuleNode, StrategyRules } from '@syldel/trading-shared-types';
 import type { StrategyBranch } from '../models/strategy-document.model';
-import { branchSummary, filledBranches } from './strategy-summary.util';
+import { branchSummary, filledBranches, implicitExitBranchIds } from './strategy-summary.util';
 
 function comparison(value: number): RuleNode {
   return {
@@ -67,5 +67,67 @@ describe('branchSummary', () => {
 
   it('has a default empty label, so a caller cannot render "undefined"', () => {
     expect(branchSummary({})).toBe('Draft — no rule yet');
+  });
+});
+
+// Le moteur du bot sort d'un côté sans sortie dès que son entrée cesse d'être
+// vraie. La règle testée ici est « le dire partout où c'est vrai, et seulement
+// là ».
+describe('implicitExitBranchIds', () => {
+  it('flags the exit of a side whose entry has conditions and whose exit has none', () => {
+    expect(implicitExitBranchIds({ long: { entry: group(comparison(1)) } })).toEqual(['long.exit']);
+  });
+
+  // L'enregistrement retire une sortie vide : le bot appliquera donc la sortie
+  // implicite, et la note doit l'annoncer dès la construction.
+  it('treats an exit that exists but holds nothing as absent', () => {
+    expect(implicitExitBranchIds(RULES)).toEqual(['long.exit', 'short.exit']);
+  });
+
+  it('says nothing once the exit carries a condition', () => {
+    const rules: StrategyRules = {
+      long: { entry: group(comparison(1)), exit: group(comparison(2)) },
+    };
+
+    expect(implicitExitBranchIds(rules)).toEqual([]);
+  });
+
+  // Sans entrée, il n'y a aucune position à refermer : la note serait fausse.
+  it('says nothing about a side whose entry is empty', () => {
+    const rules: StrategyRules = { long: { entry: group(), exit: group() } };
+
+    expect(implicitExitBranchIds(rules)).toEqual([]);
+  });
+
+  it('judges each side on its own', () => {
+    const rules: StrategyRules = {
+      long: { entry: group(comparison(1)), exit: group(comparison(2)) },
+      short: { entry: group(comparison(3)) },
+    };
+
+    expect(implicitExitBranchIds(rules)).toEqual(['short.exit']);
+  });
+
+  // Une stratégie du catalogue peut ne déclarer que ses entrées : le moteur sort
+  // quand même implicitement, donc la note se replie sur l'entrée plutôt que de
+  // disparaître avec la branche.
+  it('falls back to the entry branch when the exit branch is not offered', () => {
+    const entriesOnly: StrategyBranch[] = [{ id: 'long.entry', label: 'Long Entry Rules' }];
+
+    expect(implicitExitBranchIds({ long: { entry: group(comparison(1)) } }, entriesOnly)).toEqual([
+      'long.entry',
+    ]);
+  });
+
+  it('annotates nothing when neither branch of the side is offered', () => {
+    const shortOnly: StrategyBranch[] = [{ id: 'short.entry', label: 'Short entry' }];
+
+    expect(implicitExitBranchIds({ long: { entry: group(comparison(1)) } }, shortOnly)).toEqual([]);
+  });
+
+  it('handles rules that are not there yet', () => {
+    expect(implicitExitBranchIds(undefined)).toEqual([]);
+    expect(implicitExitBranchIds(null)).toEqual([]);
+    expect(implicitExitBranchIds({})).toEqual([]);
   });
 });

@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, inject, input, OnInit, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  OnInit,
+  signal,
+} from '@angular/core';
 import {
   IonButton,
   IonButtons,
@@ -25,6 +33,7 @@ import { firstValueFrom } from 'rxjs';
 import { locateIssue } from '../../domain/strategy-issues.util';
 import { createLogicalGroup } from '../../domain/strategy-node.factory';
 import { toLocalIssuePath } from '../../domain/strategy-path.util';
+import { implicitExitBranchIds } from '../../domain/strategy-summary.util';
 import { getAtPath, isLogicalGroup } from '../../domain/strategy-tree.ops';
 import {
   DEFAULT_STRATEGY_BRANCHES,
@@ -90,6 +99,15 @@ export class StrategyBuilderModalComponent implements OnInit {
    */
   readonly serverIssues = this.store.serverIssues;
 
+  /**
+   * Branches sous lesquelles annoncer la sortie implicite du moteur — voir
+   * `implicitExitBranchIds`. Suit `store.rules()`, un vrai signal : `branches`
+   * est une entrée de modale, constante pour la vie du composant.
+   */
+  private readonly implicitExitBranches = computed(
+    () => new Set(implicitExitBranchIds(this.store.rules(), this.branches())),
+  );
+
   constructor() {
     addIcons({ arrowBackOutline, arrowUndoOutline, chevronForwardOutline });
   }
@@ -122,6 +140,10 @@ export class StrategyBuilderModalComponent implements OnInit {
 
   disableBranch(branch: StrategyBranch): void {
     this.store.setBranch(this.branchPath(branch), undefined);
+  }
+
+  hasImplicitExit(branch: StrategyBranch): boolean {
+    return this.implicitExitBranches().has(branch.id);
   }
 
   /**
