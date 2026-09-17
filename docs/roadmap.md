@@ -25,8 +25,43 @@ reste attend — y compris des chantiers qui paraissent plus structurants.
 À distinguer des [limites acceptées](#limites-acceptées) plus bas : ce qui suit est en
 attente, pas arbitré.
 
-**Import / export JSON**, détaillé plus bas. C'est la vraie suite : au-delà de la
-sauvegarde, il ouvre l'écriture assistée de stratégies.
+## Rendre la simulation digne de confiance
+
+Ordre arrêté le 2026-09-17. Un chiffre de backtest se lit spontanément comme « ce que la
+stratégie aurait rapporté ». Tant qu'il ne l'est pas, l'import de stratégies écrites par
+une IA n'aurait rien de fiable sur quoi les juger. D'où cet ordre, **une étape = un commit
+cohérent** :
+
+1. **A — dire ce que la simulation ne fait pas** (mobile). Limites listées sous le bilan,
+   sortie implicite annoncée dans le builder, signal sur la bougie en cours marqué
+   provisoire. Voir
+   [watchlist/chart-overlays.md](watchlist/chart-overlays.md#ce-que-le-backtest-ne-dit-pas).
+2. **Étape 0 — mesurer la bougie en cours** (nest-trading-bot, sans rien changer au live).
+   Rejouer l'historique comme le bot le vit — cycle par cycle, bougie en cours comprise —
+   et compter faux départs, entrées manquées et décalages. Voir
+   [risques identifiés](#risques-identifiés).
+3. **B — le rapport de simulation** : trades (entrée, sortie, côté, %), courbe de
+   performance et pire drawdown **à chaque bougie**, pertes latentes comprises ; long,
+   short et total. Seuls comptent les trades dont l'entrée tombe dans la fenêtre affichée,
+   une position héritée de l'amorçage se signale à part. Si long et short se chevauchent,
+   le rapport le dit — le bot ne peut pas tenir les deux — et peut taire le total. Le
+   calcul va dans `trading-shared-types`, pour que le bot le serve ensuite sans le réécrire.
+4. **Étapes 1 à 3 côté bot**, chacune annoncée avant d'être commencée : décider sur des
+   bougies closes uniquement, traiter chaque bougie une seule fois, et simuler au même
+   prix que celui que le live peut réellement obtenir.
+5. **C — import / export JSON**, détaillé plus bas. Au-delà de la sauvegarde, il ouvre
+   l'écriture assistée de stratégies.
+
+## Plus tard : simuler `latent` et `protective`
+
+Le backtest n'évalue que les règles d'entrée et de sortie. Les ordres latents, les
+take-profit / stop-loss et le `exitBehavior` d'une paire ne sont **pas simulés**, alors que
+le bot les applique : une paire protégée ne rapporte donc pas ce que le bilan affiche.
+C'est dit à l'écran. Les simuler est une évolution à étudier — elle exige de savoir ce qui
+se passe à l'intérieur d'une bougie (un stop touché avant ou après le take-profit ?), ce
+qu'aucune bougie seule ne dit.
+
+## Traité récemment
 
 **Fait** — les paires héritées sans `shortname` sont désormais signalées dans la liste et
 dans le formulaire, et le moteur du bot ne les écarte plus en silence. Voir
@@ -140,9 +175,54 @@ panneau. Un réglage par expression serait l'échappatoire, s'il manque un jour.
 Ce qui n'a pas pu être vérifié est écrit plutôt que laissé dormir. Chaque `⚠️` des docs
 désigne un risque et l'endroit où chercher s'il se manifeste.
 
-**Aucun n'est ouvert à ce jour.** Le dernier — une expression malformée faisant rejeter
-toute la requête d'analyse, indicateurs compris — a été reproduit, mesuré et corrigé :
-voir
+## Le bot décide sur une bougie qui n'est pas close
+
+**⚠️ Ouvert.** Le plus sérieux des risques connus, parce qu'il touche l'argent réel et
+non l'affichage.
+
+**Mesuré** (2026-09-17) : Hyperliquid renvoie la bougie en cours comme dernière bougie, et
+ni le gateway ni le bot ne l'écartent — la dernière bougie 1h de `/analysis` était ouverte
+depuis 28 minutes.
+
+**Lu dans le code, pas encore observé en production** (nest-trading-bot) : le cron évalue
+chaque paire 3 à 4 fois par bougie (toutes les 5 min pour une paire 15m, 15 min pour 1h,
+1 h pour 4h, 6 h pour 1D), presque toujours en cours de bougie. Le bot n'entre que sur un
+signal posé sur la **dernière** bougie (`start`), et sort aussi quand le rejeu des 500
+dernières bougies ne le voit plus en position (`!shouldBeActive`). Il en découle, sans
+l'avoir encore mesuré :
+
+- **des faux départs** — une condition vraie en cours de bougie fait entrer, redevient
+  fausse avant la clôture, et fait ressortir : deux fois les frais pour un signal que la
+  bougie close n'a jamais porté ;
+- **des entrées manquées** — une condition qui ne devient vraie qu'à la clôture est lue au
+  cycle suivant sur l'avant-dernière bougie, donc `start` vaut `false` ;
+- **un résultat qui dépend de quelques millisecondes** au cycle qui tombe pile sur la
+  frontière de bougie.
+
+Conséquence : le live n'exécute pas la stratégie que le chart backteste. La norme du métier
+est de ne décider que sur des bougies closes (Freqtrade n'expose jamais la bougie en cours ;
+TradingView appelle le contraire _repainting_) et de confier le risque en cours de bougie
+aux ordres posés sur l'exchange. Le traitement est planifié par étapes, en commençant par
+une mesure — voir [prochaines étapes](#rendre-la-simulation-digne-de-confiance).
+
+En attendant, le chart dit qu'un signal sur la bougie en cours est provisoire
+(`watchlist/utils/forming-candle.util.ts`).
+
+## Le `summary` du bot ne décrit pas la fenêtre affichée
+
+**⚠️ Ouvert.** `AnalysisResponse.strategies[].summary` couvre **toute** la fenêtre
+calculée, amorçage compris. Mesuré sur BTC 1h, 72 h, `close > EMA(50)` : 148 bougies dont
+76 d'amorçage, 3 signaux sur 8 hors de l'écran, un bilan de −0,84 % sur 4 trades quand les
+sorties visibles à l'écran totalisent −0,12 %. Il additionne aussi long et short, y compris quand les deux se chevauchent.
+
+Tant que l'étape B n'est pas faite, le bandeau affiche ce chiffre **avec** ses limites
+écrites dessous. B cesse de l'afficher ; corriger le calcul côté bot attend les étapes 1 à
+3, qui changent de toute façon les signaux et le prix des trades.
+
+## Précédent
+
+Le dernier risque refermé — une expression malformée faisant rejeter toute la requête
+d'analyse, indicateurs compris — a été reproduit, mesuré et corrigé : voir
 [watchlist/chart-overlays.md](watchlist/chart-overlays.md#une-expression-malformée-emportait-tout-le-reste).
 Il vaut d'être relu comme exemple : le risque avait été écrit sans être vérifié, et la
 vérification a montré qu'il était non seulement réel, mais doublé d'un diagnostic faux
