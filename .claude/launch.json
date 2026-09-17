@@ -5,7 +5,8 @@
       "name": "hyperliquid-mobile",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "start", "--", "--configuration=development"],
-      "port": 4200
+      "port": 4200,
+      "autoPort": false
     }
   ]
 }
