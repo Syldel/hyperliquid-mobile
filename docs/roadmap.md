@@ -32,13 +32,13 @@ stratégie aurait rapporté ». Tant qu'il ne l'est pas, l'import de stratégies
 une IA n'aurait rien de fiable sur quoi les juger. D'où cet ordre, **une étape = un commit
 cohérent** :
 
-1. **A — dire ce que la simulation ne fait pas** (mobile). Limites listées sous le bilan,
-   sortie implicite annoncée dans le builder, signal sur la bougie en cours marqué
+1. **Fait — A, dire ce que la simulation ne fait pas** (mobile). Limites listées sous le
+   bilan, sortie implicite annoncée dans le builder, signal sur la bougie en cours marqué
    provisoire. Voir
    [watchlist/chart-overlays.md](watchlist/chart-overlays.md#ce-que-le-backtest-ne-dit-pas).
-2. **Étape 0 — mesurer la bougie en cours** (nest-trading-bot, sans rien changer au live).
-   Rejouer l'historique comme le bot le vit — cycle par cycle, bougie en cours comprise —
-   et compter faux départs, entrées manquées et décalages. Voir
+2. **Fait — étape 0, mesurer la bougie en cours** (nest-trading-bot, sans rien changer au
+   live). Rejeu cycle par cycle, bougie en cours comprise, comparé à une décision par bougie
+   close : `docs/trading/forming-candle-replay.md` dans nest-trading-bot, résumé dans les
    [risques identifiés](#risques-identifiés).
 3. **B — le rapport de simulation** : trades (entrée, sortie, côté, %), courbe de
    performance et pire drawdown **à chaque bougie**, pertes latentes comprises ; long,
@@ -47,8 +47,18 @@ cohérent** :
    le rapport le dit — le bot ne peut pas tenir les deux — et peut taire le total. Le
    calcul va dans `trading-shared-types`, pour que le bot le serve ensuite sans le réécrire.
 4. **Étapes 1 à 3 côté bot**, chacune annoncée avant d'être commencée : décider sur des
-   bougies closes uniquement, traiter chaque bougie une seule fois, et simuler au même
-   prix que celui que le live peut réellement obtenir.
+   bougies closes uniquement, traiter chaque bougie une seule fois — avec une marge après
+   la clôture, une bougie n'étant pas définitive à l'instant où elle se ferme —, et simuler
+   au même prix que celui que le live peut réellement obtenir. Deux points à embarquer, pas
+   à redécouvrir :
+   - **la même fenêtre, bougie en cours comprise, sert aussi à l'ATR et aux conditions des
+     ordres latents et protecteurs (TP/SL)** (`calculateMarketMetrics`,
+     `HlProtectionService`). Ne corriger que les signaux d'entrée et de sortie laisserait
+     les protections décider sur une bougie inachevée ;
+   - **`waitSeconds(200)` attend 200 millisecondes, malgré son nom** (`TradingService` et
+     `UtilsService`). Tous les appels actuels passent bien des millisecondes, donc aucun
+     délai n'est faux aujourd'hui ; mais la cadence est précisément ce que l'étape 2 touche,
+     et un nom qui ment y est un piège. À renommer à cette occasion.
 5. **C — import / export JSON**, détaillé plus bas. Au-delà de la sauvegarde, il ouvre
    l'écriture assistée de stratégies.
 
@@ -177,33 +187,40 @@ désigne un risque et l'endroit où chercher s'il se manifeste.
 
 ## Le bot décide sur une bougie qui n'est pas close
 
-**⚠️ Ouvert.** Le plus sérieux des risques connus, parce qu'il touche l'argent réel et
-non l'affichage.
+**⚠️ Ouvert.** Le plus sérieux des risques connus, parce qu'il touchera l'argent réel et
+non l'affichage — aucune stratégie n'est activée aujourd'hui, c'est ce qui laisse le temps
+de le traiter proprement.
 
 **Mesuré** (2026-09-17) : Hyperliquid renvoie la bougie en cours comme dernière bougie, et
 ni le gateway ni le bot ne l'écartent — la dernière bougie 1h de `/analysis` était ouverte
 depuis 28 minutes.
 
-**Lu dans le code, pas encore observé en production** (nest-trading-bot) : le cron évalue
-chaque paire 3 à 4 fois par bougie (toutes les 5 min pour une paire 15m, 15 min pour 1h,
-1 h pour 4h, 6 h pour 1D), presque toujours en cours de bougie. Le bot n'entre que sur un
-signal posé sur la **dernière** bougie (`start`), et sort aussi quand le rejeu des 500
-dernières bougies ne le voit plus en position (`!shouldBeActive`). Il en découle, sans
-l'avoir encore mesuré :
+Le cron évalue chaque paire 3 à 4 fois par bougie (toutes les 5 min pour une paire 15m,
+15 min pour 1h, 1 h pour 4h, 6 h pour 1D), presque toujours en cours de bougie. Le bot
+n'entre que sur un signal posé sur la **dernière** bougie (`start`), et sort aussi quand le
+rejeu des 500 dernières bougies ne le voit plus en position (`!shouldBeActive`).
 
-- **des faux départs** — une condition vraie en cours de bougie fait entrer, redevient
-  fausse avant la clôture, et fait ressortir : deux fois les frais pour un signal que la
-  bougie close n'a jamais porté ;
-- **des entrées manquées** — une condition qui ne devient vraie qu'à la clôture est lue au
-  cycle suivant sur l'avant-dernière bougie, donc `start` vaut `false` ;
-- **un résultat qui dépend de quelques millisecondes** au cycle qui tombe pile sur la
-  frontière de bougie.
+**Mesuré ensuite par rejeu** (nest-trading-bot, `docs/trading/forming-candle-replay.md` :
+BTC, ETH, SOL ; 3,5 jours en 15m, 17 jours en 1h ; trois stratégies de natures
+différentes) :
+
+- **des faux départs systématiques** — d'un cinquième à la moitié des trades du live
+  n'existent pas en bougies closes, et jusqu'à plus de la moitié se referment en moins d'une
+  bougie : des frais pour un signal que la bougie close n'a jamais porté ;
+- **des entrées manquées** — jusqu'à un tiers, voire deux tiers, des entrées confirmées à la
+  clôture, quand la nouvelle bougie existe déjà au passage de la frontière ;
+- **une frontière qui se joue à une ou deux secondes** — sondé à 12:30:00, le gateway rend
+  encore la bougie close jusqu'à ~+1 s, la nouvelle entre +1,9 et +2,8 s selon le coin ; et
+  la bougie close gagnait encore des trades après 12:30 : **une bougie n'est pas
+  définitive à l'instant de sa clôture**.
 
 Conséquence : le live n'exécute pas la stratégie que le chart backteste. La norme du métier
 est de ne décider que sur des bougies closes (Freqtrade n'expose jamais la bougie en cours ;
 TradingView appelle le contraire _repainting_) et de confier le risque en cours de bougie
-aux ordres posés sur l'exchange. Le traitement est planifié par étapes, en commençant par
-une mesure — voir [prochaines étapes](#rendre-la-simulation-digne-de-confiance).
+aux ordres posés sur l'exchange. Le traitement est planifié par étapes — voir
+[prochaines étapes](#rendre-la-simulation-digne-de-confiance), qui liste aussi les deux
+points à ne pas oublier (ATR et ancres latentes/protectrices sur la même fenêtre ;
+`waitSeconds` en millisecondes).
 
 En attendant, le chart dit qu'un signal sur la bougie en cours est provisoire
 (`watchlist/utils/forming-candle.util.ts`).

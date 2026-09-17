@@ -26,6 +26,25 @@ ou pas prise du tout, sans que rien ne le signale. Tout ce qui suit en découle.
 En cas de doute, préférer l'option qui échoue **bruyamment et tôt**. Voir
 [docs/conventions.md](docs/conventions.md#exigence-de-robustesse).
 
+## Stade du projet : casser est permis, et souvent souhaitable
+
+**Aujourd'hui, un seul utilisateur — le développeur —, aucune stratégie activée sur le bot,
+aucun argent réel en jeu.** C'est précisément la fenêtre où la qualité se construit à bas
+coût, avant que l'exigence ci-dessus ne s'applique à de vrais ordres.
+
+- **Les changements cassants sont acceptés**, côté app comme côté bot ou types partagés :
+  modèle, format de stockage, contrat d'API, structure de composant. Si casser rend le
+  système plus robuste, plus fiable ou plus évolutif, c'est la voie attendue.
+- **Proposer la meilleure option, pas le compromis qui préserve l'existant.** Une
+  compatibilité ascendante n'a pas encore d'enjeu réel ; la conserver par réflexe fige des
+  défauts qu'on paiera plus tard, avec de l'argent réel.
+- **Casser n'est jamais casser en silence.** Un ancien format abandonné se migre
+  explicitement ou se refuse bruyamment ; une donnée de l'utilisateur ne disparaît pas sans
+  que ce soit dit. Un changement qui traverse les trois dépôts se coordonne (tag de
+  `trading-shared-types`, bot, app) au lieu de s'éviter.
+
+Voir [docs/conventions.md](docs/conventions.md#casser-plutôt-que-compromettre).
+
 ## Comment travailler ici
 
 L'exigence ci-dessus porte sur le produit ; celle-ci porte sur la façon de l'obtenir.

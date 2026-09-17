@@ -62,6 +62,43 @@ identifié, non reproduit, avec l'endroit où chercher s'il se manifeste.
 En cas de doute, préférer l'option qui échoue **bruyamment et tôt** à celle qui continue
 en apparence.
 
+## Casser plutôt que compromettre
+
+L'exigence ci-dessus vise le jour où l'application passera de vrais ordres. **Ce jour n'est
+pas encore venu** : un seul utilisateur (le développeur), aucune stratégie activée sur le
+bot, aucun argent réel en jeu. C'est la raison pour laquelle le projet accepte — et
+recherche — les changements cassants, dans les trois dépôts : si casser rend le système plus
+robuste, plus fiable ou plus évolutif, c'est la philosophie du projet. D'où l'ouverture aux
+propositions, et l'effort de qualité maximal dès maintenant : ce qui n'est pas corrigé tant
+que c'est gratuit le sera plus tard avec de l'argent réel.
+
+Concrètement :
+
+- un modèle, un format de stockage ou un contrat d'API qui gêne une meilleure conception se
+  change, plutôt que de s'empiler sous des adaptateurs de compatibilité ;
+- entre deux options, la plus robuste l'emporte sur celle qui préserve l'existant — la
+  préservation n'est pas un argument en soi ;
+- un changement qui touche plusieurs dépôts se coordonne (nouveau tag de
+  `trading-shared-types`, puis bot, puis app) plutôt que de s'éviter.
+
+Ce que « casser » n'autorise **pas** :
+
+- **casser en silence.** Un ancien format abandonné se migre explicitement ou se refuse avec
+  un message ; une stratégie ou une configuration de l'utilisateur ne disparaît pas sans
+  que ce soit dit. C'est la règle [aucune défaillance muette](#aucune-défaillance-muette)
+  appliquée au changement lui-même ;
+- **confondre compatibilité et robustesse.** Plusieurs mécanismes de ce dépôt ressemblent
+  à de la compatibilité mais protègent contre une divergence réelle, et restent donc
+  valables quel que soit le stade : le catalogue lu depuis le bot plutôt que depuis le paquet
+  compilé (une app installée peut retarder sur le bot déployé), la conservation verbatim
+  d'un nœud de règle inconnu (ne jamais perdre ce qu'on ne sait pas lire). Un mécanisme de
+  pure reprise de données, comme `migrateLegacyWatchlistStrategies`, peut en revanche être
+  retiré le jour où il ne sert plus — par décision, pas par oubli.
+
+Côté bot, la même règle est écrite dans son `CLAUDE.md` (« Project stage »), avec une
+exception qui vaut aussi ici dès qu'une fonctionnalité y touche : la sécurité des ordres, la
+protection des positions et les secrets ne se cassent pas.
+
 ---
 
 # Écriture
