@@ -29,6 +29,10 @@ h2 {
   font-size: 12px;
   line-height: 1.4;
   color: var(--ion-color-warning-shade);
+
+  p {
+    margin: 0;
+  }
 }
 
 // Un tableau plutôt qu'une liste : la lecture utile est en colonnes — comparer

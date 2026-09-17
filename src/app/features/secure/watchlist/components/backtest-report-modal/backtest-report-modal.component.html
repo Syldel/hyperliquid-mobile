@@ -21,16 +21,18 @@
   <!-- Le rapport refuse un total quand les deux côtés se chevauchent : le dire,
        sinon l'absence de colonne se lirait comme un oubli. -->
   @if (report().total === null) {
-    <p class="warning">
-      Long and short positions overlap on {{ report().overlap.candles }}
-      {{ report().overlap.candles === 1 ? 'candle' : 'candles' }}
-      @if (report().overlap.firstTime !== null) {
-        (first at {{ report().overlap.firstTime | date: 'MMM d, HH:mm' }})
-      }
-    </p>
-    <p class="warning">
-      The bot holds one position per pair, so it cannot get both: no total is shown.
-    </p>
+    <!-- Un seul avertissement en deux lignes : le constat, puis sa conséquence.
+         Deux blocs séparés se liraient comme deux problèmes distincts. -->
+    <div class="warning">
+      <p>
+        Long and short positions overlap on {{ report().overlap.candles }}
+        {{ report().overlap.candles === 1 ? 'candle' : 'candles' }}
+        @if (report().overlap.firstTime !== null) {
+          (first at {{ report().overlap.firstTime | date: 'MMM d, HH:mm' }})
+        }
+      </p>
+      <p>The bot holds one position per pair, so it cannot get both: no total is shown.</p>
+    </div>
   }
 
   @if (report().anomalies.length > 0) {
