@@ -743,7 +743,16 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     this.displayRangeStart = startTime;
     this.renderCandles(candles);
     this.computeStats(candles);
+    // Les résultats de backtest décrivent la fenêtre du dernier appel réussi,
+    // pas ces bougies-ci. Les garder laissait le bilan chiffré et la bande de
+    // positions affichés sous des bougies nues — mesuré : les chiffres du 1H
+    // restaient sous un chart passé en 4H, alors que le toast annonçait un
+    // chart sans surcouches. Vider le cache fait aussi qu'un basculement de
+    // stratégie redemande un backtest au lieu de redessiner l'ancien.
+    this.strategyResults.set(new Map());
+    this.formingOpenTime.set(null);
     this.strategySignals.clear();
+    this.strategyPositions.clear();
     this.expressionsPane.clear();
     this.indicatorSeriesCache.clear();
     this.expressionSeriesCache.set(new Map());
