@@ -49,16 +49,31 @@ cohérent** :
 4. **Étapes 1 à 3 côté bot**, chacune annoncée avant d'être commencée : décider sur des
    bougies closes uniquement, traiter chaque bougie une seule fois — avec une marge après
    la clôture, une bougie n'étant pas définitive à l'instant où elle se ferme —, et simuler
-   au même prix que celui que le live peut réellement obtenir. Deux points à embarquer, pas
-   à redécouvrir :
-   - **la même fenêtre, bougie en cours comprise, sert aussi à l'ATR et aux conditions des
-     ordres latents et protecteurs (TP/SL)** (`calculateMarketMetrics`,
-     `HlProtectionService`). Ne corriger que les signaux d'entrée et de sortie laisserait
-     les protections décider sur une bougie inachevée ;
-   - **`waitSeconds(200)` attend 200 millisecondes, malgré son nom** (`TradingService` et
-     `UtilsService`). Tous les appels actuels passent bien des millisecondes, donc aucun
-     délai n'est faux aujourd'hui ; mais la cadence est précisément ce que l'étape 2 touche,
-     et un nom qui ment y est un piège. À renommer à cette occasion.
+   au même prix que celui que le live peut réellement obtenir.
+
+   **Fait — 1a, sortir la décision de `processPerp`** (2026-09-17). La fonction qui place
+   les ordres décidait sans un seul test, et le script de rejeu portait une copie tenue à
+   la main de ses règles. `decidePerpAction` les détient désormais, `processPerp` ne fait
+   plus qu'exécuter, et le rejeu appelle le code de production au lieu d'une transcription.
+   Comportement inchangé, confronté exhaustivement à l'ancien code.
+
+   **Fait — phase A, les coutures** (2026-09-20), sans changer une seule décision. Elle
+   absorbe les deux points qui étaient listés ici comme « à ne pas redécouvrir » :
+
+   - **une seule fenêtre de bougies par passage**, passée explicitement au lieu d'être
+     relue par chaque branche de stratégie. Le signal et les protections ne peuvent plus
+     décider sur deux fenêtres différentes : les deux lectures traversaient un cache dont
+     le seau vaut `max(intervalle / 4, 15 s)`, et rien ne garantissait le même seau ;
+   - **le prix live a sa propre source** (`domain/live-price.ts`), journalisée avec la
+     valeur. Il vaut toujours le close de la dernière bougie — c'est précisément le seul
+     endroit à changer quand il devra cesser de sortir de la fenêtre que la phase B va
+     tronquer ;
+   - **`waitSeconds` est renommé `waitMs`** : il prenait déjà des millisecondes, et la
+     phase B touche justement à ces délais.
+
+   **Reste la phase B** : bougies closes, une décision par bougie, crons décalés. Les trois
+   sont indissociables — filtrer sans le garde-fou ferait voir le même signal 3 à 4 fois, et
+   décaler les crons sans filtrer ne servirait à rien.
 5. **C — import / export JSON**, détaillé plus bas. Au-delà de la sauvegarde, il ouvre
    l'écriture assistée de stratégies.
 
@@ -226,9 +241,9 @@ Conséquence : le live n'exécute pas la stratégie que le chart backteste. La n
 est de ne décider que sur des bougies closes (Freqtrade n'expose jamais la bougie en cours ;
 TradingView appelle le contraire _repainting_) et de confier le risque en cours de bougie
 aux ordres posés sur l'exchange. Le traitement est planifié par étapes — voir
-[prochaines étapes](#rendre-la-simulation-digne-de-confiance), qui liste aussi les deux
-points à ne pas oublier (ATR et ancres latentes/protectrices sur la même fenêtre ;
-`waitSeconds` en millisecondes).
+[prochaines étapes](#rendre-la-simulation-digne-de-confiance). Les coutures sont posées
+(décision extraite et testée, fenêtre unique par passage, prix live isolé) ; ce qui
+change réellement le comportement du bot reste à faire.
 
 En attendant, le chart dit qu'un signal sur la bougie en cours est provisoire
 (`watchlist/utils/forming-candle.util.ts`).
