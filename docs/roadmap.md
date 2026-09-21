@@ -71,6 +71,14 @@ cohérent** :
    - **`waitSeconds` est renommé `waitMs`** : il prenait déjà des millisecondes, et la
      phase B touche justement à ces délais.
 
+   **Fait — garde-fous d'appels vers Hyperliquid** (2026-09-21), avant la phase B parce
+   qu'elle touche au cron. Hyperliquid limite le débit par IP sans documenter la sanction, et
+   l'audit a trouvé quatre chemins vers un bannissement : un 429 rendu en 500 que le bot
+   relançait, des passages accumulés sans borne puis relâchés d'un coup, aucune requête
+   bornée dans le temps, et un gateway qui plantait au démarrage et se faisait relancer en
+   boucle. Tous fermés ; détail dans `nest-hyperliquid-gateway/docs/rate-limits.md` et
+   `nest-trading-bot/docs/known-gaps.md`.
+
    **Reste la phase B** : bougies closes, une décision par bougie, crons décalés. Les trois
    sont indissociables — filtrer sans le garde-fou ferait voir le même signal 3 à 4 fois, et
    décaler les crons sans filtrer ne servirait à rien.
