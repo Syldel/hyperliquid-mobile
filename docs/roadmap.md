@@ -81,7 +81,11 @@ cohérent** :
 
    **Reste la phase B** : bougies closes, une décision par bougie, crons décalés. Les trois
    sont indissociables — filtrer sans le garde-fou ferait voir le même signal 3 à 4 fois, et
-   décaler les crons sans filtrer ne servirait à rien.
+   décaler les crons sans filtrer ne servirait à rien. Arrêté le 2026-09-21 : décider **30 s**
+   après la frontière, et choisir la bougie de décision **par son heure**
+   (`ouverture + intervalle ≤ maintenant − 30 s`), jamais par sa position dans le tableau —
+   juste après la frontière, l'API renvoie encore la bougie qui vient de se fermer en
+   dernière position. Reste à trancher : la règle au redémarrage du garde-fou.
 5. **C — import / export JSON**, détaillé plus bas. Au-delà de la sauvegarde, il ouvre
    l'écriture assistée de stratégies.
 
@@ -243,7 +247,10 @@ différentes) :
 - **une frontière qui se joue à une ou deux secondes** — sondé à 12:30:00, le gateway rend
   encore la bougie close jusqu'à ~+1 s, la nouvelle entre +1,9 et +2,8 s selon le coin ; et
   la bougie close gagnait encore des trades après 12:30 : **une bougie n'est pas
-  définitive à l'instant de sa clôture**.
+  définitive à l'instant de sa clôture**. Mesuré à nouveau le 2026-09-21 sur quatre
+  frontières : elle a bougé **jusqu'à 4-6 s** après la clôture, son close compris, puis
+  plus rien jusqu'à +20 s. Le délai varie d'une mesure à l'autre ; la phase B décidera à
+  +30 s, soit une marge de 5 sur le pire cas vu.
 
 Conséquence : le live n'exécute pas la stratégie que le chart backteste. La norme du métier
 est de ne décider que sur des bougies closes (Freqtrade n'expose jamais la bougie en cours ;
