@@ -90,6 +90,24 @@ cohérent** :
    démarrage ne déclenche aucune entrée. Le prix d'exécution garde la bougie en cours, sans
    appel de plus.
 
+   **Fait — les deux premiers défauts que la simulation a trouvés** (2026-09-22). Le faux
+   gateway et les scénarios de bout en bout ont été écrits pour être dignes de confiance ;
+   voici ce qu'ils ont rapporté, corrigé le jour même :
+
+   - **une paire sans bloc `protective` arrêtait tout le passage.** L'app en crée une à
+     chaque nouvelle paire, et « Remove all protective configurations » le retire : la
+     configuration la plus ordinaire de l'app tuait le passage de l'utilisateur, paires
+     suivantes comprises. Le garde manquant est posé, l'échec d'une paire est désormais
+     contenu à cette paire — sauf limite de débit et ordre dans un état inconnu, qui
+     concernent l'IP et le compte —, et il est journalisé **et** alerté ;
+   - **le reste d'un ordre au marché était calculé en virgule flottante.** Sur une sortie
+     pourtant complète, le bot lisait une sortie partielle et interrompait le passage : un
+     **retournement était perdu**. Tout se compte désormais en chaînes décimales exactes.
+
+   Le second n'était atteignable qu'en faisant répondre un faux exchange fidèle : c'est le
+   premier retour sur investissement de cette étape. Détail dans
+   `nest-trading-bot/docs/known-gaps.md`.
+
    **Reste l'étape 3** : simuler au prix que le live peut réellement obtenir — le backtest
    exécute au close de la bougie du signal, le live 30 s après. Ce que la phase B laisse
    ouvert par ailleurs est listé dans `nest-trading-bot/docs/known-gaps.md`.
