@@ -85,7 +85,11 @@ cohérent** :
    après la frontière, et choisir la bougie de décision **par son heure**
    (`ouverture + intervalle ≤ maintenant − 30 s`), jamais par sa position dans le tableau —
    juste après la frontière, l'API renvoie encore la bougie qui vient de se fermer en
-   dernière position. Reste à trancher : la règle au redémarrage du garde-fou.
+   dernière position. Arrêté le 2026-09-22 : le garde-fou « une décision par bougie » ne
+   retient que les entrées, une sortie se réévaluant à chaque passage ; au redémarrage, une
+   bougie dont le moment de décision précède le démarrage ne déclenche aucune entrée. Plus
+   aucune question ne bloque la phase B ; ce qui reste à régler en cours de route est listé
+   dans `nest-trading-bot/docs/known-gaps.md`.
 5. **C — import / export JSON**, détaillé plus bas. Au-delà de la sauvegarde, il ouvre
    l'écriture assistée de stratégies.
 

@@ -66,6 +66,11 @@ de cette façon s'est révélé réel _et_ doublé d'un diagnostic faux affiché
 écrit, et envers son propre travail des tours précédents. Un désaccord argumenté est plus
 utile qu'un acquiescement.
 
+**S'appuyer sur ce qui existe.** Devant une décision incertaine, chercher comment les bots et
+plateformes établis la traitent (Freqtrade pour le bot, TradingView pour l'affichage) avant de
+proposer, et le citer. Un standard oriente, il ne décide pas ; un écart se justifie. Ce qui a
+déjà été confronté côté bot : `nest-trading-bot/docs/trading/professional-practices.md`.
+
 ## Règles qui coûtent cher si on les ignore
 
 **Ne jamais committer, tagger ou pousser sans demande explicite**, dans aucun des trois
