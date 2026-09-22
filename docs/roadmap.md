@@ -79,17 +79,20 @@ cohérent** :
    boucle. Tous fermés ; détail dans `nest-hyperliquid-gateway/docs/rate-limits.md` et
    `nest-trading-bot/docs/known-gaps.md`.
 
-   **Reste la phase B** : bougies closes, une décision par bougie, crons décalés. Les trois
-   sont indissociables — filtrer sans le garde-fou ferait voir le même signal 3 à 4 fois, et
-   décaler les crons sans filtrer ne servirait à rien. Arrêté le 2026-09-21 : décider **30 s**
-   après la frontière, et choisir la bougie de décision **par son heure**
-   (`ouverture + intervalle ≤ maintenant − 30 s`), jamais par sa position dans le tableau —
-   juste après la frontière, l'API renvoie encore la bougie qui vient de se fermer en
-   dernière position. Arrêté le 2026-09-22 : le garde-fou « une décision par bougie » ne
-   retient que les entrées, une sortie se réévaluant à chaque passage ; au redémarrage, une
-   bougie dont le moment de décision précède le démarrage ne déclenche aucune entrée. Plus
-   aucune question ne bloque la phase B ; ce qui reste à régler en cours de route est listé
-   dans `nest-trading-bot/docs/known-gaps.md`.
+   **Fait — phase B** (2026-09-22) : bougies closes, une décision d'entrée par bougie,
+   passages décalés. Les trois étaient indissociables — filtrer sans le garde-fou aurait
+   fait voir le même signal 3 à 4 fois, et décaler les crons sans filtrer n'aurait servi à
+   rien. Le bot décide **30 s** après la frontière, en UTC, sur la bougie choisie **par son
+   heure** (`ouverture + intervalle ≤ maintenant − 30 s`), jamais par sa position dans le
+   tableau : juste après la frontière, l'API renvoie encore la bougie qui vient de se fermer
+   en dernière position. Le garde-fou ne retient que les entrées, une sortie se réévaluant à
+   chaque passage ; au redémarrage, une bougie dont le moment de décision précède le
+   démarrage ne déclenche aucune entrée. Le prix d'exécution garde la bougie en cours, sans
+   appel de plus.
+
+   **Reste l'étape 3** : simuler au prix que le live peut réellement obtenir — le backtest
+   exécute au close de la bougie du signal, le live 30 s après. Ce que la phase B laisse
+   ouvert par ailleurs est listé dans `nest-trading-bot/docs/known-gaps.md`.
 5. **C — import / export JSON**, détaillé plus bas. Au-delà de la sauvegarde, il ouvre
    l'écriture assistée de stratégies.
 
@@ -259,13 +262,13 @@ différentes) :
 Conséquence : le live n'exécute pas la stratégie que le chart backteste. La norme du métier
 est de ne décider que sur des bougies closes (Freqtrade n'expose jamais la bougie en cours ;
 TradingView appelle le contraire _repainting_) et de confier le risque en cours de bougie
-aux ordres posés sur l'exchange. Le traitement est planifié par étapes — voir
-[prochaines étapes](#rendre-la-simulation-digne-de-confiance). Les coutures sont posées
-(décision extraite et testée, fenêtre unique par passage, prix live isolé) ; ce qui
-change réellement le comportement du bot reste à faire.
+aux ordres posés sur l'exchange. **Corrigé côté bot le 2026-09-22** (phase B) : il décide
+sur la bougie close, 30 s après la frontière, et entre au plus une fois par bougie. Reste
+l'étape 3, le prix simulé du backtest — voir
+[prochaines étapes](#rendre-la-simulation-digne-de-confiance).
 
-En attendant, le chart dit qu'un signal sur la bougie en cours est provisoire
-(`watchlist/utils/forming-candle.util.ts`).
+Le chart dit qu'un signal sur la bougie en cours est provisoire
+(`watchlist/utils/forming-candle.util.ts`) ; le bot, désormais, l'ignore.
 
 ## Le `summary` du bot ne décrivait pas la fenêtre affichée
 
