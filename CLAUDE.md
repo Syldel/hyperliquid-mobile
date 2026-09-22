@@ -168,6 +168,11 @@ n'apprend rien et fige le bug avec.
 Un test de régression **s'éprouve sur le code cassé** : retirer la correction, vérifier
 qu'il tombe, et pour la bonne raison.
 
+**Une simulation qui ment est pire que pas de simulation.** Un double ne rend que ce que
+le vrai rendrait, formes et erreurs comprises : copié de son code, ou mesuré. Côté bot,
+les règles du faux gateway en sont l'application : `nest-trading-bot/CLAUDE.md`,
+« Simuler sans mentir ».
+
 **Le domaine d'abord, les services ensuite** — non par ordre d'importance, mais parce
 qu'une décision difficile à tester est une décision au mauvais endroit : la sortir en
 fonction pure. Les services restent la dette de couverture actuelle
