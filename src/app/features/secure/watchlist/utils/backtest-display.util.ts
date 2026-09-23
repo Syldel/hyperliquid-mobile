@@ -54,8 +54,15 @@ const PRICE_FORMAT = new Intl.NumberFormat('en-US', { maximumSignificantDigits: 
  * Un prix lisible quelle que soit son échelle : `76,438.5` pour BTC comme
  * `0.0000123456` pour un token à huit décimales. Un nombre fixe de décimales
  * écraserait l'un ou noierait l'autre.
+ *
+ * ⚠️ **À ne pas confondre avec `formatPrice` de `@syldel/hl-shared-types`**,
+ * qui est un tout autre métier : celui-là pose un prix sur la grille de tick
+ * d'Hyperliquid pour qu'un ordre soit accepté, et rendrait `76438.5` — sans
+ * séparateur de milliers, puisqu'une virgule ferait refuser l'ordre. D'où le
+ * suffixe ici : le nom dit pour qui la valeur est écrite. Un import de travers
+ * ne compile de toute façon pas, le partagé exigeant un `szDecimals`.
  */
-export function formatPrice(value: number): string {
+export function formatPriceForDisplay(value: number): string {
   return PRICE_FORMAT.format(value);
 }
 

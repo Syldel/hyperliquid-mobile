@@ -147,9 +147,9 @@
           <ion-label>
             <h3>Since {{ position.entryTime | date: 'MMM d, HH:mm' }}</h3>
             <p>
-              {{ formatPrice(position.entryPrice) }}
+              {{ formatPriceForDisplay(position.entryPrice) }}
               @if (position.markPrice !== null) {
-                → {{ formatPrice(position.markPrice) }}
+                → {{ formatPriceForDisplay(position.markPrice) }}
               }
             </p>
           </ion-label>
@@ -207,7 +207,10 @@
               {{ trade.entryTime | date: 'MMM d, HH:mm' }} →
               {{ trade.exitTime | date: 'MMM d, HH:mm' }}
             </h3>
-            <p>{{ formatPrice(trade.entryPrice) }} → {{ formatPrice(trade.exitPrice) }}</p>
+            <p>
+              {{ formatPriceForDisplay(trade.entryPrice) }} →
+              {{ formatPriceForDisplay(trade.exitPrice) }}
+            </p>
           </ion-label>
           <ion-note
             slot="end"

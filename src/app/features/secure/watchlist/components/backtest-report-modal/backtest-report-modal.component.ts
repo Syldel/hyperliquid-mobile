@@ -23,7 +23,7 @@ import {
   BACKTEST_LIMITS,
   equityLines,
   formatPercent,
-  formatPrice,
+  formatPriceForDisplay,
   percentTone,
   statsOf,
 } from '../../utils/backtest-display.util';
@@ -87,7 +87,7 @@ export class BacktestReportModalComponent implements OnInit {
 
   readonly limits = BACKTEST_LIMITS;
   readonly formatPercent = formatPercent;
-  readonly formatPrice = formatPrice;
+  readonly formatPriceForDisplay = formatPriceForDisplay;
   readonly percentTone = percentTone;
   readonly sideLabel = (side: PositionSide) => SIDE_LABELS[side];
   readonly sideColor = (side: PositionSide) =>

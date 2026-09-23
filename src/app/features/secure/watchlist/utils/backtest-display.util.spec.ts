@@ -3,7 +3,7 @@ import {
   definedSides,
   equityLines,
   formatPercent,
-  formatPrice,
+  formatPriceForDisplay,
   percentTone,
   tradeFocusRange,
 } from './backtest-display.util';
@@ -76,10 +76,10 @@ describe('percentTone', () => {
   });
 });
 
-describe('formatPrice', () => {
+describe('formatPriceForDisplay', () => {
   it('keeps a readable precision at any price scale', () => {
-    expect(formatPrice(76438.5)).toBe('76,438.5');
-    expect(formatPrice(0.0000123456)).toBe('0.0000123456');
+    expect(formatPriceForDisplay(76438.5)).toBe('76,438.5');
+    expect(formatPriceForDisplay(0.0000123456)).toBe('0.0000123456');
   });
 });
 
