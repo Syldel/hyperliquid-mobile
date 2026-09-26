@@ -125,6 +125,31 @@ qu'aucune bougie seule ne dit.
 
 ## Traité récemment
 
+**Fait** — la modale Protective n'efface plus ce qu'elle n'affiche pas. Elle reconstruisait
+chaque entrée à partir de ses trois champs, si bien qu'ouvrir puis cliquer Save suffisait à
+perdre le reste : `condition`, que le bot évalue avant de poser la protection,
+`protective.enabled`, qu'il lit `!== false`, et les réglages d'ancre, de mode de suivi et
+de plancher. Le type ne protégeait rien, un `as ProtectiveOrderEntry[]` affirmant au
+compilateur ce que l'objet n'avait pas — `anchor` y est obligatoire et n'était jamais
+écrit.
+
+Ce qui s'édite et ce qui se **transporte** sont désormais séparés
+(`bot-strategies/domain/protective-entry-form.util.ts`), le transporté voyageant dans la
+ligne du formulaire plutôt que dans un tableau parallèle à resynchroniser. Deux décisions
+qui vont plus loin que la réparation :
+
+- **l'ancre implicite s'écrit.** Le bot applique `ENTRY` quand aucune ancre n'est déclarée
+  (`entry.anchor?.source || 'ENTRY'`) : l'écrire ne déplace aucun prix, ça rend explicite
+  ce qui se passait déjà et ça honore le type. Même règle que l'éditeur d'opérande, qui
+  écrit les paramètres d'un indicateur même laissés à leur défaut ;
+- **un champ inconnu traverse, un champ retiré se nomme.** Les deux ne se confondent pas :
+  un inconnu vient peut-être d'un build plus récent et se transporte ; un retiré est une
+  décision datée, prise en sachant ce qu'on jette (`RETIRED_ENTRY_FIELDS`). `label` en est
+  le premier et, à ce jour, le seul.
+
+Éprouvé par dix mutations, dont deux sur le seul câblage — une conversion juste, branchée à
+moitié, redonne exactement le défaut d'avant.
+
 **Fait** — la bande de positions ne tait plus un chevauchement long / short. Constaté en
 vérifiant l'étape B : `buildPositionBars` retenait le premier segment couvrant chaque
 bougie, si bien que le chart taisait ce que le rapport annonçait. Ces bougies sont
@@ -298,6 +323,27 @@ sorties visibles à l'écran totalisent −0,12 %. Il additionne aussi long et s
 
 Le prix d'exécution simulé (clôture de la bougie du signal) reste, lui, l'affaire de
 l'étape 3 ; le rapport le suivra sans changement, puisqu'il lit les prix des signaux.
+
+## Le champ `label` des protections : retiré, son origine inconnue
+
+**Arbitré le 2026-09-26.** Mesuré sur le compte de développement : les quatre entrées
+protectrices de `vntl:ROBOT` portaient un `label: ''` qui n'existe dans aucun type partagé.
+Cherché sans succès dans les cinq dépôts **et** dans `nest-mongo-user`, qui stocke
+`tradingSettings` en `Record<string, any>` sans schéma par champ : aucun lecteur, nulle
+part. Un vestige d'un build précédent.
+
+Il est retiré **nommément** (`RETIRED_ENTRY_FIELDS` dans
+`bot-strategies/domain/protective-entry-form.util.ts`), et pas par omission. La nuance
+porte tout le reste : ce qui est inconnu se transporte, ce qui est retiré se décide. Une
+liste blanche « on ne garde que ce qu'on connaît » rendrait exactement le défaut que cette
+passe vient de réparer, et deux tests la refusent — dont un sur le `distance` que l'étape
+suivante va introduire, précisément le champ qu'un mobile en retard rognerait.
+
+La suppression est **paresseuse** : elle a lieu quand la modale d'une paire est ouverte
+puis enregistrée, pas avant. Aucune migration ne balaie les documents.
+
+**⚠️ Ce qui reste ouvert** : d'où venait ce champ, et s'il existe d'autres vestiges du même
+genre ailleurs dans le document utilisateur. Rien n'a cherché hors des entrées protectrices.
 
 ## Précédent
 

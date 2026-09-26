@@ -278,6 +278,26 @@ export class IonContentStub {}
 @Component({ selector: 'ion-list', standalone: true, template: '<ng-content></ng-content>' })
 export class IonListStub {}
 
+@Component({ selector: 'ion-card', standalone: true, template: '<ng-content></ng-content>' })
+export class IonCardStub {}
+
+@Component({ selector: 'ion-card-header', standalone: true, template: '<ng-content></ng-content>' })
+export class IonCardHeaderStub {}
+
+@Component({
+  selector: 'ion-card-content',
+  standalone: true,
+  template: '<ng-content></ng-content>',
+})
+export class IonCardContentStub {}
+
+/** `value` et `color` sont liés, pas statiques : ils doivent être déclarés. */
+@Component({ selector: 'ion-progress-bar', standalone: true, template: '' })
+export class IonProgressBarStub {
+  @Input() value?: number;
+  @Input() color?: string;
+}
+
 @Component({ selector: 'ion-note', standalone: true, template: '<ng-content></ng-content>' })
 export class IonNoteStub {}
 
@@ -377,6 +397,9 @@ export {
   IonBadgeStub as IonBadge,
   IonButtonStub as IonButton,
   IonButtonsStub as IonButtons,
+  IonCardStub as IonCard,
+  IonCardContentStub as IonCardContent,
+  IonCardHeaderStub as IonCardHeader,
   IonChipStub as IonChip,
   IonContentStub as IonContent,
   IonFabStub as IonFab,
@@ -391,6 +414,7 @@ export {
   IonLabelStub as IonLabel,
   IonListStub as IonList,
   IonNoteStub as IonNote,
+  IonProgressBarStub as IonProgressBar,
   IonRangeStub as IonRange,
   IonSearchbarStub as IonSearchbar,
   IonSegmentStub as IonSegment,

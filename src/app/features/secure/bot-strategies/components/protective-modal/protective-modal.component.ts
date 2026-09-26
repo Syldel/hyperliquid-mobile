@@ -4,6 +4,7 @@ import {
   AbstractControl,
   FormArray,
   FormBuilder,
+  FormControl,
   FormGroup,
   ReactiveFormsModule,
   ValidationErrors,
@@ -43,11 +44,12 @@ import {
 } from 'ionicons/icons';
 
 import { TradingPair } from '@models/user.interface';
+import { ProtectiveOrderEntry, TpslType } from '@syldel/trading-shared-types';
 import {
-  ProtectiveOrderEntry,
-  ProtectiveOrderStrategy,
-  TpslType,
-} from '@syldel/trading-shared-types';
+  CarriedProtectiveFields,
+  toProtectiveEntryForm,
+  toProtectiveStrategy,
+} from '../../domain/protective-entry-form.util';
 
 // ─── Result type ──────────────────────────────────────────────────────────────
 
@@ -70,6 +72,26 @@ function sizePercentSumValidator(type: TpslType): ValidatorFn {
     return sum > 100 ? { [`${type}SumExceeds100`]: { sum: Math.round(sum * 10) / 10 } } : null;
   };
 }
+
+// ─── Form model ──────────────────────────────────────────────────────────────
+
+/**
+ * Une ligne du formulaire. `carried` n'a pas de champ à l'écran : il transporte
+ * ce que la modale ne sait pas encore éditer — ancre, mode de suivi, plancher,
+ * condition — pour que sauver ne l'efface pas. Voir
+ * `domain/protective-entry-form.util.ts`.
+ *
+ * Le typage n'est pas cosmétique : c'est lui qui permet à `getRawValue()` de
+ * rendre exactement `ProtectiveEntryFormValue[]`, donc de supprimer le
+ * `as ProtectiveOrderEntry[]` qui affirmait au compilateur ce que l'objet
+ * n'avait pas.
+ */
+type ProtectiveEntryGroup = FormGroup<{
+  tpsl: FormControl<TpslType>;
+  atrMultiplier: FormControl<number | string>;
+  sizePercent: FormControl<number | string>;
+  carried: FormControl<CarriedProtectiveFields>;
+}>;
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -122,7 +144,7 @@ export class ProtectiveModalComponent implements OnInit {
 
   // ── Form ──────────────────────────────────────────────────────────────────
 
-  form!: FormGroup;
+  form!: FormGroup<{ entries: FormArray<ProtectiveEntryGroup> }>;
 
   constructor() {
     addIcons({
@@ -152,25 +174,29 @@ export class ProtectiveModalComponent implements OnInit {
 
   // ── FormArray helpers ─────────────────────────────────────────────────────
 
-  get entries(): FormArray {
-    return this.form.get('entries') as FormArray;
+  get entries(): FormArray<ProtectiveEntryGroup> {
+    return this.form.controls.entries;
   }
 
-  entryGroup(i: number): FormGroup {
-    return this.entries.at(i) as FormGroup;
+  entryGroup(i: number): ProtectiveEntryGroup {
+    return this.entries.at(i);
   }
 
-  private buildEntryGroup(entry?: Partial<ProtectiveOrderEntry>): FormGroup {
-    return this.fb.group({
-      tpsl: [entry?.tpsl ?? 'tp', Validators.required],
+  private buildEntryGroup(entry?: Partial<ProtectiveOrderEntry>): ProtectiveEntryGroup {
+    const value = toProtectiveEntryForm(entry);
+
+    return this.fb.nonNullable.group({
+      tpsl: [value.tpsl, Validators.required],
       atrMultiplier: [
-        entry?.atrMultiplier ?? 1.5,
+        value.atrMultiplier,
         [Validators.required, Validators.min(0.1), Validators.max(20)],
       ],
       sizePercent: [
-        entry?.sizePercent ?? 100,
+        value.sizePercent,
         [Validators.required, Validators.min(1), Validators.max(100)],
       ],
+      // Sans champ à l'écran, et c'est le but : le formulaire le rend tel quel.
+      carried: [value.carried],
     });
   }
 
@@ -195,10 +221,11 @@ export class ProtectiveModalComponent implements OnInit {
   // ── Sums ──────────────────────────────────────────────────────────────────
 
   private refreshSums(): void {
+    const rows = this.entries.getRawValue();
     const sum = (type: TpslType) =>
-      (this.entries.controls as FormGroup[])
-        .filter((g) => g.get('tpsl')?.value === type)
-        .reduce((s, g) => s + (Number(g.get('sizePercent')?.value) || 0), 0);
+      rows
+        .filter((row) => row.tpsl === type)
+        .reduce((s, row) => s + (Number(row.sizePercent) || 0), 0);
     this.tpSum.set(sum('tp'));
     this.slSum.set(sum('sl'));
   }
@@ -230,13 +257,15 @@ export class ProtectiveModalComponent implements OnInit {
     const currentStrategy = this.pair().strategy;
     if (!currentStrategy) return;
 
-    const strategy: ProtectiveOrderStrategy = {
-      entries: this.form.value.entries as ProtectiveOrderEntry[],
-    };
-
     const updatedPair: TradingPair = {
       ...this.pair(),
-      strategy: { ...currentStrategy, protective: strategy },
+      strategy: {
+        ...currentStrategy,
+        // `currentStrategy.protective` est passé pour lui-même : `enabled` est
+        // un réglage du bloc, que la modale n'affiche pas et ne doit pas
+        // éteindre ni rallumer en passant.
+        protective: toProtectiveStrategy(this.entries.getRawValue(), currentStrategy.protective),
+      },
     };
 
     this.modalCtrl.dismiss({ pair: updatedPair } satisfies ProtectiveModalResult, 'confirm');
