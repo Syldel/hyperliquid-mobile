@@ -1,13 +1,77 @@
 /**
- * Ionic Dark Palette
- * -----------------------------------------------------
- * For more information, please see:
- * https://ionicframework.com/docs/theming/dark-mode
+ * Thème Hyperliquid
+ * =============================================================================
+ * Un thème tient dans deux couleurs : un fond et un texte. Les dix-neuf paliers
+ * de gris qu'Ionic interpole entre les deux s'en **déduisent**, ils ne se
+ * recopient pas — voir `stepped-colors` plus bas.
+ *
+ * Ce fichier n'importe plus `@ionic/core/css/palettes/dark.class.css`, et
+ * n'`@extend` plus `.ion-palette-dark`. Ce qu'ils apportaient est écrit une
+ * fois ci-dessous et appliqué aux **deux** chemins qui mènent au sombre.
+ *
+ * Le défaut que cela corrige, mesuré le 2026-09-29 : `.dark-theme` recevait la
+ * palette Ionic (paliers compris) tandis que la branche
+ * `@media (prefers-color-scheme: dark)` ne recevait que `dark-mode-vars`, qui
+ * ne redéfinissait que quatre variables. Or `ThemeService` n'ajoute **aucune
+ * classe** en mode `auto`, qui est le défaut : un utilisateur en sombre système
+ * gardait donc l'échelle de paliers claire et les couleurs sémantiques claires.
+ * Sur fond `#1d1d1d`, cela donnait un titre de page à 1,26:1, un texte
+ * secondaire à 2,37:1 et des cartes peintes en blanc — le seuil WCAG AA pour du
+ * petit texte étant 4,5:1.
+ *
+ * La règle qui en découle : tout ce qui distingue le sombre du clair vit dans
+ * `dark-mode-vars`, et nulle part ailleurs. Deux branches qui appliquent le
+ * même mixin ne peuvent plus diverger.
  */
-@use '@ionic/core/css/palettes/dark.class.css';
+@use 'sass:color';
+@use 'sass:math';
+
+// Les deux couleurs dont tout le reste se déduit.
+$light-background: #feffff;
+$light-text: #1d1d1d;
+$dark-background: #1d1d1d;
+$dark-text: #feffff;
+
+/// Les trois canaux d'une couleur, prêts pour un `--ion-*-rgb`.
+/// Écrire le hex et son triplet à la main les laisse diverger en silence, et
+/// tout `rgba(var(--ion-…-rgb), …)` peint alors une autre couleur que son hex.
+@function rgb-channels($c) {
+  @return color.channel($c, 'red'), color.channel($c, 'green'), color.channel($c, 'blue');
+}
+
+/// Un mélange de deux couleurs, ramené à des canaux entiers.
+/// Depuis Sass 1.79 `color.mix` garde les décimales (`rgb(242.75, 243.7, …)`).
+/// Le rendu serait le même — le navigateur arrondit — mais la feuille cesserait
+/// d'être comparable, canal par canal, à celle qu'elle remplace.
+@function mix-channels($a, $b, $ratio) {
+  $mixed: color.mix($a, $b, $ratio);
+  @return rgb(
+    math.round(color.channel($mixed, 'red')),
+    math.round(color.channel($mixed, 'green')),
+    math.round(color.channel($mixed, 'blue'))
+  );
+}
+
+/// L'échelle de paliers d'Ionic : un dégradé linéaire du fond vers le texte,
+/// par pas de 5 %. `--ion-background-color-step-50` est à 5 % du chemin depuis
+/// le fond, `--ion-text-color-step-50` à 5 % du chemin depuis le texte.
+///
+/// Calculée, et non recopiée : les trente-huit valeurs qui étaient écrites ici
+/// à la main ne disaient plus de quoi elles descendaient, et n'existaient que
+/// pour le thème clair. Vérifié le 2026-09-29 en comparant les CSS compilés
+/// avant et après : les trente-huit paliers clairs sortent avec exactement les
+/// mêmes canaux (`rgb(243, 244, 244)` là où on lisait `#f3f4f4` — Sass 1.97 ne
+/// réémet plus en hexadécimal, c'est la seule différence).
+@mixin stepped-colors($background, $text) {
+  @for $i from 1 through 19 {
+    $ratio: math.percentage(math.div($i, 20));
+    --ion-background-color-step-#{$i * 50}: #{mix-channels($text, $background, $ratio)};
+    --ion-text-color-step-#{$i * 50}: #{mix-channels($background, $text, $ratio)};
+  }
+}
 
 /* ------------------------------
-   Hyperliquid Theme
+   Thème clair
    ------------------------------ */
 :root {
   color-scheme: light;
@@ -33,10 +97,10 @@
   --ion-color-tertiary-shade: #e07046;
   --ion-color-tertiary-tint: #ff8c62;
 
-  --ion-background-color: #feffff;
-  --ion-background-color-rgb: 254, 255, 255;
-  --ion-text-color: #1d1d1d;
-  --ion-text-color-rgb: 29, 29, 29;
+  --ion-background-color: #{$light-background};
+  --ion-background-color-rgb: #{rgb-channels($light-background)};
+  --ion-text-color: #{$light-text};
+  --ion-text-color-rgb: #{rgb-channels($light-text)};
 
   --ion-color-light: #f6f8fc;
   --ion-color-light-rgb: 246, 248, 252;
@@ -62,51 +126,25 @@
   --bubble-background: #a8bfb5;
   --bubble-color: #a8bfb5;
 
-  // Stepped Colors
-
-  --ion-text-color-step-50: #282828;
-  --ion-text-color-step-100: #343434;
-  --ion-text-color-step-150: #3f3f3f;
-  --ion-text-color-step-200: #4a4a4a;
-  --ion-text-color-step-250: #555656;
-  --ion-text-color-step-300: #616161;
-  --ion-text-color-step-350: #6c6c6c;
-  --ion-text-color-step-400: #777777;
-  --ion-text-color-step-450: #828383;
-  --ion-text-color-step-500: #8e8e8e;
-  --ion-text-color-step-550: #999999;
-  --ion-text-color-step-600: #a4a5a5;
-  --ion-text-color-step-650: #afb0b0;
-  --ion-text-color-step-700: #babbbb;
-  --ion-text-color-step-750: #c6c7c7;
-  --ion-text-color-step-800: #d1d2d2;
-  --ion-text-color-step-850: #dcdddd;
-  --ion-text-color-step-900: #e8e8e8;
-  --ion-text-color-step-950: #f3f4f4;
-
-  --ion-background-color-step-50: #f3f4f4;
-  --ion-background-color-step-100: #e8e8e8;
-  --ion-background-color-step-150: #dcdddd;
-  --ion-background-color-step-200: #d1d2d2;
-  --ion-background-color-step-250: #c6c7c7;
-  --ion-background-color-step-300: #babbbb;
-  --ion-background-color-step-350: #afb0b0;
-  --ion-background-color-step-400: #a4a5a5;
-  --ion-background-color-step-450: #999999;
-  --ion-background-color-step-500: #8e8e8e;
-  --ion-background-color-step-550: #828383;
-  --ion-background-color-step-600: #777777;
-  --ion-background-color-step-650: #6c6c6c;
-  --ion-background-color-step-700: #616161;
-  --ion-background-color-step-750: #555656;
-  --ion-background-color-step-800: #4a4a4a;
-  --ion-background-color-step-850: #3f3f3f;
-  --ion-background-color-step-900: #343434;
-  --ion-background-color-step-950: #282828;
+  @include stepped-colors($light-background, $light-text);
 }
 
+/* ------------------------------
+   Thème sombre
+   ------------------------------ */
 @mixin dark-mode-vars {
   color-scheme: dark;
+
+  --ion-background-color: #{$dark-background};
+  --ion-background-color-rgb: #{rgb-channels($dark-background)};
+  --ion-text-color: #{$dark-text};
+  --ion-text-color-rgb: #{rgb-channels($dark-text)};
+
+  @include stepped-colors($dark-background, $dark-text);
+
+  // ========================================
+  // COULEURS DE MARQUE
+  // ========================================
 
   --ion-color-primary: #4db5a5;
   --ion-color-primary-rgb: 77, 181, 165;
@@ -122,44 +160,88 @@
   --ion-color-secondary-shade: #94a89f;
   --ion-color-secondary-tint: #b1c5bc;
 
-  --ion-background-color: #1d1d1d;
-  --ion-background-color-rgb: 29, 29, 29;
-  --ion-text-color: #feffff;
-  --ion-text-color-rgb: 254, 255, 255;
+  // ========================================
+  // COULEURS NEUTRES ET SÉMANTIQUES
+  // ========================================
+  // Valeurs de la palette sombre d'Ionic 8.8.2
+  // (`@ionic/core/css/palettes/dark.class.css`), recopiées plutôt qu'importées
+  // pour que les deux branches du sombre appliquent exactement le même bloc.
+  //
+  // `success` n'y figure pas : `#2dd55b` est identique en clair et en sombre, et
+  // donne déjà 8,65:1 sur `#1d1d1d`. Le redéclarer ne dirait rien.
+  //
+  // `tertiary` non plus : l'app le marque en corail `#ff7f50`, que la palette
+  // Ionic remplaçait par un violet en sombre — c'est-à-dire que l'accent de
+  // l'app changeait selon la façon dont le sombre avait été obtenu.
+
+  --ion-color-warning: #ffce31;
+  --ion-color-warning-rgb: 255, 206, 49;
+  --ion-color-warning-contrast: #000000;
+  --ion-color-warning-contrast-rgb: 0, 0, 0;
+  --ion-color-warning-shade: #e0b52b;
+  --ion-color-warning-tint: #ffd346;
+
+  // `#c5000f`, le rouge clair, tombait à 2,17:1 sur fond sombre — sur des
+  // messages qui annoncent qu'une stratégie ne tourne pas.
+  --ion-color-danger: #f24c58;
+  --ion-color-danger-rgb: 242, 76, 88;
+  --ion-color-danger-contrast: #000000;
+  --ion-color-danger-contrast-rgb: 0, 0, 0;
+  --ion-color-danger-shade: #d5434d;
+  --ion-color-danger-tint: #f35e69;
+
+  // `medium` porte presque tout le texte secondaire de l'app. Il valait
+  // `#5f5f5f` en sombre, soit 2,37:1.
+  --ion-color-medium: #989aa2;
+  --ion-color-medium-rgb: 152, 154, 162;
+  --ion-color-medium-contrast: #000000;
+  --ion-color-medium-contrast-rgb: 0, 0, 0;
+  --ion-color-medium-shade: #86888f;
+  --ion-color-medium-tint: #a2a4ab;
+
+  // `light` et `dark` s'inversent : ce sont des rôles, pas des teintes. `dark`
+  // servait le titre des pages, à 1,26:1 sur le fond sombre.
+  --ion-color-light: #222428;
+  --ion-color-light-rgb: 34, 36, 40;
+  --ion-color-light-contrast: #ffffff;
+  --ion-color-light-contrast-rgb: 255, 255, 255;
+  --ion-color-light-shade: #1e2023;
+  --ion-color-light-tint: #383a3e;
+
+  --ion-color-dark: #f4f5f8;
+  --ion-color-dark-rgb: 244, 245, 248;
+  --ion-color-dark-contrast: #000000;
+  --ion-color-dark-contrast-rgb: 0, 0, 0;
+  --ion-color-dark-shade: #d7d8da;
+  --ion-color-dark-tint: #f5f6f9;
 
   // ========================================
   // TOOLBAR & HEADER
   // ========================================
 
-  // Toolbar background
-  --ion-toolbar-background: #1d1d1d;
-  --ion-toolbar-background-color: #1d1d1d;
+  --ion-toolbar-background: #{$dark-background};
+  --ion-toolbar-background-color: #{$dark-background};
 
-  // Toolbar text
-  --ion-toolbar-color: #feffff;
-  --ion-toolbar-color-rgb: 255, 255, 255;
+  --ion-toolbar-color: #{$dark-text};
+  --ion-toolbar-color-rgb: #{rgb-channels($dark-text)};
 
-  // Toolbar border (ligne en bas de la toolbar)
+  // Ligne en bas de la toolbar
   --ion-toolbar-border-color: #2d2d2d;
 
-  // Header background
-  --ion-header-background: #1d1d1d;
+  --ion-header-background: #{$dark-background};
 
   // ========================================
   // SURFACES & ITEMS
   // ========================================
 
-  // Item backgrounds
-  --ion-item-background: #1d1d1d;
-  --ion-item-background-color: #1d1d1d;
+  --ion-item-background: #{$dark-background};
+  --ion-item-background-color: #{$dark-background};
 
-  // Card background
   --ion-card-background: #2d2d2d;
 
-  // Tab bar
-  --ion-tab-bar-background: #1d1d1d;
+  --ion-tab-bar-background: #{$dark-background};
   --ion-tab-bar-color: #8d8d8d;
-  --ion-tab-bar-color-selected: #feffff;
+  --ion-tab-bar-color-selected: #{$dark-text};
 
   // ========================================
   // BORDERS & SEPARATORS
@@ -167,17 +249,19 @@
 
   --ion-border-color: #2d2d2d;
 
-  --bubble-background: #1d1d1d;
+  --bubble-background: #{$dark-background};
   --bubble-color: #2f4d40;
 }
 
 .md.dark-theme,
 .ios.dark-theme,
 .dark-theme {
-  @extend .ion-palette-dark;
   @include dark-mode-vars;
 }
 
+// `ThemeService` n'ajoute de classe que pour un choix **explicite** : en `auto`
+// — le défaut — seule cette branche s'applique. Elle doit donc dire exactement
+// la même chose que celle du dessus, d'où le mixin partagé.
 @media (prefers-color-scheme: dark) {
   :root:not(.dark-theme):not(.light-theme) {
     @include dark-mode-vars;

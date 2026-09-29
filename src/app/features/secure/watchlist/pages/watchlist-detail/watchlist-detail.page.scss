@@ -277,7 +277,7 @@
   font-size: 12px;
   text-align: left;
   color: inherit;
-  background: var(--ion-color-step-100, #1c1c1c);
+  background: var(--ion-color-step-100, var(--ion-background-color-step-100));
 
   &__head {
     display: flex;

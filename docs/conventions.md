@@ -196,6 +196,19 @@ ils affichent, ils ne calculent pas.
 Le découpage se voit dans les tests : ils portent sur du domaine, des utilitaires et des
 services — jamais sur du rendu Ionic.
 
+## Une couleur ne se choisit pas dans un composant
+
+Tout part de `src/theme/variables.scss`, qui dérive l'échelle entière de quatre couleurs.
+Une règle de composant consomme des variables, elle n'invente pas de teinte et ne termine
+jamais une chaîne `var()` sur une couleur en dur — c'est ainsi qu'un fond de rule-tree est
+resté noir sur page blanche pendant des mois.
+
+Et **le sombre vit à un seul endroit** : `dark-mode-vars`, appliqué aux deux chemins qui y
+mènent (la classe `.dark-theme`, et la requête média pour le mode `auto`, qui est le
+défaut). Quand ces deux branches ont divergé, le sombre s'est appliqué à moitié.
+
+Le détail, les mesures de contraste et ce qui reste ouvert : [theming.md](theming.md).
+
 ---
 
 # Tests

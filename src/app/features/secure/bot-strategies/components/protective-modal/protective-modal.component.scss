@@ -22,6 +22,21 @@
 
 // ─── Context row ─────────────────────────────────────────────────────────────
 
+/**
+ * Ionic peint le texte d'une `ion-chip` colorée avec `--ion-color-shade`, la
+ * variante **assombrie** de la couleur. C'est juste sur fond clair et à
+ * l'envers sur fond sombre, où assombrir rapproche du fond : mesuré le
+ * 2026-09-29, `medium-shade` donnait 4,22:1 sur la carte, sous le seuil AA de
+ * 4,5:1 pour du texte de 11,5 px. La couleur de base donne 5,32:1.
+ *
+ * Le même travers touche toutes les puces colorées de l'app ; seules celles-ci
+ * sont corrigées, parce que ce sont celles dont l'illisibilité a été constatée.
+ * Voir docs/theming.md.
+ */
+ion-chip.ion-color {
+  color: var(--ion-color-base);
+}
+
 .context-row {
   display: flex;
   align-items: center;
@@ -38,8 +53,11 @@
   align-items: flex-start;
   padding: 4px 10px;
 
+  // Pas d'`opacity` : la couleur de la puce est déjà le rôle « secondaire ».
+  // L'atténuer une seconde fois multipliait deux atténuations — mesuré le
+  // 2026-09-29 en sombre, 2,25:1 pour un identifiant de stratégie qu'il faut
+  // pouvoir lire. La taille suffit à hiérarchiser.
   .chip-short {
-    opacity: 0.55;
     font-size: 0.64rem;
     margin-top: 1px;
   }
@@ -61,7 +79,10 @@
   padding: 14px;
   background: var(--ion-color-step-50, var(--ion-background-color-step-50));
   border-radius: 14px;
-  border: 1px solid var(--ion-border-color, var(--ion-color-step-100));
+  // La chaîne se terminait sur `--ion-color-step-100`, que rien ne définit :
+  // en clair, où `--ion-border-color` n'existe pas non plus, la déclaration
+  // était invalide et la bordure disparaissait.
+  border: 1px solid var(--ion-border-color, var(--ion-background-color-step-100));
 }
 
 .alloc-row {
@@ -167,11 +188,8 @@
 }
 
 .entry-card {
-  // Dérivé de la couleur du texte, jamais d'un palier : le thème sombre
-  // redéfinit `--ion-text-color`, mais pas les `--ion-background-color-step-*`,
-  // qui restaient clairs et peignaient la carte en blanc sur fond noir.
-  --background: rgba(var(--ion-text-color-rgb), 0.04);
-  border: 1px solid rgba(var(--ion-text-color-rgb), 0.12);
+  --background: var(--ion-color-step-50, var(--ion-background-color-step-50));
+  border: 1px solid var(--ion-border-color, var(--ion-background-color-step-100));
   border-left: 3px solid transparent;
   margin: 0 0 10px;
   box-shadow: none;
@@ -302,9 +320,11 @@
   font-weight: 600;
 }
 
+// Même raison que `.chip-short` : l'`opacity` s'appliquait par-dessus
+// `--ion-color-medium` et ramenait le sens de la protection — au-dessus ou
+// au-dessous de l'ancre — à 2,87:1.
 .atr-dir {
   font-size: 0.64rem;
-  opacity: 0.6;
 }
 
 // ─── Empty state ─────────────────────────────────────────────────────────────

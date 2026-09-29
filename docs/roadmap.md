@@ -59,7 +59,6 @@ cohérent** :
 
    **Fait — phase A, les coutures** (2026-09-20), sans changer une seule décision. Elle
    absorbe les deux points qui étaient listés ici comme « à ne pas redécouvrir » :
-
    - **une seule fenêtre de bougies par passage**, passée explicitement au lieu d'être
      relue par chaque branche de stratégie. Le signal et les protections ne peuvent plus
      décider sur deux fenêtres différentes : les deux lectures traversaient un cache dont
@@ -93,7 +92,6 @@ cohérent** :
    **Fait — les deux premiers défauts que la simulation a trouvés** (2026-09-22). Le faux
    gateway et les scénarios de bout en bout ont été écrits pour être dignes de confiance ;
    voici ce qu'ils ont rapporté, corrigé le jour même :
-
    - **une paire sans bloc `protective` arrêtait tout le passage.** L'app en crée une à
      chaque nouvelle paire, et « Remove all protective configurations » le retire : la
      configuration la plus ordinaire de l'app tuait le passage de l'utilisateur, paires
@@ -111,6 +109,7 @@ cohérent** :
    **Reste l'étape 3** : simuler au prix que le live peut réellement obtenir — le backtest
    exécute au close de la bougie du signal, le live 30 s après. Ce que la phase B laisse
    ouvert par ailleurs est listé dans `nest-trading-bot/docs/known-gaps.md`.
+
 5. **C — import / export JSON**, détaillé plus bas. Au-delà de la sauvegarde, il ouvre
    l'écriture assistée de stratégies.
 
@@ -124,6 +123,20 @@ se passe à l'intérieur d'une bougie (un stop touché avant ou après le take-p
 qu'aucune bougie seule ne dit.
 
 ## Traité récemment
+
+**Fait** — le thème sombre s'appliquait à moitié. Deux chemins y mènent, la classe
+`.dark-theme` et la requête média ; seule la première recevait la palette Ionic, et
+`ThemeService` n'ajoute de classe que pour un choix **explicite**. Un utilisateur en mode
+`auto` — le défaut — gardait donc l'échelle de paliers claire : cartes blanches sur fond
+noir, action-sheet à 1,60:1, texte secondaire à 2,54:1. Les deux branches appliquent
+désormais le même mixin, et l'échelle se calcule depuis le fond et le texte au lieu d'être
+collée à la main. Mesures avant/après et ce qui reste ouvert :
+[theming.md](theming.md).
+
+Trois sujets laissés ouverts par ce chantier, tous chiffrés dans ce document : le texte
+des puces Ionic colorées, corrigé seulement là où le défaut avait été constaté ; le vert
+de succès d'Ionic, illisible en thème clair (1,68:1), qu'on ne change pas sans décider ;
+et les étiquettes rouges sur fond rouge, à 3,84 et 4,18:1.
 
 **Fait** — la modale Protective n'efface plus ce qu'elle n'affiche pas. Elle reconstruisait
 chaque entrée à partir de ses trois champs, si bien qu'ouvrir puis cliquer Save suffisait à
