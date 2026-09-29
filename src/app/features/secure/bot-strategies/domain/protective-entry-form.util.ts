@@ -1,5 +1,6 @@
 import type {
-  IOrderAnchor,
+  DistanceUnit,
+  PriceAnchor,
   ProtectiveOrderEntry,
   ProtectiveOrderStrategy,
   TpslType,
@@ -40,19 +41,25 @@ import type {
  */
 export type CarriedProtectiveFields = Omit<
   ProtectiveOrderEntry,
-  'tpsl' | 'atrMultiplier' | 'sizePercent'
+  'tpsl' | 'distance' | 'sizePercent'
 >;
 
 /** Une ligne du formulaire : trois champs éditables, et le reste en soute. */
 export interface ProtectiveEntryFormValue {
   tpsl: TpslType;
   /**
+   * L'unité de la distance. Servie par `/exchanges/meta` (`distanceUnits`), et
+   * non déduite du paquet compilé : un mobile en retard ne doit pas proposer
+   * une unité que le bot ne sait pas calculer.
+   */
+  distanceUnit: DistanceUnit;
+  /**
    * `number | string` parce qu'un `ion-input type="number"` rend une **chaîne**
    * dès que l'utilisateur saisit, alors que la valeur initiale est un nombre.
    * Le type dit la vérité plutôt que de la masquer ; `toProtectiveEntry`
    * convertit au moment d'écrire.
    */
-  atrMultiplier: number | string;
+  distanceValue: number | string;
   sizePercent: number | string;
   carried: CarriedProtectiveFields;
 }
@@ -67,8 +74,10 @@ export interface ProtectiveEntryFormValue {
  * leur valeur par défaut : une configuration doit continuer à produire le même
  * prix si les défauts du bot changent.
  */
-export const IMPLICIT_ANCHOR: IOrderAnchor = { source: 'ENTRY' };
+export const IMPLICIT_ANCHOR: PriceAnchor = { source: 'ENTRY' };
 
+/** Ce que le formulaire propose par défaut : l'unité qui existait seule. */
+export const DEFAULT_DISTANCE_UNIT: DistanceUnit = 'ATR';
 export const DEFAULT_ATR_MULTIPLIER = 1.5;
 export const DEFAULT_SIZE_PERCENT = 100;
 export const DEFAULT_TPSL: TpslType = 'tp';
@@ -105,11 +114,12 @@ function withoutRetiredFields<T extends object>(value: T): T {
 export function toProtectiveEntryForm(
   entry?: Partial<ProtectiveOrderEntry>,
 ): ProtectiveEntryFormValue {
-  const { tpsl, atrMultiplier, sizePercent, ...rest } = entry ?? {};
+  const { tpsl, distance, sizePercent, ...rest } = entry ?? {};
 
   return {
     tpsl: tpsl ?? DEFAULT_TPSL,
-    atrMultiplier: atrMultiplier ?? DEFAULT_ATR_MULTIPLIER,
+    distanceUnit: distance?.unit ?? DEFAULT_DISTANCE_UNIT,
+    distanceValue: distance?.value ?? DEFAULT_ATR_MULTIPLIER,
     sizePercent: sizePercent ?? DEFAULT_SIZE_PERCENT,
     carried: withoutRetiredFields({ ...rest, anchor: rest.anchor ?? IMPLICIT_ANCHOR }),
   };
@@ -124,7 +134,10 @@ export function toProtectiveEntry(value: ProtectiveEntryFormValue): ProtectiveOr
   return {
     ...value.carried,
     tpsl: value.tpsl,
-    atrMultiplier: Number(value.atrMultiplier),
+    distance: {
+      unit: value.distanceUnit,
+      value: Number(value.distanceValue),
+    },
     sizePercent: Number(value.sizePercent),
   };
 }

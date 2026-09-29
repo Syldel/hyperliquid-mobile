@@ -29,8 +29,11 @@ const ENTRY_CONDITION: RuleNode = {
 
 const HAND_TUNED: ProtectiveOrderEntry = {
   tpsl: 'sl',
-  anchor: { source: 'INDICATOR', name: 'ema', period: 20 },
-  atrMultiplier: 1.2,
+  anchor: {
+    source: 'EXPRESSION',
+    expression: { type: 'indicator', name: 'ema', period: 20 },
+  },
+  distance: { unit: 'ATR', value: 1.2 },
   sizePercent: 60,
   followMode: 'TIGHTEN_ONLY',
   boundedByEntry: true,
@@ -58,10 +61,13 @@ describe('toProtectiveEntryForm / toProtectiveEntry', () => {
   it('keeps the anchor, the follow mode and the bound while size is edited', () => {
     const saved = toProtectiveEntry({
       ...toProtectiveEntryForm(HAND_TUNED),
-      atrMultiplier: 3,
+      distanceValue: 3,
     });
 
-    expect(saved.anchor).toEqual({ source: 'INDICATOR', name: 'ema', period: 20 });
+    expect(saved.anchor).toEqual({
+      source: 'EXPRESSION',
+      expression: { type: 'indicator', name: 'ema', period: 20 },
+    });
     expect(saved.followMode).toBe('TIGHTEN_ONLY');
     expect(saved.boundedByEntry).toBe(true);
   });
@@ -78,7 +84,7 @@ describe('toProtectiveEntryForm / toProtectiveEntry', () => {
     // et ça honore un type où `anchor` est obligatoire.
     const legacy: Partial<ProtectiveOrderEntry> = {
       tpsl: 'tp',
-      atrMultiplier: 2,
+      distance: { unit: 'ATR', value: 2 },
       sizePercent: 100,
     };
 
@@ -95,14 +101,14 @@ describe('toProtectiveEntryForm / toProtectiveEntry', () => {
     // build ne modélise pas. Un cast le tairait.
     const stored: Partial<ProtectiveOrderEntry> & { label: string } = {
       tpsl: 'sl',
-      atrMultiplier: 1.5,
+      distance: { unit: 'ATR', value: 1.5 },
       sizePercent: 60,
       label: '',
     };
 
     expect(toProtectiveEntry(toProtectiveEntryForm(stored))).toEqual({
       tpsl: 'sl',
-      atrMultiplier: 1.5,
+      distance: { unit: 'ATR', value: 1.5 },
       sizePercent: 60,
       anchor: IMPLICIT_ANCHOR,
     });
@@ -116,7 +122,7 @@ describe('toProtectiveEntryForm / toProtectiveEntry', () => {
     // n'autorise rien.
     const fromNewerBuild: Partial<ProtectiveOrderEntry> & { trailingStep: number } = {
       tpsl: 'sl',
-      atrMultiplier: 1.5,
+      distance: { unit: 'ATR', value: 1.5 },
       sizePercent: 60,
       trailingStep: 3,
     };
@@ -127,18 +133,19 @@ describe('toProtectiveEntryForm / toProtectiveEntry', () => {
     });
   });
 
-  it('carries a field a future contract will add, such as the coming distance', () => {
+  it('carries a field a future contract will add', () => {
     // Deuxième angle sur le même invariant, et pas un cas d'école : `distance`
-    // remplacera `atrMultiplier` à l'étape suivante. Entre le tag des types et
-    // le déploiement de l'app, un mobile resté en arrière ne doit pas rogner ce
-    // qu'une version à jour a écrit — un objet, pas seulement un scalaire.
+    // tenait ce rôle jusqu'à ce qu'il arrive vraiment, en v0.24. Entre le tag
+    // des types et le déploiement de l'app, un mobile resté en arrière ne doit
+    // pas rogner ce qu'une version à jour a écrit — un objet, pas seulement un
+    // scalaire.
     const fromNewerBuild: Partial<ProtectiveOrderEntry> & {
-      distance: { unit: string; value: number };
+      trigger: { kind: string; delaySeconds: number };
     } = {
       tpsl: 'sl',
-      atrMultiplier: 1.5,
+      distance: { unit: 'ATR', value: 1.5 },
       sizePercent: 60,
-      distance: { unit: 'PERCENT', value: 2 },
+      trigger: { kind: 'DELAYED', delaySeconds: 30 },
     };
 
     expect(toProtectiveEntry(toProtectiveEntryForm(fromNewerBuild))).toEqual({
@@ -153,18 +160,21 @@ describe('toProtectiveEntryForm / toProtectiveEntry', () => {
     // `2 / "201"` dans l'éditeur d'opérande.
     const saved = toProtectiveEntry({
       ...toProtectiveEntryForm(HAND_TUNED),
-      atrMultiplier: '2.5',
+      distanceValue: '2.5',
       sizePercent: '40',
     });
 
-    expect(saved.atrMultiplier).toBe(2.5);
+    expect(saved.distance.value).toBe(2.5);
     expect(saved.sizePercent).toBe(40);
   });
 
   it('gives a brand new entry the documented defaults', () => {
     expect(toProtectiveEntryForm()).toEqual({
       tpsl: 'tp',
-      atrMultiplier: 1.5,
+      // L'unite qui existait seule avant v0.24 : le defaut ne change pas le
+      // comportement de ce que l'app produisait deja.
+      distanceUnit: 'ATR',
+      distanceValue: 1.5,
       sizePercent: 100,
       carried: { anchor: IMPLICIT_ANCHOR },
     });

@@ -162,7 +162,7 @@
             </label>
             <ion-item lines="none" class="entry-item">
               <ion-input
-                formControlName="atrMultiplier"
+                formControlName="distanceValue"
                 type="number"
                 inputmode="decimal"
                 min="0.1"
@@ -171,17 +171,18 @@
                 placeholder="1.5"
                 (ionInput)="onEntriesChanged()"
               />
-              <ion-note slot="end" class="unit-tag">× ATR</ion-note>
+              <ion-note slot="end" class="unit-tag">{{ distanceUnitLabel(i) }}</ion-note>
             </ion-item>
             @if (
-              entryGroup(i).get('atrMultiplier')?.invalid &&
-              entryGroup(i).get('atrMultiplier')?.touched
+              entryGroup(i).get('distanceValue')?.invalid &&
+              entryGroup(i).get('distanceValue')?.touched
             ) {
               <p class="field-error">Value between 0.1 and 20</p>
-            } @else if (atrValue(i) !== null) {
+            } @else if (distanceValue(i) !== null) {
               <p class="atr-preview">
                 <span class="atr-formula">
-                  entryPx {{ isTp(i) ? '+' : '−' }} {{ atrValue(i) }} × ATR
+                  entryPx {{ isTp(i) ? '+' : '−' }} {{ distanceValue(i) }}
+                  {{ distanceUnitLabel(i) }}
                 </span>
                 <span class="atr-dir">{{ isTp(i) ? '↑ above entry' : '↓ below entry' }}</span>
               </p>

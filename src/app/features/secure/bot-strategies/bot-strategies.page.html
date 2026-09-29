@@ -71,7 +71,8 @@
                   <ion-icon
                     [name]="e.tpsl === 'tp' ? 'trending-up-outline' : 'trending-down-outline'"
                   />
-                  {{ e.tpsl | uppercase }} {{ e.sizePercent }}% · {{ e.atrMultiplier }}×ATR
+                  {{ e.tpsl | uppercase }} {{ e.sizePercent }}% · {{ e.distance?.value }}{{
+                  e.distance?.unit === 'PERCENT' ? '%' : '×ATR' }}
                 </ion-badge>
                 }
               </div>

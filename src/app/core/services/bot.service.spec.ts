@@ -21,6 +21,7 @@ function buildMeta(packageVersion: string): ExchangesMetaResponse {
     functions: [],
     strategyFormSchema: {
       anchorSources: [],
+      distanceUnits: [],
       orderTypes: [],
       tpslTypes: [],
       positionSides: [],

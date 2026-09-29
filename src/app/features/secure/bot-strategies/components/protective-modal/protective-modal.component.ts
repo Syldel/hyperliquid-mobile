@@ -44,7 +44,7 @@ import {
 } from 'ionicons/icons';
 
 import { TradingPair } from '@models/user.interface';
-import { ProtectiveOrderEntry, TpslType } from '@syldel/trading-shared-types';
+import { DistanceUnit, ProtectiveOrderEntry, TpslType } from '@syldel/trading-shared-types';
 import {
   CarriedProtectiveFields,
   toProtectiveEntryForm,
@@ -88,10 +88,24 @@ function sizePercentSumValidator(type: TpslType): ValidatorFn {
  */
 type ProtectiveEntryGroup = FormGroup<{
   tpsl: FormControl<TpslType>;
-  atrMultiplier: FormControl<number | string>;
+  distanceUnit: FormControl<DistanceUnit>;
+  distanceValue: FormControl<number | string>;
   sizePercent: FormControl<number | string>;
   carried: FormControl<CarriedProtectiveFields>;
 }>;
+
+/**
+ * Le plafond de la distance dépend de son unité : 20 ATR est un écart énorme,
+ * 20 % ne l'est pas. Le plancher, lui, ne bouge pas — une distance nulle est
+ * refusée par la validation partagée (`INVALID_DISTANCE_VALUE`).
+ *
+ * ⚠️ Lu à la construction du contrôle, donc figé tant que l'unité n'est pas
+ * modifiable à l'écran. Il devra suivre le sélecteur d'unité.
+ */
+const MAX_DISTANCE_BY_UNIT: Record<DistanceUnit, number> = {
+  ATR: 20,
+  PERCENT: 100,
+};
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -187,9 +201,14 @@ export class ProtectiveModalComponent implements OnInit {
 
     return this.fb.nonNullable.group({
       tpsl: [value.tpsl, Validators.required],
-      atrMultiplier: [
-        value.atrMultiplier,
-        [Validators.required, Validators.min(0.1), Validators.max(20)],
+      distanceUnit: [value.distanceUnit, Validators.required],
+      distanceValue: [
+        value.distanceValue,
+        [
+          Validators.required,
+          Validators.min(0.1),
+          Validators.max(MAX_DISTANCE_BY_UNIT[value.distanceUnit]),
+        ],
       ],
       sizePercent: [
         value.sizePercent,
@@ -236,9 +255,14 @@ export class ProtectiveModalComponent implements OnInit {
     return this.entryGroup(i).get('tpsl')?.value === 'tp';
   }
 
-  atrValue(i: number): number | null {
-    const v = this.entryGroup(i).get('atrMultiplier')?.value;
+  distanceValue(i: number): number | null {
+    const v = this.entryGroup(i).controls.distanceValue.value;
     return v != null && !isNaN(Number(v)) ? Number(v) : null;
+  }
+
+  /** Ce que la distance multiplie, tel qu'il s'affiche à côté du nombre. */
+  distanceUnitLabel(i: number): string {
+    return this.entryGroup(i).controls.distanceUnit.value === 'PERCENT' ? '%' : '× ATR';
   }
 
   hasExistingStrategy(): boolean {

@@ -28,8 +28,11 @@ const ENTRY_CONDITION: RuleNode = {
 /** Une protection réglée à la main, comme seule l'édition directe permet. */
 const HAND_TUNED: ProtectiveOrderEntry = {
   tpsl: 'sl',
-  anchor: { source: 'INDICATOR', name: 'ema', period: 20 },
-  atrMultiplier: 1.2,
+  anchor: {
+    source: 'EXPRESSION',
+    expression: { type: 'indicator', name: 'ema', period: 20 },
+  },
+  distance: { unit: 'ATR', value: 1.2 },
   sizePercent: 60,
   followMode: 'TIGHTEN_ONLY',
   boundedByEntry: true,
@@ -84,14 +87,13 @@ describe('ProtectiveModalComponent — ce que sauver préserve', () => {
   it('keeps the anchor while the multiplier is edited', () => {
     mount(pairWith([HAND_TUNED]));
 
-    component.entryGroup(0).controls.atrMultiplier.setValue('3.5');
+    component.entryGroup(0).controls.distanceValue.setValue('3.5');
 
     expect(savedEntries()[0].anchor).toEqual({
-      source: 'INDICATOR',
-      name: 'ema',
-      period: 20,
+      source: 'EXPRESSION',
+      expression: { type: 'indicator', name: 'ema', period: 20 },
     });
-    expect(savedEntries()[0].atrMultiplier).toBe(3.5);
+    expect(savedEntries()[0].distance?.value).toBe(3.5);
   });
 
   it('keeps the condition the bot evaluates before placing the protection', () => {
@@ -137,7 +139,7 @@ describe('ProtectiveModalComponent — ce que sauver préserve', () => {
     const other: ProtectiveOrderEntry = {
       tpsl: 'tp',
       anchor: { source: 'MARKET' },
-      atrMultiplier: 4,
+      distance: { unit: 'ATR', value: 4 },
       sizePercent: 100,
       followMode: 'FREE',
     };
@@ -151,7 +153,7 @@ describe('ProtectiveModalComponent — ce que sauver préserve', () => {
     const other: ProtectiveOrderEntry = {
       tpsl: 'tp',
       anchor: { source: 'MARKET' },
-      atrMultiplier: 4,
+      distance: { unit: 'ATR', value: 4 },
       sizePercent: 100,
       followMode: 'FREE',
     };
@@ -167,7 +169,7 @@ describe('ProtectiveModalComponent — ce que sauver préserve', () => {
     // applique `ENTRY` ; l'écrire ne déplace rien et honore le type.
     const legacy = {
       tpsl: 'tp',
-      atrMultiplier: 2,
+      distance: { unit: 'ATR', value: 2 },
       sizePercent: 100,
     } as ProtectiveOrderEntry;
     mount(pairWith([legacy]));
@@ -181,7 +183,7 @@ describe('ProtectiveModalComponent — ce que sauver préserve', () => {
     const vestige: ProtectiveOrderEntry & { label: string } = {
       tpsl: 'sl',
       anchor: { source: 'ENTRY' },
-      atrMultiplier: 1.5,
+      distance: { unit: 'ATR', value: 1.5 },
       sizePercent: 60,
       label: '',
     };
@@ -202,7 +204,7 @@ describe('ProtectiveModalComponent — ce que sauver préserve', () => {
   it('refuses to save an emptied multiplier rather than writing a broken entry', () => {
     mount(pairWith([HAND_TUNED]));
 
-    component.entryGroup(0).controls.atrMultiplier.setValue('');
+    component.entryGroup(0).controls.distanceValue.setValue('');
     component.save();
 
     expect(modalCtrl.dismissed).toHaveLength(0);
@@ -227,7 +229,7 @@ describe('ProtectiveModalComponent — ce que sauver préserve', () => {
     expect(savedEntries()[0]).toEqual({
       tpsl: 'sl',
       anchor: { source: 'ENTRY' },
-      atrMultiplier: 1.5,
+      distance: { unit: 'ATR', value: 1.5 },
       sizePercent: 100,
     });
   });
