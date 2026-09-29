@@ -126,6 +126,29 @@ export class BotService {
   );
 
   /**
+   * Les origines de prix qu'un ordre peut prendre pour ancre, avec leur libellé
+   * et les contextes où chacune a un sens — `ENTRY` n'en a aucun pour un ordre
+   * latent, qui n'a pas encore de position.
+   *
+   * Servies, jamais déduites d'`ANCHOR_SOURCES` compilé : un mobile en avance
+   * proposerait une source que le bot ne sait pas résoudre, et un mobile en
+   * retard en cacherait une qu'il sait résoudre. Même raison que pour la
+   * grammaire du rule-builder.
+   */
+  readonly anchorSources = computed(
+    () => this.metadataCache()?.strategyFormSchema.anchorSources ?? [],
+  );
+
+  /**
+   * Les unités dans lesquelles une distance peut s'exprimer, avec la phrase qui
+   * dit ce que la valeur multiplie. La description vient du bot pour la même
+   * raison que le reste : c'est lui qui calcule, donc c'est lui qui sait.
+   */
+  readonly distanceUnits = computed(
+    () => this.metadataCache()?.strategyFormSchema.distanceUnits ?? [],
+  );
+
+  /**
    * Clé sous laquelle `POST /analysis` range la série d'un indicateur dans
    * `AnalysisResponse.indicators` (ex: `ema_9`, `macd_12_26_9`).
    *

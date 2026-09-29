@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ModalController } from '@ionic/angular/standalone';
 import type { TradingPair } from '@models/user.interface';
-import type { ProtectiveOrderEntry, RuleNode } from '@syldel/trading-shared-types';
+import type { PriceAnchor, ProtectiveOrderEntry, RuleNode } from '@syldel/trading-shared-types';
 import { ProtectiveModalComponent, type ProtectiveModalResult } from './protective-modal.component';
 
 /**
@@ -142,6 +142,7 @@ describe('ProtectiveModalComponent — ce que sauver préserve', () => {
       distance: { unit: 'ATR', value: 4 },
       sizePercent: 100,
       followMode: 'FREE',
+      boundedByEntry: false,
     };
     mount(pairWith([HAND_TUNED, other]));
 
@@ -156,6 +157,7 @@ describe('ProtectiveModalComponent — ce que sauver préserve', () => {
       distance: { unit: 'ATR', value: 4 },
       sizePercent: 100,
       followMode: 'FREE',
+      boundedByEntry: false,
     };
     mount(pairWith([HAND_TUNED, other]));
 
@@ -221,16 +223,113 @@ describe('ProtectiveModalComponent — ce que sauver préserve', () => {
     expect(modalCtrl.dismissed).toHaveLength(0);
   });
 
+  describe("le retour de la modale d'ancre", () => {
+    /** Une modale qui rend ce qu'on lui dit de rendre, sans rien afficher. */
+    function anchorModalReturning(data: PriceAnchor | null, role: string) {
+      vi.spyOn(
+        TestBed.inject(ModalController) as unknown as {
+          create: () => Promise<unknown>;
+        },
+        'create',
+      ).mockResolvedValue({
+        present: async () => {},
+        onDidDismiss: async () => ({ data, role }),
+      });
+    }
+
+    it('applies the anchor the modal hands back', async () => {
+      mount(pairWith([HAND_TUNED]));
+      anchorModalReturning({ source: 'MARKET' }, 'confirm');
+
+      await component.openAnchorEditor(0);
+
+      expect(savedEntries()[0].anchor).toEqual({ source: 'MARKET' });
+    });
+
+    it('keeps the anchor untouched when the modal is dismissed', async () => {
+      mount(pairWith([HAND_TUNED]));
+      anchorModalReturning(null, 'cancel');
+
+      await component.openAnchorEditor(0);
+
+      expect(savedEntries()[0].anchor).toEqual(HAND_TUNED.anchor);
+    });
+  });
+
+  describe('ce que la modale dit de la configuration saisie', () => {
+    // Le verdict n'est pas recalcule ici : c'est `adviseProtection`, la meme
+    // fonction dont le bot journalise la sortie. Ce qui est eprouve, c'est le
+    // branchement — et surtout qu'il juge **chaque** entree, pas la premiere.
+    it('grades a ratcheting stop as standard, in green', () => {
+      mount(pairWith([HAND_TUNED]));
+
+      expect(component.advice(0)!.level).toBe('standard');
+      expect(component.adviceColor(0)).toBe('success');
+    });
+
+    it('grades a stop that can only loosen as runaway, in red', () => {
+      mount(pairWith([HAND_TUNED]));
+
+      component.entryGroup(0).controls.followMode.setValue('WIDEN_ONLY');
+      component.entryGroup(0).controls.boundedByEntry.setValue(false);
+
+      expect(component.advice(0)!.level).toBe('runaway');
+      expect(component.adviceColor(0)).toBe('danger');
+      expect(component.advice(0)!.message).toContain('loosen');
+    });
+
+    it('grades a free stop as caution, in amber', () => {
+      mount(pairWith([HAND_TUNED]));
+
+      component.entryGroup(0).controls.followMode.setValue('FREE');
+      component.entryGroup(0).controls.boundedByEntry.setValue(false);
+
+      expect(component.advice(0)!.level).toBe('caution');
+      expect(component.adviceColor(0)).toBe('warning');
+    });
+
+    it('judges each entry on its own, never the first one twice', () => {
+      const runaway: ProtectiveOrderEntry = {
+        tpsl: 'sl',
+        anchor: { source: 'ENTRY' },
+        distance: { unit: 'ATR', value: 1 },
+        sizePercent: 100,
+        followMode: 'WIDEN_ONLY',
+        boundedByEntry: false,
+      };
+      mount(pairWith([HAND_TUNED, runaway]));
+
+      expect(component.adviceColor(0)).toBe('success');
+      expect(component.adviceColor(1)).toBe('danger');
+    });
+
+    it('follows the anchor as well as the mode', () => {
+      // `MARKET` + `WIDEN_ONLY` a sa propre phrase : c'est l'ancre qui fuit,
+      // pas seulement le mode.
+      mount(pairWith([HAND_TUNED]));
+
+      component.entryGroup(0).controls.anchor.setValue({ source: 'MARKET' });
+      component.entryGroup(0).controls.followMode.setValue('WIDEN_ONLY');
+      component.entryGroup(0).controls.boundedByEntry.setValue(false);
+
+      expect(component.advice(0)!.code).toBe('MARKET_ANCHOR_RUNS_AWAY');
+    });
+  });
+
   it('adds a new entry carrying the default anchor', () => {
     mount(pairWith([]));
 
     component.addEntry('sl');
 
+    // Les trois defauts sont ecrits noir sur blanc : une configuration doit
+    // continuer a produire le meme prix si les defauts du bot changent.
     expect(savedEntries()[0]).toEqual({
       tpsl: 'sl',
       anchor: { source: 'ENTRY' },
       distance: { unit: 'ATR', value: 1.5 },
       sizePercent: 100,
+      followMode: 'FIXED',
+      boundedByEntry: false,
     });
   });
 });

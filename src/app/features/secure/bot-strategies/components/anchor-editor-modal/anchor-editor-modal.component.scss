@@ -1,0 +1,9 @@
+/**
+ * `ion-note` est en ligne par défaut : `ion-padding-start` ne décale alors que
+ * la **première** ligne, et le texte replié revenait coller au bord gauche.
+ */
+ion-note {
+  display: block;
+  padding-inline-start: 16px;
+  padding-inline-end: 16px;
+}

@@ -167,8 +167,11 @@
 }
 
 .entry-card {
-  --background: var(--ion-color-step-50, var(--ion-background-color-step-50));
-  border: 1px solid var(--ion-border-color, var(--ion-color-step-100));
+  // Dérivé de la couleur du texte, jamais d'un palier : le thème sombre
+  // redéfinit `--ion-text-color`, mais pas les `--ion-background-color-step-*`,
+  // qui restaient clairs et peignaient la carte en blanc sur fond noir.
+  --background: rgba(var(--ion-text-color-rgb), 0.04);
+  border: 1px solid rgba(var(--ion-text-color-rgb), 0.12);
   border-left: 3px solid transparent;
   margin: 0 0 10px;
   box-shadow: none;
@@ -363,4 +366,9 @@
 
 .clear-btn {
   font-size: 0.74rem;
+}
+
+/** Le sélecteur d'unité suit le nombre : il lui faut de l'air, pas un collage. */
+.unit-item {
+  margin-top: 8px;
 }

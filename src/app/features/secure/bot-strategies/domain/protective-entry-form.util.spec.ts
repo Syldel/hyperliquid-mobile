@@ -111,6 +111,8 @@ describe('toProtectiveEntryForm / toProtectiveEntry', () => {
       distance: { unit: 'ATR', value: 1.5 },
       sizePercent: 60,
       anchor: IMPLICIT_ANCHOR,
+      followMode: 'FIXED',
+      boundedByEntry: false,
     });
   });
 
@@ -130,6 +132,8 @@ describe('toProtectiveEntryForm / toProtectiveEntry', () => {
     expect(toProtectiveEntry(toProtectiveEntryForm(fromNewerBuild))).toEqual({
       ...fromNewerBuild,
       anchor: IMPLICIT_ANCHOR,
+      followMode: 'FIXED',
+      boundedByEntry: false,
     });
   });
 
@@ -151,6 +155,8 @@ describe('toProtectiveEntryForm / toProtectiveEntry', () => {
     expect(toProtectiveEntry(toProtectiveEntryForm(fromNewerBuild))).toEqual({
       ...fromNewerBuild,
       anchor: IMPLICIT_ANCHOR,
+      followMode: 'FIXED',
+      boundedByEntry: false,
     });
   });
 
@@ -176,7 +182,10 @@ describe('toProtectiveEntryForm / toProtectiveEntry', () => {
       distanceUnit: 'ATR',
       distanceValue: 1.5,
       sizePercent: 100,
-      carried: { anchor: IMPLICIT_ANCHOR },
+      anchor: IMPLICIT_ANCHOR,
+      followMode: 'FIXED',
+      boundedByEntry: false,
+      carried: {},
     });
   });
 });

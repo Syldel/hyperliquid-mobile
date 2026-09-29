@@ -151,13 +151,22 @@
             </ion-item>
           </div>
 
-          <!-- ATR Multiplier -->
+          <!-- Anchor -->
+          <div class="field-group">
+            <label class="field-label">Anchor</label>
+            <ion-item lines="none" class="entry-item" button="true" (click)="openAnchorEditor(i)">
+              <ion-label>{{ anchorLabel(i) }}</ion-label>
+              <ion-icon name="create-outline" slot="end" />
+            </ion-item>
+          </div>
+
+          <!-- Distance -->
           <div class="field-group">
             <label class="field-label">
-              ATR Multiplier
+              Distance from the anchor
               <span
                 class="info-icon"
-                title="triggerPx = entryPx ± (ATR × multiplier) — computed server-side at each entry"
+                title="triggerPx = anchor ± distance — computed server-side at each pass"
               ></span>
             </label>
             <ion-item lines="none" class="entry-item">
@@ -173,6 +182,22 @@
               />
               <ion-note slot="end" class="unit-tag">{{ distanceUnitLabel(i) }}</ion-note>
             </ion-item>
+            <ion-item lines="none" class="entry-item unit-item">
+              <ion-select
+                formControlName="distanceUnit"
+                interface="popover"
+                (ionChange)="onEntriesChanged()"
+              >
+                @for (unit of distanceUnits; track unit.value) {
+                  <ion-select-option [value]="unit.value">{{ unit.label }}</ion-select-option>
+                }
+              </ion-select>
+            </ion-item>
+            @if (distanceUnitDescription(i); as description) {
+              <p class="atr-preview">
+                <span class="atr-formula">{{ description }}</span>
+              </p>
+            }
             @if (
               entryGroup(i).get('distanceValue')?.invalid &&
               entryGroup(i).get('distanceValue')?.touched
@@ -181,13 +206,52 @@
             } @else if (distanceValue(i) !== null) {
               <p class="atr-preview">
                 <span class="atr-formula">
-                  entryPx {{ isTp(i) ? '+' : '−' }} {{ distanceValue(i) }}
+                  {{ anchorLabel(i) }} {{ isAbove(i) ? '+' : '−' }} {{ distanceValue(i) }}
                   {{ distanceUnitLabel(i) }}
                 </span>
-                <span class="atr-dir">{{ isTp(i) ? '↑ above entry' : '↓ below entry' }}</span>
+                <span class="atr-dir">
+                  {{ isAbove(i) ? '↑ above the anchor' : '↓ below the anchor' }}
+                </span>
               </p>
             }
           </div>
+
+          <!-- Follow mode -->
+          <div class="field-group">
+            <label class="field-label">Once placed, it may</label>
+            <ion-item lines="none" class="entry-item">
+              <ion-select
+                formControlName="followMode"
+                interface="popover"
+                (ionChange)="onEntriesChanged()"
+              >
+                @for (mode of followModes; track mode) {
+                  <ion-select-option [value]="mode">{{ followModeLabel(mode) }}</ion-select-option>
+                }
+              </ion-select>
+            </ion-item>
+          </div>
+
+          <!-- Entry bound -->
+          <div class="field-group">
+            <ion-item lines="none" class="entry-item">
+              <ion-toggle formControlName="boundedByEntry" (ionChange)="onEntriesChanged()">
+                Never move past where it was at entry
+              </ion-toggle>
+            </ion-item>
+          </div>
+
+          <!-- What this configuration actually does -->
+          @if (advice(i); as verdict) {
+            <div class="field-group">
+              <ion-item lines="none" class="entry-item advice-item">
+                <ion-label class="ion-text-wrap">
+                  <ion-badge [color]="adviceColor(i)">{{ verdict.level }}</ion-badge>
+                  <p>{{ verdict.message }}</p>
+                </ion-label>
+              </ion-item>
+            </div>
+          }
 
           <!-- Size % -->
           <div class="field-group">

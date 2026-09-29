@@ -1,10 +1,12 @@
 import type {
   DistanceUnit,
+  FollowMode,
   PriceAnchor,
   ProtectiveOrderEntry,
   ProtectiveOrderStrategy,
   TpslType,
 } from '@syldel/trading-shared-types';
+import { DEFAULT_FOLLOW_MODE } from '@syldel/trading-shared-types';
 
 /**
  * ============================================================================
@@ -41,7 +43,7 @@ import type {
  */
 export type CarriedProtectiveFields = Omit<
   ProtectiveOrderEntry,
-  'tpsl' | 'distance' | 'sizePercent'
+  'tpsl' | 'distance' | 'sizePercent' | 'anchor' | 'followMode' | 'boundedByEntry'
 >;
 
 /** Une ligne du formulaire : trois champs éditables, et le reste en soute. */
@@ -61,6 +63,10 @@ export interface ProtectiveEntryFormValue {
    */
   distanceValue: number | string;
   sizePercent: number | string;
+  /** Où le prix se calcule. Éditée par `AnchorEditorModalComponent`. */
+  anchor: PriceAnchor;
+  followMode: FollowMode;
+  boundedByEntry: boolean;
   carried: CarriedProtectiveFields;
 }
 
@@ -114,14 +120,17 @@ function withoutRetiredFields<T extends object>(value: T): T {
 export function toProtectiveEntryForm(
   entry?: Partial<ProtectiveOrderEntry>,
 ): ProtectiveEntryFormValue {
-  const { tpsl, distance, sizePercent, ...rest } = entry ?? {};
+  const { tpsl, distance, sizePercent, anchor, followMode, boundedByEntry, ...rest } = entry ?? {};
 
   return {
     tpsl: tpsl ?? DEFAULT_TPSL,
     distanceUnit: distance?.unit ?? DEFAULT_DISTANCE_UNIT,
     distanceValue: distance?.value ?? DEFAULT_ATR_MULTIPLIER,
     sizePercent: sizePercent ?? DEFAULT_SIZE_PERCENT,
-    carried: withoutRetiredFields({ ...rest, anchor: rest.anchor ?? IMPLICIT_ANCHOR }),
+    anchor: anchor ?? IMPLICIT_ANCHOR,
+    followMode: followMode ?? DEFAULT_FOLLOW_MODE,
+    boundedByEntry: boundedByEntry === true,
+    carried: withoutRetiredFields({ ...rest }),
   };
 }
 
@@ -131,14 +140,20 @@ export function toProtectiveEntryForm(
  * `as` d'avant lui interdisait de faire.
  */
 export function toProtectiveEntry(value: ProtectiveEntryFormValue): ProtectiveOrderEntry {
+  // Écrits explicitement, même à leur valeur par défaut : une configuration
+  // doit continuer à produire le même prix si les défauts du bot changent.
+  // Même règle que les paramètres d'indicateur de l'éditeur d'opérande.
   return {
     ...value.carried,
     tpsl: value.tpsl,
+    anchor: value.anchor,
     distance: {
       unit: value.distanceUnit,
       value: Number(value.distanceValue),
     },
     sizePercent: Number(value.sizePercent),
+    followMode: value.followMode,
+    boundedByEntry: value.boundedByEntry,
   };
 }
 

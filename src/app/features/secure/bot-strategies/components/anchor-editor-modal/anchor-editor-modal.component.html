@@ -1,0 +1,58 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="dismiss()" fill="clear">
+        <ion-icon name="close-outline" slot="icon-only" />
+      </ion-button>
+    </ion-buttons>
+
+    <ion-title>Anchor</ion-title>
+
+    <ion-buttons slot="end">
+      <ion-button (click)="confirm()" [disabled]="!canConfirm()" fill="solid" color="primary">
+        Done
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <ion-list>
+    <ion-item lines="none">
+      <ion-select
+        label="Price origin"
+        labelPlacement="stacked"
+        interface="popover"
+        [value]="source()"
+        (ionChange)="source.set($event.detail.value)"
+      >
+        @for (option of sources(); track option.value) {
+          <ion-select-option [value]="option.value">
+            {{ option.label }}
+          </ion-select-option>
+        }
+      </ion-select>
+    </ion-item>
+
+    @if (sources().length === 0) {
+      <ion-note color="warning">
+        The bot has not answered yet — no anchor source can be offered until it does.
+      </ion-note>
+    }
+
+    @if (source() === 'EXPRESSION') {
+      <ion-item lines="none" button="true" (click)="editExpression()">
+        <ion-label>
+          <p>Expression</p>
+          <h3>{{ expressionLabel() ?? 'Not set yet' }}</h3>
+        </ion-label>
+        <ion-icon name="create-outline" slot="end" />
+      </ion-item>
+
+      <ion-note>
+        Anything the rule builder can express: an indicator line, a formula, the highest of two
+        values. Evaluated on the same window as the signals.
+      </ion-note>
+    }
+  </ion-list>
+</ion-content>

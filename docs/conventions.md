@@ -126,6 +126,37 @@ Les modales Ionic reçoivent leurs entrées via `componentProps: { x: () => vale
 Ionic affecte les `componentProps` directement sur l'instance ; une fonction est donc ce
 qu'un `input()` signal peut consommer de façon interchangeable.
 
+## Cette app est **zoneless** : rien ne se repeint tout seul
+
+`zone.js` n'est pas une dépendance du projet — pas même transitive. C'est le défaut
+d'Angular 21, et ça change la règle la plus fondamentale de l'affichage : **une valeur
+modifiée hors d'un signal ou d'une liaison d'évènement ne provoque aucune détection de
+changement.** Le DOM garde l'ancienne valeur jusqu'à ce qu'autre chose réveille Angular.
+
+Ce qui notifie, et qu'on utilise donc sans y penser :
+
+- l'écriture d'un **signal** (`signal.set`, `update`) ;
+- une **liaison d'évènement** du gabarit (`(ionInput)`, `(ionChange)`, `(click)`) ;
+- un `AsyncPipe`, un `toSignal`.
+
+Ce qui ne notifie **pas** :
+
+- l'écriture dans un **contrôle de formulaire réactif** (`control.setValue`) ;
+- la reprise après un `await`, y compris `modal.onDidDismiss()` ;
+- `NgZone.run()`, qui n'a plus rien à faire tourner.
+
+Mesuré le 2026-09-29 : au retour de la modale d'ancre, `control.setValue()` écrivait bien
+la nouvelle ancre — la lire dans le composant le montrait — et l'écran continuait
+d'afficher l'ancienne. Les autres champs du même formulaire n'avaient jamais posé le
+problème parce qu'ils sont modifiés **par** une liaison d'évènement, qui notifie au
+passage. Le premier correctif, un `NgZone.run()`, n'a rien changé : c'était une réponse
+d'avant le zoneless.
+
+**La règle :** une valeur issue d'un formulaire réactif et affichée par le gabarit se
+termine par un `ChangeDetectorRef.markForCheck()` explicite dès qu'elle ne vient pas d'un
+évènement du gabarit. Et quand le choix se présente, préférer un **signal** — qui n'a pas
+besoin qu'on y pense.
+
 ## Une entrée de modale se lit, elle ne se suit pas
 
 L'interchangeabilité ci-dessus vaut pour la **lecture**, pas pour la réactivité. Ionic
