@@ -126,25 +126,45 @@ plus. Le gateway n'a pas été sollicité — ses seuls appelants sont le formul
 le détail d'un ordre — et reste couvert par `auth.interceptor.spec.ts`, dont une mutation
 retirant le gateway de la liste fait rougir la suite.
 
-### Comment le destinataire est reconnu
+### Comment le destinataire est reconnu : il ne l'est pas
 
-Pas « l'une des deux bases de confiance préfixe l'URL » : **celui des quatre services dont
-la base correspond le plus longuement**, puis on regarde s'il valide le jeton.
+**L'intercepteur ne devine plus.** Une requête **réclame** le jeton, ou ne le reçoit pas :
 
-La nuance ne se voit pas en développement, où chaque service a son port. Elle décide en
-production, où les topologies sont variées — et neuf d'entre elles ont été confrontées à
-l'implémentation avant d'être figées en tests :
+```ts
+this.http.get<ExternalUser>(`${this.config.userServiceUrl}/auth/me`, withWalletToken());
+```
 
-| Topologie                                                                   | Ce qu'elle change                                                                                                 |
-| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| sous-domaines distincts (`user.`, `gateway.`, `bot.`)                       | rien, le cas facile                                                                                               |
-| un seul hôte, préfixes de chemin (`/user`, `/gateway`, `/bot`)              | rien                                                                                                              |
-| **un service à la racine d'un hôte, un autre sous un chemin du même hôte**  | ⚠️ la comparaison naïve donnait le jeton au bot, dont l'URL commence bel et bien par celle du service utilisateur |
-| **l'API publique relayée sous un chemin de confiance** (contournement CORS) | ⚠️ sans elle dans l'arbitrage, le proxy héritait de la confiance de son hôte                                      |
-| barres finales dans la configuration, port explicite                        | rien, normalisés                                                                                                  |
-| **deux services sur exactement la même base**                               | à égalité on ne devine pas : le jeton ne part pas                                                                 |
-| domaine sosie (`user.mondomaine.fr.attaquant.net`)                          | rejeté par la frontière sur le `/`                                                                                |
-| **rien de configuré**, URL relative                                         | une base vide est refusée, sans quoi `startsWith('/')` livrerait tout `/assets/…`                                 |
+Le drapeau par défaut vaut `false`. Rien dans la forme d'une URL n'accorde quoi que ce soit.
+
+C'est la deuxième correction du même jour, et elle remplace la première. La version
+intermédiaire comparait l'URL aux bases configurées, puis retenait le service dont la base
+correspondait le plus longuement. Elle marchait — mais elle **devinait**, et chaque
+topologie de production était une devinette de plus : un service à la racine d'un hôte et
+un autre sous un chemin du même hôte, deux services sur la même base, l'API publique
+relayée pour contourner le CORS. Trois cas plausibles lui échappaient encore, trouvés en
+les cherchant. Rien n'aurait signalé le quatrième.
+
+**Le mode de défaillance était le mauvais**, et c'est le vrai motif du changement : un
+appel ajouté demain vers un hôte mal deviné aurait emporté le jeton **en silence**.
+Désormais un appel qui oublie de le réclamer prend un `401` — bruyant, immédiat, diagnostiqué
+en une minute. On échange une fuite invisible contre une panne visible.
+
+Ce que ça a coûté : quatre sites d'appel à annoter, et la disparition de toute la
+comparaison d'URL.
+
+### Ce qui garde la liste
+
+Le seul risque introduit par l'opt-in est qu'on recopie l'appel là où il ne faut pas — et
+celui-là se voit dans un diff. `wallet-token-callers.spec.ts` le prend de toute façon, dans
+les deux sens :
+
+- **aucun autre fichier** que `user.service.ts` et `hyperliquid-gateway.service.ts` n'a le
+  droit de nommer `withWalletToken` ;
+- et ces deux-là doivent continuer à le faire — un service qui cesserait de s'authentifier
+  prendrait sinon un `401` en production plutôt qu'un test rouge.
+
+Éprouvé par mutation le 2026-09-29 : faire réclamer le jeton par le bot, le faire cesser de
+l'être par l'un des deux, ou basculer le drapeau à `true` par défaut, font rougir la suite.
 
 ---
 

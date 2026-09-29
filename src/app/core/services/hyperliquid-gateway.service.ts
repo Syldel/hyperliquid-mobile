@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { ConfigService } from '@services/config.service';
+import { withWalletToken } from '../interceptors/auth.interceptor';
 import {
   HLCancelOrderResponse,
   HLOid,
@@ -18,7 +19,11 @@ export class HyperliquidGatewayService {
   private readonly http = inject(HttpClient);
 
   private post<T>(path: string, body: object): Observable<T> {
-    return this.http.post<T>(`${this.config.hyperliquidGatewayUrl}/${path}`, body);
+    return this.http.post<T>(
+      `${this.config.hyperliquidGatewayUrl}/${path}`,
+      body,
+      withWalletToken(),
+    );
   }
 
   // ── Orders info ────────────────────────────────────────────────────────────
@@ -26,6 +31,7 @@ export class HyperliquidGatewayService {
   getOrderStatus(oid: number): Observable<HLOrderStatusResponse> {
     return this.http.get<HLOrderStatusResponse>(
       `${this.config.hyperliquidGatewayUrl}/hyperliquid/orders/open/${oid}`,
+      withWalletToken(),
     );
   }
 
