@@ -12,18 +12,34 @@ import { AuthService } from '@auth/auth.service';
 
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {
-  private readonly PUBLIC_ROUTES: string[] = ['/login'];
+  /**
+   * Les routes que l'on interroge sans jeton, comparées à la **fin du chemin**,
+   * query retirée.
+   *
+   * Ni motif ni joker. La version précédente compilait une `RegExp` par entrée
+   * et par requête, en y remplaçant les astérisques par « n'importe quoi » :
+   * elle traitait une chaîne comme un motif sans que personne l'ait demandé.
+   * Deux conséquences, mesurées le 2026-09-29 :
+   *
+   * - l'expression s'appliquait à l'**URL entière**, query comprise. Une route
+   *   privée du genre `/auth/me?redirect=/login` passait donc pour publique et
+   *   partait sans jeton. Aucun appel de l'app ne construit de query
+   *   aujourd'hui, le piège attendait le premier `?returnUrl=` ;
+   * - un métacaractère dans une future entrée changeait silencieusement le
+   *   sens : `/v1.0/login` aurait aussi accepté `/v1X0/login`.
+   *
+   * Si un vrai motif devient nécessaire, il faudra échapper les parties
+   * littérales, pas seulement remplacer `*`.
+   */
+  private readonly PUBLIC_ROUTES: readonly string[] = ['/login'];
 
   readonly auth = inject(AuthService);
 
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     const token = this.auth.currentToken();
 
-    const isPublicRoute = this.PUBLIC_ROUTES.some((route) => {
-      const routePattern = route.replace(/\*/g, '.*');
-      const regex = new RegExp(`${routePattern}(\\?.*)?$`);
-      return regex.test(req.url);
-    });
+    const path = req.url.split('?')[0];
+    const isPublicRoute = this.PUBLIC_ROUTES.some((route) => path.endsWith(route));
 
     let clonedReq = req;
     if (token && !isPublicRoute) {

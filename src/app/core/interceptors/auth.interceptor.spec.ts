@@ -103,6 +103,52 @@ describe('AuthInterceptor', () => {
       expect(sentAuthHeader(httpMock, LOGIN_URL)).toBeNull();
     });
 
+    it('attaches nothing to the login route when it carries a query string', () => {
+      // La query ne doit pas empêcher de reconnaître la route.
+      const { http, httpMock } = setup(TOKEN);
+      const url = `${LOGIN_URL}?redirect=/balances`;
+
+      http.post(url, {}).subscribe();
+
+      expect(sentAuthHeader(httpMock, url)).toBeNull();
+    });
+
+    it('attaches the token to a private route whose query merely ends in /login', () => {
+      // La reconnaissance porte sur le **chemin**, pas sur l'URL entière : une
+      // query qui se termine par `/login` ne rend pas la route publique.
+      // Mesuré le 2026-09-29 : l'ancienne comparaison, une `RegExp` appliquée à
+      // l'URL complète, prenait cette route pour publique et la privait de son
+      // jeton. Aucun appel de l'app ne construit de query aujourd'hui, donc le
+      // piège n'avait jamais servi — il attendait le premier `?returnUrl=`.
+      const { http, httpMock } = setup(TOKEN);
+      const url = `${USER_SERVICE_URL}?redirect=/login`;
+
+      http.get(url).subscribe();
+
+      expect(sentAuthHeader(httpMock, url)).toBe(`Bearer ${TOKEN}`);
+    });
+
+    it('attaches the token to a path that continues past /login', () => {
+      // La reconnaissance porte sur la **fin** du chemin : une sous-route de
+      // `/login` n'hérite pas de son caractère public. Sans ce test, remplacer
+      // `endsWith` par `includes` ne cassait rien.
+      const { http, httpMock } = setup(TOKEN);
+      const url = 'http://user.test/auth/login/verify';
+
+      http.get(url).subscribe();
+
+      expect(sentAuthHeader(httpMock, url)).toBe(`Bearer ${TOKEN}`);
+    });
+
+    it('attaches the token to a path that merely ends with the word login', () => {
+      const { http, httpMock } = setup(TOKEN);
+      const url = 'http://user.test/auth/relogin';
+
+      http.get(url).subscribe();
+
+      expect(sentAuthHeader(httpMock, url)).toBe(`Bearer ${TOKEN}`);
+    });
+
     it('⚠️ also attaches the token to the bot and to the public Hyperliquid API', () => {
       // Ce test décrit l'état actuel, pas un état souhaitable : le seul
       // filtre est « l'URL ne finit pas par /login », donc le JWT part vers
