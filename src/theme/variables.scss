@@ -253,17 +253,28 @@ $dark-text: #feffff;
   --bubble-color: #2f4d40;
 }
 
-.md.dark-theme,
-.ios.dark-theme,
-.dark-theme {
-  @include dark-mode-vars;
+/// Applique un bloc **aux deux chemins** qui mènent au thème sombre.
+///
+/// Une règle qui ne vaut qu'en sombre ne s'écrit pas à la main dans l'une des
+/// deux branches : c'est exactement comme ça que le thème s'est retrouvé
+/// appliqué à moitié. Un seul appel, deux sorties, aucune occasion d'en oublier
+/// une. Voir docs/theming.md.
+@mixin when-dark {
+  .md.dark-theme,
+  .ios.dark-theme,
+  .dark-theme {
+    @content;
+  }
+
+  // `ThemeService` n'ajoute de classe que pour un choix **explicite** : en
+  // `auto` — le défaut — seule cette branche s'applique.
+  @media (prefers-color-scheme: dark) {
+    :root:not(.dark-theme):not(.light-theme) {
+      @content;
+    }
+  }
 }
 
-// `ThemeService` n'ajoute de classe que pour un choix **explicite** : en `auto`
-// — le défaut — seule cette branche s'applique. Elle doit donc dire exactement
-// la même chose que celle du dessus, d'où le mixin partagé.
-@media (prefers-color-scheme: dark) {
-  :root:not(.dark-theme):not(.light-theme) {
-    @include dark-mode-vars;
-  }
+@include when-dark {
+  @include dark-mode-vars;
 }

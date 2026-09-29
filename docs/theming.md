@@ -55,6 +55,23 @@ donc **appliqué à moitié** pour qui ne l'avait pas choisi à la main.
 La palette Ionic n'est plus importée : ce qu'elle apportait d'utile est recopié
 dans `dark-mode-vars`, avec sa source et sa version en commentaire.
 
+### Une règle qui ne vaut qu'en sombre
+
+Elle ne s'écrit pas à la main dans l'une des deux branches — c'est la faute
+d'origine. Le mixin `when-dark` les produit toutes les deux depuis un seul
+appel :
+
+```scss
+@include when-dark {
+  ion-chip.ion-color {
+    color: var(--ion-color-base);
+  }
+}
+```
+
+Vérifié le 2026-09-29 : les deux chemins rendent les mêmes douze valeurs de
+contraste, et le clair reste identique à ce qu'il était.
+
 ## Ce que le défaut coûtait
 
 Mesuré le 2026-09-29 dans le navigateur, mode `md`, sombre système, sur la modale
@@ -84,7 +101,34 @@ combats de spécificité contre `:root:not(.dark-theme):not(.light-theme)` et
 rend des chiffres faux. Recoupement : la reconstitution retrouve à l'identique
 les 1,10 et 2,09 relevés en début de séance, avant toute modification.
 
-## Deux pièges de couleur, et ce qu'ils ont coûté
+## Trois pièges de couleur, et ce qu'ils ont coûté
+
+### Le `shade` d'Ionic va dans le mauvais sens en thème sombre
+
+Ionic peint le texte d'une `ion-chip` colorée avec `--ion-color-shade`. Assombrir
+**éloigne** du fond quand le fond est clair, et l'en **rapproche** quand il est
+sombre : le défaut travaille donc contre la lisibilité dans un thème sombre.
+
+Mesuré le 2026-09-29 sur les six couleurs × les deux remplissages, avec de
+vraies `ion-chip` hydratées (contraste avec `--ion-color-shade` → avec
+`--ion-color-base`) :
+
+| Puce             | Sombre          | Clair         |
+| ---------------- | --------------- | ------------- |
+| `medium` plein   | 4,22 → **5,32** | 6,76 → 5,70   |
+| `medium` outline | 4,76 → 6,00     | 7,56 → 6,37   |
+| `primary` plein  | 4,68 → 5,99     | 14,27 → 13,55 |
+| `danger` plein   | 3,50 → 4,39     | 6,50 → 5,35   |
+| `danger` outline | 3,80 → **4,78** | 7,53 → 6,20   |
+| `success` plein  | 5,79 → 7,51     | 2,38 → 1,83   |
+| `warning` plein  | 7,26 → 9,49     | 2,00 → 1,53   |
+| `tertiary` plein | 4,68 → 5,98     | 2,97 → 2,32   |
+
+La base gagne **partout** en sombre (+0,89 à +2,66 ; en gras, les deux qui
+repassent au-dessus de 4,5:1) et perd **partout** en clair (−0,47 à −1,33).
+Aucune combinaison ne franchit le seuil vers le bas en clair, mais dégrader un
+thème sain pour en réparer un autre n'a pas de sens : la règle est posée dans
+`src/styles.scss`, **en sombre seulement**, via `when-dark`.
 
 ### Une `opacity` ne remplace pas un rôle
 
@@ -121,11 +165,8 @@ unité du fond en sombre.
 
 ## Ce qui reste
 
-- **Les puces colorées d'Ionic utilisent `--ion-color-shade` pour leur texte.**
-  Assombrir est juste sur fond clair, à l'envers sur fond sombre. Mesuré :
-  `medium-shade` donne 4,22:1, la couleur de base 5,32:1. Seules les puces de la
-  modale de protection sont corrigées, là où l'illisibilité a été constatée ; la
-  règle générale reste à trancher (une ligne dans `global.scss` suffirait).
+- **`danger` plein reste à 4,39:1 en sombre**, même corrigé — la seule des douze
+  combinaisons de puces à rester sous le seuil.
 - **Rouge sur rouge.** `.type-chip` en `danger` tient 3,84:1 et
   `.alloc-label.sl-label` 4,18:1 — le fond de ces éléments est teinté avec la
   couleur du texte, ce qui rapproche les deux. Sous le seuil, mais très au-dessus

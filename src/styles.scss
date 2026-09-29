@@ -49,6 +49,25 @@ ion-badge {
   opacity: 0.75;
 }
 
+/* Ionic peint le texte d'une `ion-chip` colorée avec `--ion-color-shade`, la
+   variante **assombrie** de la couleur. Assombrir éloigne du fond quand le fond
+   est clair — et l'en rapproche quand il est sombre. En thème sombre, le défaut
+   d'Ionic travaille donc contre la lisibilité.
+
+   Sombre seulement, et c'est mesuré : le 2026-09-29, sur les six couleurs × les
+   deux remplissages, la couleur de base gagne partout en sombre (de +0,89 à
+   +2,66, et deux combinaisons repassent au-dessus du seuil AA de 4,5:1) mais
+   perd partout en clair (de −0,47 à −1,33). Appliquer la même règle aux deux
+   thèmes aurait dégradé le clair pour réparer le sombre.
+
+   `when-dark` écrit les deux chemins du sombre depuis cet unique appel : en
+   poser un seul à la main est précisément ce qui avait cassé le thème. */
+@include when-dark {
+  ion-chip.ion-color {
+    color: var(--ion-color-base);
+  }
+}
+
 /* `ion-padding` pose 16px en haut du contenu, et une liste `inset` ajoute sa
    propre marge de 16px : le premier bloc se retrouvait donc à 32px du bord,
    deux fois plus bas que voulu. Seule la marge haute de la PREMIÈRE liste est

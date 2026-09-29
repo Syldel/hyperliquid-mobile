@@ -205,7 +205,9 @@ resté noir sur page blanche pendant des mois.
 
 Et **le sombre vit à un seul endroit** : `dark-mode-vars`, appliqué aux deux chemins qui y
 mènent (la classe `.dark-theme`, et la requête média pour le mode `auto`, qui est le
-défaut). Quand ces deux branches ont divergé, le sombre s'est appliqué à moitié.
+défaut). Quand ces deux branches ont divergé, le sombre s'est appliqué à moitié. Une règle
+qui ne vaut qu'en sombre passe par le mixin `when-dark`, jamais par une branche écrite à
+la main.
 
 Le détail, les mesures de contraste et ce qui reste ouvert : [theming.md](theming.md).
 

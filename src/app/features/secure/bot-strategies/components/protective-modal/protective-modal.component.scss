@@ -22,21 +22,6 @@
 
 // ─── Context row ─────────────────────────────────────────────────────────────
 
-/**
- * Ionic peint le texte d'une `ion-chip` colorée avec `--ion-color-shade`, la
- * variante **assombrie** de la couleur. C'est juste sur fond clair et à
- * l'envers sur fond sombre, où assombrir rapproche du fond : mesuré le
- * 2026-09-29, `medium-shade` donnait 4,22:1 sur la carte, sous le seuil AA de
- * 4,5:1 pour du texte de 11,5 px. La couleur de base donne 5,32:1.
- *
- * Le même travers touche toutes les puces colorées de l'app ; seules celles-ci
- * sont corrigées, parce que ce sont celles dont l'illisibilité a été constatée.
- * Voir docs/theming.md.
- */
-ion-chip.ion-color {
-  color: var(--ion-color-base);
-}
-
 .context-row {
   display: flex;
   align-items: center;
