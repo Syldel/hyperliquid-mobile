@@ -1,13 +1,8 @@
-import {
-  HTTP_INTERCEPTORS,
-  HttpClient,
-  provideHttpClient,
-  withInterceptorsFromDi,
-} from '@angular/common/http';
+import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { AuthService } from '@auth/auth.service';
-import { AuthInterceptor } from './auth.interceptor';
+import { authInterceptor } from './auth.interceptor';
 
 /**
  * ============================================================================
@@ -47,9 +42,8 @@ function setup(token: string | null) {
 
   TestBed.configureTestingModule({
     providers: [
-      provideHttpClient(withInterceptorsFromDi()),
+      provideHttpClient(withInterceptors([authInterceptor])),
       provideHttpClientTesting(),
-      { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true },
       { provide: AuthService, useValue: auth },
     ],
   });
@@ -69,7 +63,7 @@ function sentAuthHeader(httpMock: HttpTestingController, url: string): string | 
   return header;
 }
 
-describe('AuthInterceptor', () => {
+describe('authInterceptor', () => {
   afterEach(() => {
     TestBed.inject(HttpTestingController).verify();
     vi.restoreAllMocks();

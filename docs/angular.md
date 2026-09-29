@@ -105,16 +105,29 @@ relevé mémoire.
 
 - **`constructor(private …)` dans deux services** : `config.service.ts` et
   `theme.service.ts` ;
-- **l'intercepteur HTTP par classe.** `app.config.ts` déclare
-  `provideHttpClient(withInterceptorsFromDi())` plus un `HTTP_INTERCEPTORS`, là où la
-  forme fonctionnelle `withInterceptors([authInterceptor])` est la voie actuelle. 50
-  lignes à convertir, et le jeton se lit déjà par `inject()` ;
 - **`standalone: true` écrit 52 fois** alors que c'est le défaut depuis Angular 19. Bruit
   pur, à retirer au fil de l'eau ;
 - **`ChangeDetectionStrategy.OnPush` sur 18 composants applicatifs sur 51.** En zoneless
   la détection ne part que d'un signal ou d'une liaison d'évènement, donc c'est un
   raffinement de performance et non une question de correction — mais l'écart mérite
   d'être comblé plutôt que documenté comme s'il n'existait pas.
+
+## Un précédent de conversion : l'intercepteur HTTP
+
+`app.config.ts` déclarait `provideHttpClient(withInterceptorsFromDi())` plus un
+`HTTP_INTERCEPTORS`, et `AuthInterceptor` était une classe. C'est désormais
+`withInterceptors([authInterceptor])` et une `HttpInterceptorFn`, dont la signature typée
+`HttpRequest<unknown>` a fait disparaître les deux `any` au passage.
+
+La méthode vaut plus que le résultat, parce qu'elle se réemploie : **on ne convertit pas
+du code qui n'a pas de test.** L'ordre suivi le 2026-09-29 a été d'écrire d'abord les
+tests sur la version par classe, puis de convertir, puis de vérifier que **le même compte
+et les mêmes assertions** passent — 527 tests avant, 527 après. Sans cette étape, une
+conversion est un pari sur du code qu'on ne regarde plus.
+
+Puis les huit mutations ont été rejouées sur la forme fonctionnelle : toutes tombent, donc
+la conversion n'a pas émoussé la suite. Une mutation qui cesse de faire rougir après un
+refactoring signale un test devenu décoratif.
 
 ## Les pièges qui ont déjà coûté quelque chose ici
 
