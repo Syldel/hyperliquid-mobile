@@ -183,12 +183,24 @@ $dark-text: #feffff;
 
   // `#c5000f`, le rouge clair, tombait à 2,17:1 sur fond sombre — sur des
   // messages qui annoncent qu'une stratégie ne tourne pas.
-  --ion-color-danger: #f24c58;
-  --ion-color-danger-rgb: 242, 76, 88;
+  //
+  // Et `#f24c58`, le rouge sombre d'Ionic, ne suffisait pas non plus. Il est
+  // calibré contre **son** fond (`#121212`) ; le nôtre est `#1d1d1d`, et
+  // l'app écrit partout le même idiome — bordure rouge, fond teinté du même
+  // rouge à 10 %, texte rouge. Le fond monte alors vers le texte : mesuré le
+  // 2026-09-29, 4,29:1 sur le bandeau « the bot is not running it » et 3,84:1
+  // sur la puce `Stop Loss`. `#ff6b75` fait passer les quatre cas.
+  //
+  // Valeur dérivée, pas une valeur d'Ionic : c'est le premier cran qui y
+  // parvient. `shade` et `tint` suivent la formule d'Ionic (base × 0,88 ;
+  // base + 10 % vers le blanc), vérifiée en la recalculant sur `#f24c58`.
+  // Le noir de `contrast` y gagne aussi : 5,95 → 7,61:1.
+  --ion-color-danger: #ff6b75;
+  --ion-color-danger-rgb: 255, 107, 117;
   --ion-color-danger-contrast: #000000;
   --ion-color-danger-contrast-rgb: 0, 0, 0;
-  --ion-color-danger-shade: #d5434d;
-  --ion-color-danger-tint: #f35e69;
+  --ion-color-danger-shade: #e05e67;
+  --ion-color-danger-tint: #ff7a83;
 
   // `medium` porte presque tout le texte secondaire de l'app. Il valait
   // `#5f5f5f` en sombre, soit 2,37:1.

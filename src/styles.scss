@@ -66,6 +66,23 @@ ion-badge {
   ion-chip.ion-color {
     color: var(--ion-color-base);
   }
+
+  /* Même travers, autre endroit : la ligne d'explication d'un bandeau d'alerte
+     se distingue du titre en prenant `--ion-color-danger-shade`. En clair c'est
+     juste (6,26:1 contre 5,15 pour la base) ; en sombre ça la ramenait à 4,16.
+
+     Elle prend donc la couleur du titre en sombre, et la hiérarchie repose sur
+     la typographie — le titre est en 700, majuscules, interlettré. Sur un
+     message qui annonce qu'une stratégie ne tourne pas, la lisibilité passe
+     avant la nuance.
+
+     Règle globale plutôt que recopiée : l'idiome existe à l'identique dans
+     `bot-strategies.page.scss` et `trading-pair-modal.component.scss`. Elle est
+     ici, et non dans les composants, parce que `when-dark` n'est pas atteignable
+     depuis une feuille de composant — voir docs/theming.md. */
+  .stalled__why {
+    color: var(--ion-color-danger);
+  }
 }
 
 /* `ion-padding` pose 16px en haut du contenu, et une liste `inset` ajoute sa

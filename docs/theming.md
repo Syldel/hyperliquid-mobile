@@ -101,7 +101,7 @@ combats de spécificité contre `:root:not(.dark-theme):not(.light-theme)` et
 rend des chiffres faux. Recoupement : la reconstitution retrouve à l'identique
 les 1,10 et 2,09 relevés en début de séance, avant toute modification.
 
-## Trois pièges de couleur, et ce qu'ils ont coûté
+## Quatre pièges de couleur, et ce qu'ils ont coûté
 
 ### Le `shade` d'Ionic va dans le mauvais sens en thème sombre
 
@@ -129,6 +129,16 @@ repassent au-dessus de 4,5:1) et perd **partout** en clair (−0,47 à −1,33).
 Aucune combinaison ne franchit le seuil vers le bas en clair, mais dégrader un
 thème sain pour en réparer un autre n'a pas de sens : la règle est posée dans
 `src/styles.scss`, **en sombre seulement**, via `when-dark`.
+
+Le même travers touche `.stalled__why`, la ligne d'explication d'un bandeau
+d'alerte, qui se distingue de son titre en prenant `--ion-color-danger-shade` :
+6,26:1 en clair — la nuance y est gratuite — mais 4,16:1 en sombre. Elle prend
+donc la couleur du titre en sombre, la hiérarchie reposant alors sur la
+typographie seule (700, majuscules, interlettré). Même règle, même endroit, et
+elle couvre d'un coup les deux composants qui recopient ce bandeau.
+
+Un `shade` n'est pas condamné pour autant : celui de `warning` (`#e0b52b`) tient
+6,56:1 en sombre. C'est la marge de la couleur qui décide, pas le principe.
 
 ### Une `opacity` ne remplace pas un rôle
 
@@ -163,20 +173,58 @@ déclaration devenait invalide, `0px none`), et un fond de rule-tree figé à
 `#1c1c1c` dans **les deux** thèmes — noir sur page blanche en clair, et à une
 unité du fond en sombre.
 
+### Un fond teinté de la couleur de son propre texte
+
+L'app écrit partout le même idiome, recopié dans **quatre fichiers** :
+
+```scss
+border: 1px solid var(--ion-color-danger);
+background: rgba(var(--ion-color-danger-rgb), 0.1);
+color: var(--ion-color-danger);
+```
+
+Le fond monte alors **vers** le texte, et le contraste se referme d'autant.
+Ionic fait pareil sur ses puces colorées (`rgba(base, .08)`). Ce n'est pas une
+erreur en soi — c'est une teinte discrète qui rattache le bloc à son sens — mais
+elle mange une réserve de contraste que le rouge sombre d'Ionic n'avait pas.
+
+Trois pistes mesurées le 2026-09-29, en sombre :
+
+|                     | actuel | sans la teinte | `#f35e69` | **`#ff6b75`** |
+| ------------------- | -----: | -------------: | --------: | ------------: |
+| titre du bandeau    |   4,29 |           4,78 |      4,69 |      **5,31** |
+| ligne « pourquoi »  |   3,42 |           3,80 |      3,36 |      **5,31** |
+| `.type-chip` danger |   3,84 |           3,84 |      4,21 |      **4,77** |
+| `.alloc-label` SL   |   4,18 |           4,18 |      4,64 |      **5,34** |
+
+Retirer la teinte ne suffit pas : ça ne touche ni `.alloc-label`, qui n'en a
+pas, ni la puce — Ionic écrit son fond **en dur**, `--background` ne le reprend
+pas. C'est donc la couleur qui monte, dans `dark-mode-vars` seulement :
+`--ion-color-danger: #ff6b75`. Valeur dérivée, pas une valeur d'Ionic — le
+premier cran qui fait passer les quatre cas. Le noir de `contrast` y gagne
+aussi, 5,95 → 7,61:1, et aucune feuille n'écrit de blanc sur un fond `danger`.
+
+Balayage complet après coup : **7 échecs → 2**, les deux restants étant les
+non-défauts connus (`.save-btn`, artefact de sonde ; `.add-btn`, désactivé).
+Aucun nouvel échec, aucun aggravé. Vérifié aussi sur `user-fills` (bandeau de
+perte, 4,29 → 5,31) et `trading-pair-modal` (bandeau, 3,42/4,29 → 5,31 ; plus
+aucun échec dans la modale). La variante `--warning` du même bandeau garde son
+`warning-shade` : `#e0b52b` tient 6,56:1, le jaune est assez clair pour que la
+mauvaise direction ne coûte rien.
+
 ## Ce qui reste
 
-- **`danger` plein reste à 4,39:1 en sombre**, même corrigé — la seule des douze
-  combinaisons de puces à rester sous le seuil.
-- **Rouge sur rouge.** `.type-chip` en `danger` tient 3,84:1 et
-  `.alloc-label.sl-label` 4,18:1 — le fond de ces éléments est teinté avec la
-  couleur du texte, ce qui rapproche les deux. Sous le seuil, mais très au-dessus
-  des 1,98 et 2,17 d'avant.
+- **`danger` plein reste à 4,39:1 en sombre** sur une puce — la seule des douze
+  combinaisons à rester sous le seuil.
 - **Le vert de succès en thème clair** : `#2dd55b` sur blanc donne 1,68:1. C'est
   la valeur par défaut d'Ionic, jamais reprise par l'app, et elle est illisible
   en clair pour du texte. Non corrigée : changer une couleur de marque est une
   décision, pas un correctif.
 - **`--ion-text-color-step-400`** (`#777777`) sert du texte d'explication à
   4,06–4,47:1 en clair. Juste sous le seuil.
+- **Encore des `opacity` sur du texte, en clair** : `ion-badge` est passé à 0,75
+  globalement (`.prot-badge` tombe à 3,84:1 sur son fond rouge) et `.select-text`
+  à 0,6 (4,45:1). Même travers que celui décrit plus haut, pas encore traité.
 - Deux feuilles dépassent le budget de 4 kB d'Angular
   (`protective-modal.component.scss`, `watchlist-detail.page.scss`). Le
   dépassement **préexistait** — 4581 et 4922 octets compilés compressés à
