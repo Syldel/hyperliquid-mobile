@@ -54,14 +54,60 @@ tourne et que l'origine de l'app figure dans son `ALLOWED_ORIGINS`.
 Utilisateurs, clés privées, et la configuration de trading de chaque compte. Deux routes
 seulement sont consommées ici : `GET /auth/me` et `PATCH /auth/strategy`.
 
-C'est **le seul service authentifié** : l'intercepteur y joint le JWT du wallet courant.
-Une paire du bot n'existe que parce qu'elle a été écrite là.
+C'est **le seul service qui exige une authentification**. Une paire du bot n'existe que
+parce qu'elle a été écrite là.
+
+⚠️ Attention : « le seul service authentifié » décrit ce que le **serveur** exige, pas ce
+que le client envoie. L'intercepteur, lui, joint le JWT à **toute** requête dont l'URL ne
+finit pas par `/login` — voir la section suivante.
 
 ## [nest-hyperliquid-gateway](https://github.com/Syldel/nest-hyperliquid-gateway)
 
 Le gateway Hyperliquid interne, pour ce qui engage un compte (statut d'ordre, actions
 signées). À distinguer de l'API publique Hyperliquid (`https://api.hyperliquid.xyz/info`),
 interrogée directement pour les bougies, les marchés et l'information de marché.
+
+---
+
+# Le modèle de session : une adresse mémorisée, un jeton optionnel
+
+C'est un choix d'architecture, pas un état de fait provisoire, et il explique plusieurs
+choses qui surprennent à la lecture du code.
+
+**On se connecte une fois**, pour créer l'entrée et mémoriser l'adresse du wallet.
+Ensuite, l'essentiel de ce que l'app donne à voir — l'évolution d'une position, les
+bougies, les marchés — passe par l'**API publique Hyperliquid**, qui ne demande rien. Le
+login ne revient donc que devant une route qui exige vraiment une authentification.
+
+Le code dit exactement cela :
+
+|                         |                                                                            |
+| ----------------------- | -------------------------------------------------------------------------- |
+| `/secure` est gardé par | **`WalletGuard`** — il exige `currentAddress()`, une adresse **mémorisée** |
+| `AuthGuard` exige       | `isLoggedIn()`, donc un jeton valide…                                      |
+| …et garde               | **rien**. Il n'est importé par aucun fichier (vérifié le 2026-09-29)       |
+
+**Conséquence, et elle est délibérée : un 401 ne déconnecte pas.** L'intercepteur le
+journalise et le relaie à l'appelant, sans toucher à la session. Déconnecter éjecterait
+l'utilisateur d'écrans qui n'avaient pas besoin de lui. Les lignes commentées dans
+`auth.interceptor.ts` sont ce choix, pas un chantier inachevé — et
+`auth.interceptor.spec.ts` le **fige** : réactiver la déconnexion fait rougir la suite.
+
+⚠️ Ne pas câbler `AuthGuard` sur `/secure` en croyant réparer un oubli. Ce serait
+remplacer cette architecture par une autre.
+
+## Ce qui ne suit pas cette philosophie : le jeton part partout
+
+Le filtre de l'intercepteur est « l'URL ne finit pas par `/login` », et rien d'autre. Donc
+le JWT du service utilisateur est aussi envoyé au bot, au gateway, et à
+**`api.hyperliquid.xyz`** — un tiers qui n'en a aucun usage, mais qui le reçoit et peut le
+journaliser.
+
+Mesuré le 2026-09-29 par un test qui décrit cet état sans le cautionner
+(`auth.interceptor.spec.ts`, cas marqué ⚠️). La correction serait de restreindre l'en-tête
+à `userServiceUrl` ; elle n'a pas été faite, parce que ce serait un changement de
+comportement et que le comportement actuel n'a pas été demandé à changer. Le test tombera
+le jour où on s'y met : c'est son rôle.
 
 ---
 
