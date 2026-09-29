@@ -91,6 +91,16 @@ compilation). Voir [docs/ecosystem.md](docs/ecosystem.md#le-catalogue-vient-du-s
 types partagés est épinglée par tag git (`github:Syldel/trading-shared-types#vX.Y.Z`) :
 la faire évoluer est une décision, pas un détail d'implémentation.
 
+**Toute modification visuelle se vérifie dans les deux thèmes.** Une couleur, un fond, une
+`opacity` ou une taille de texte qui change se contrôle en clair **et** en sombre avant
+d'être proposée : le navigateur émule les deux schémas, la vérification ne se délègue pas
+à l'utilisateur. Et le contraste se **calcule**, il ne s'apprécie pas à l'œil — seuil
+4,5:1 pour du texte courant, 3:1 au-delà de 24 px (ou 18,7 px en gras), les contrôles
+désactivés exemptés. Deux raisons concrètes : le thème sombre est resté **à moitié
+appliqué** pendant des mois sans que rien ne le signale, et une correction qui répare un
+thème peut dégrader l'autre — mesuré. Seuils, pièges de mesure et chiffres de référence :
+[docs/theming.md](docs/theming.md).
+
 **Vérifier l'état réel avant de ré-implémenter.** Lire le fichier et l'historique git
 avant de refaire une étape supposée manquante.
 
@@ -114,14 +124,15 @@ plus. Si un diff de fins de ligne réapparaît, vérifier `git config core.autoc
 
 ## Documentation
 
-| Fichier                                                              | Contenu                                             |
-| -------------------------------------------------------------------- | --------------------------------------------------- |
-| [docs/ecosystem.md](docs/ecosystem.md)                               | les dépôts, qui possède quoi, la règle du catalogue |
-| [docs/strategies/overview.md](docs/strategies/overview.md)           | le rule-builder de bout en bout                     |
-| [docs/strategies/rule-model.md](docs/strategies/rule-model.md)       | l'arbre de règles, les chemins, les anomalies       |
-| [docs/watchlist/chart-overlays.md](docs/watchlist/chart-overlays.md) | les couches du chart et les règles de pane          |
-| [docs/conventions.md](docs/conventions.md)                           | exigence, usages, tests, pièges d'outillage         |
-| [docs/roadmap.md](docs/roadmap.md)                                   | ce qui est remis à plus tard, et pourquoi           |
+| Fichier                                                              | Contenu                                              |
+| -------------------------------------------------------------------- | ---------------------------------------------------- |
+| [docs/ecosystem.md](docs/ecosystem.md)                               | les dépôts, qui possède quoi, la règle du catalogue  |
+| [docs/strategies/overview.md](docs/strategies/overview.md)           | le rule-builder de bout en bout                      |
+| [docs/strategies/rule-model.md](docs/strategies/rule-model.md)       | l'arbre de règles, les chemins, les anomalies        |
+| [docs/watchlist/chart-overlays.md](docs/watchlist/chart-overlays.md) | les couches du chart et les règles de pane           |
+| [docs/conventions.md](docs/conventions.md)                           | exigence, usages, tests, pièges d'outillage          |
+| [docs/theming.md](docs/theming.md)                                   | les deux thèmes, les paliers, les contrastes mesurés |
+| [docs/roadmap.md](docs/roadmap.md)                                   | ce qui est remis à plus tard, et pourquoi            |
 
 ## Où vivent les choses
 

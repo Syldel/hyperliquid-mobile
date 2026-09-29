@@ -211,6 +211,39 @@ la main.
 
 Le détail, les mesures de contraste et ce qui reste ouvert : [theming.md](theming.md).
 
+## Le contraste se mesure, et dans les deux thèmes
+
+Toute modification qui touche une couleur, un fond, une `opacity` ou une taille de texte
+se vérifie **en clair et en sombre** avant d'être proposée. Le navigateur émule les deux
+schémas de couleurs : la vérification ne se délègue pas à l'utilisateur, et une capture
+d'écran ne la remplace pas.
+
+Seuils WCAG AA : **4,5:1** pour du texte courant, **3:1** au-delà de 24 px (ou 18,7 px en
+gras). Les contrôles **désactivés** en sont exemptés (critère 1.4.3) — un bouton grisé à
+2,68:1 n'est pas un défaut.
+
+Vérifier les deux thèmes n'est pas une formalité : **une correction qui répare l'un peut
+dégrader l'autre.** Mesuré le 2026-09-29 — peindre le texte des puces avec la couleur de
+base au lieu de son `shade` gagne partout en sombre (+0,89 à +2,66) et perd partout en
+clair (−0,47 à −1,33). C'est ce qui a fait naître `when-dark` plutôt qu'une règle globale.
+
+Quatre pièges qui font rendre un faux chiffre, tous rencontrés ici :
+
+- `getComputedStyle(el).color` **ne reflète pas l'`opacity`** — un texte annoncé à 5,39:1
+  en valait 2,87 à l'écran ;
+- `opacity` compose **tout le sous-arbre, fond compris**, par-dessus ce qui est hors du
+  groupe. Un élément qui porte les deux voit son contraste se dégrader bien plus lentement
+  qu'un texte seul : l'`opacity` d'`ion-badge`, accusée à 3,84:1, en vaut 4,56 ;
+- un élément **replié** — un titre dans un menu fermé — mesure 0 × 0 et se compare au fond
+  de la page au lieu du sien ;
+- le texte d'un bouton Ionic vit dans le **shadow DOM** (`.button-native`) ; lire l'hôte
+  donne une couleur qui n'est pas celle qui est peinte.
+
+Et mesurer **dans le mode où le défaut se trouve** : un correctif de thème clair essayé en
+sombre a failli dégrader le sombre de 6,80 à 3,66 sans qu'on le voie.
+
+La sonde, la méthode et les chiffres de référence : [theming.md](theming.md#mesurer-soi-même).
+
 ---
 
 # Tests
