@@ -91,6 +91,15 @@ compilation). Voir [docs/ecosystem.md](docs/ecosystem.md#le-catalogue-vient-du-s
 types partagés est épinglée par tag git (`github:Syldel/trading-shared-types#vX.Y.Z`) :
 la faire évoluer est une décision, pas un détail d'implémentation.
 
+**L'Angular moderne est la norme ; l'ancien est du code de compatibilité.** Angular 21,
+zoneless, tout standalone — relevé le 2026-09-29 : 164 `inject()` contre 2 constructeurs,
+188 `@if` et zéro `*ngIf`, aucun `@Input()` dans le code applicatif, zéro `NgModule`.
+Introduire l'une de ces formes anciennes est donc une **régression**, pas un choix de
+style. Quelle primitive prendre selon ce qu'on écrit, et ce qui reste légitimement en
+ancien : [docs/angular.md](docs/angular.md). ⚠️ Un ordre ne passe **jamais** par un
+`resource()` — Angular y annule les chargements en vol, et une écriture annulée est un
+ordre dont on ignore l'état.
+
 **Toute modification visuelle se vérifie dans les deux thèmes.** Une couleur, un fond, une
 `opacity` ou une taille de texte qui change se contrôle en clair **et** en sombre avant
 d'être proposée : le navigateur émule les deux schémas, la vérification ne se délègue pas
@@ -131,6 +140,7 @@ plus. Si un diff de fins de ligne réapparaît, vérifier `git config core.autoc
 | [docs/strategies/rule-model.md](docs/strategies/rule-model.md)       | l'arbre de règles, les chemins, les anomalies        |
 | [docs/watchlist/chart-overlays.md](docs/watchlist/chart-overlays.md) | les couches du chart et les règles de pane           |
 | [docs/conventions.md](docs/conventions.md)                           | exigence, usages, tests, pièges d'outillage          |
+| [docs/angular.md](docs/angular.md)                                   | quelle primitive choisir, et l'état réel du dépôt    |
 | [docs/theming.md](docs/theming.md)                                   | les deux thèmes, les paliers, les contrastes mesurés |
 | [docs/roadmap.md](docs/roadmap.md)                                   | ce qui est remis à plus tard, et pourquoi            |
 

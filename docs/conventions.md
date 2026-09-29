@@ -119,8 +119,13 @@ Les gros modules de domaine ouvrent sur un bloc d'en-tête encadré
 
 # Angular
 
-Composants **standalone**, `ChangeDetectionStrategy.OnPush`, signaux partout :
-`signal`, `computed`, `input()`.
+Composants **standalone**, signaux partout : `signal`, `computed`, `input()`. Le choix de
+primitive devant une fonctionnalité nouvelle, l'état exact du dépôt et ce qui y reste
+d'ancien : [angular.md](angular.md).
+
+⚠️ `ChangeDetectionStrategy.OnPush` était annoncé ici comme acquis. Relevé le 2026-09-29 :
+**18 composants applicatifs sur 51** le posent. En zoneless c'est un raffinement de
+performance, pas une question de correction — mais la phrase était fausse.
 
 Les modales Ionic reçoivent leurs entrées via `componentProps: { x: () => valeur }`.
 Ionic affecte les `componentProps` directement sur l'instance ; une fonction est donc ce
