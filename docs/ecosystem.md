@@ -57,15 +57,19 @@ seulement sont consommées ici : `GET /auth/me` et `PATCH /auth/strategy`.
 C'est **le seul service qui exige une authentification**. Une paire du bot n'existe que
 parce qu'elle a été écrite là.
 
-⚠️ Attention : « le seul service authentifié » décrit ce que le **serveur** exige, pas ce
-que le client envoie. L'intercepteur, lui, joint le JWT à **toute** requête dont l'URL ne
-finit pas par `/login` — voir la section suivante.
+⚠️ « Le seul service qui exige une authentification » ne veut pas dire « le seul qui reçoit
+le jeton » : le gateway le vérifie aussi. Qui le reçoit, et pourquoi : voir plus bas.
 
 ## [nest-hyperliquid-gateway](https://github.com/Syldel/nest-hyperliquid-gateway)
 
 Le gateway Hyperliquid interne, pour ce qui engage un compte (statut d'ordre, actions
 signées). À distinguer de l'API publique Hyperliquid (`https://api.hyperliquid.xyz/info`),
 interrogée directement pour les bougies, les marchés et l'information de marché.
+
+Il **vérifie le JWT du wallet** : `UserAuthGuard` porte sur ses contrôleurs d'ordres, de
+trade, d'info et de fills, et valide la signature avec le même `JWT_USER_SECRET` que
+`nest-mongo-user`. C'est donc, avec ce dernier, l'un des deux seuls destinataires légitimes
+du jeton.
 
 ---
 
@@ -96,18 +100,51 @@ l'utilisateur d'écrans qui n'avaient pas besoin de lui. Les lignes commentées 
 ⚠️ Ne pas câbler `AuthGuard` sur `/secure` en croyant réparer un oubli. Ce serait
 remplacer cette architecture par une autre.
 
-## Ce qui ne suit pas cette philosophie : le jeton part partout
+## À qui le jeton a le droit d'être montré
 
-Le filtre de l'intercepteur est « l'URL ne finit pas par `/login` », et rien d'autre. Donc
-le JWT du service utilisateur est aussi envoyé au bot, au gateway, et à
-**`api.hyperliquid.xyz`** — un tiers qui n'en a aucun usage, mais qui le reçoit et peut le
-journaliser.
+**Deux services le valident, et l'intercepteur ne le joint qu'à eux :**
 
-Mesuré le 2026-09-29 par un test qui décrit cet état sans le cautionner
-(`auth.interceptor.spec.ts`, cas marqué ⚠️). La correction serait de restreindre l'en-tête
-à `userServiceUrl` ; elle n'a pas été faite, parce que ce serait un changement de
-comportement et que le comportement actuel n'a pas été demandé à changer. Le test tombera
-le jour où on s'y met : c'est son rôle.
+| Service                    | Reçoit le jeton | Pourquoi                                                                                           |
+| -------------------------- | --------------- | -------------------------------------------------------------------------------------------------- |
+| `nest-mongo-user`          | **oui**         | il l'émet, et il le vérifie sur `/auth/me` et `/auth/strategy`                                     |
+| `nest-hyperliquid-gateway` | **oui**         | `UserAuthGuard` sur ses contrôleurs d'ordres, de trade, d'info et de fills, même `JWT_USER_SECRET` |
+| `nest-trading-bot`         | non             | aucun garde sur les routes consommées ici                                                          |
+| `api.hyperliquid.xyz`      | **non**         | un tiers                                                                                           |
+
+Jusqu'au 2026-09-29, il partait vers **les quatre** : le seul filtre était « l'URL ne finit
+pas par `/login` », sans aucune notion de destinataire. Le JWT du wallet était donc transmis
+à `api.hyperliquid.xyz` à chaque bougie et chaque appel de marché — un jeton remis à un
+tiers est un jeton qu'on ne contrôle plus, il vit désormais dans ses journaux.
+
+⚠️ Le réflexe naïf — « restreindre au service utilisateur » — **aurait cassé le trading**,
+le gateway validant le même jeton. C'est la lecture de `user-auth.guard.ts` dans son dépôt
+qui l'a évité, pas le raisonnement.
+
+Vérifié à l'exécution le 2026-09-29, en observant les en-têtes réellement émis :
+`localhost:3010` les reçoit, `localhost:3001` et `api.hyperliquid.xyz` ne les reçoivent
+plus. Le gateway n'a pas été sollicité — ses seuls appelants sont le formulaire d'ordre et
+le détail d'un ordre — et reste couvert par `auth.interceptor.spec.ts`, dont une mutation
+retirant le gateway de la liste fait rougir la suite.
+
+### Comment le destinataire est reconnu
+
+Pas « l'une des deux bases de confiance préfixe l'URL » : **celui des quatre services dont
+la base correspond le plus longuement**, puis on regarde s'il valide le jeton.
+
+La nuance ne se voit pas en développement, où chaque service a son port. Elle décide en
+production, où les topologies sont variées — et neuf d'entre elles ont été confrontées à
+l'implémentation avant d'être figées en tests :
+
+| Topologie                                                                   | Ce qu'elle change                                                                                                 |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| sous-domaines distincts (`user.`, `gateway.`, `bot.`)                       | rien, le cas facile                                                                                               |
+| un seul hôte, préfixes de chemin (`/user`, `/gateway`, `/bot`)              | rien                                                                                                              |
+| **un service à la racine d'un hôte, un autre sous un chemin du même hôte**  | ⚠️ la comparaison naïve donnait le jeton au bot, dont l'URL commence bel et bien par celle du service utilisateur |
+| **l'API publique relayée sous un chemin de confiance** (contournement CORS) | ⚠️ sans elle dans l'arbitrage, le proxy héritait de la confiance de son hôte                                      |
+| barres finales dans la configuration, port explicite                        | rien, normalisés                                                                                                  |
+| **deux services sur exactement la même base**                               | à égalité on ne devine pas : le jeton ne part pas                                                                 |
+| domaine sosie (`user.mondomaine.fr.attaquant.net`)                          | rejeté par la frontière sur le `/`                                                                                |
+| **rien de configuré**, URL relative                                         | une base vide est refusée, sans quoi `startsWith('/')` livrerait tout `/assets/…`                                 |
 
 ---
 
