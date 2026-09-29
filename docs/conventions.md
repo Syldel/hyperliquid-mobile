@@ -103,7 +103,23 @@ protection des positions et les secrets ne se cassent pas.
 
 # Écriture
 
-**Commentaires en français, identifiants en anglais, messages de commit en anglais.**
+**Le code s'écrit en anglais. Seuls les commentaires sont en français.**
+
+La frontière passe entre ce qui _s'exécute ou se lit comme du code_ et ce qui
+_l'explique_. Est du code, donc en anglais :
+
+- identifiants — variables, fonctions, classes, champs, fichiers, dossiers ;
+- **libellés de test** : `describe`, `it`, `test`. Ce sont les noms de la suite, ils se
+  lisent dans une sortie de CI ;
+- messages de journal, d'erreur et d'exception, libellés d'interface ;
+- messages de commit, titres et descriptions de PR.
+
+Est de l'explication, donc en français : les commentaires, les blocs d'en-tête de module,
+et les `docs/`.
+
+Le piège est dans les libellés de test, parce qu'ils ressemblent à des phrases. Relevé le
+2026-09-29 : 43 specs sur 46 étaient en anglais, trois avaient dérivé — dont une écrite le
+jour même. Un `it()` en français se voit mal à la relecture et pas du tout au compilateur.
 
 Un commentaire explique _pourquoi_, jamais _quoi_ — de préférence l'incident ou la
 contrainte qui a dicté le choix. Les commentaires de ce dépôt servent beaucoup à ça :

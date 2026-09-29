@@ -162,13 +162,16 @@ l'usage établi reste le chemin relatif (`../../../strategies/...`).
 
 ## Conventions de code
 
-Les commentaires sont **en français**, les identifiants en anglais, les messages de
-commit en anglais. Un commentaire explique _pourquoi_, pas _quoi_ — de préférence
-l'incident ou la contrainte qui a dicté le choix.
+**Le code s'écrit en anglais, seuls les commentaires sont en français.** Identifiants,
+**libellés de `describe` et `it`**, messages de journal et d'erreur, libellés d'interface,
+messages de commit : anglais. Commentaires, blocs d'en-tête et `docs/` : français. Un
+commentaire explique _pourquoi_, pas _quoi_ — de préférence l'incident ou la contrainte qui
+a dicté le choix. Le piège est dans les libellés de test, qui ressemblent à des phrases :
+voir [docs/conventions.md](docs/conventions.md#écriture).
 
-Composants standalone, `ChangeDetectionStrategy.OnPush`, signaux (`signal`, `computed`,
-`input()`). Les modales Ionic reçoivent leurs entrées via
-`componentProps: { x: () => valeur }`.
+Composants standalone, signaux (`signal`, `computed`, `input()`) — la primitive à choisir
+selon ce qu'on écrit est dans [docs/angular.md](docs/angular.md). Les modales Ionic
+reçoivent leurs entrées via `componentProps: { x: () => valeur }`.
 
 La logique métier va dans `domain/`, en fonctions pures testées ; les composants
 orchestrent. Un effet ne sert qu'à _dériver_ : hydrater un formulaire depuis une entrée

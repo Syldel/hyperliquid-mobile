@@ -51,7 +51,7 @@ const pairWith = (entries: ProtectiveOrderEntry[], enabled?: boolean): TradingPa
   },
 });
 
-describe('ProtectiveModalComponent — ce que sauver préserve', () => {
+describe('ProtectiveModalComponent — what saving preserves', () => {
   let fixture: ComponentFixture<ProtectiveModalComponent>;
   let component: ProtectiveModalComponent;
   let modalCtrl: { dismissed: { data: unknown; role?: string }[] };
@@ -223,7 +223,7 @@ describe('ProtectiveModalComponent — ce que sauver préserve', () => {
     expect(modalCtrl.dismissed).toHaveLength(0);
   });
 
-  describe("le retour de la modale d'ancre", () => {
+  describe('what the anchor modal hands back', () => {
     /** Une modale qui rend ce qu'on lui dit de rendre, sans rien afficher. */
     function anchorModalReturning(data: PriceAnchor | null, role: string) {
       vi.spyOn(
@@ -256,7 +256,7 @@ describe('ProtectiveModalComponent — ce que sauver préserve', () => {
     });
   });
 
-  describe('ce que la modale dit de la configuration saisie', () => {
+  describe('what the modal says about the configuration entered', () => {
     // Le verdict n'est pas recalcule ici : c'est `adviseProtection`, la meme
     // fonction dont le bot journalise la sortie. Ce qui est eprouve, c'est le
     // branchement — et surtout qu'il juge **chaque** entree, pas la premiere.

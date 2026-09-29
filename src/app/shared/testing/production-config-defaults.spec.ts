@@ -9,16 +9,16 @@ import { describe, expect, it } from 'vitest';
  * interrogerait la machine d'un développeur, et l'échec réseau qui s'ensuit ne nomme pas
  * sa cause. D'où ces invariants, à tenir des deux côtés du `fileReplacements`.
  */
-describe('amorçage de la configuration par environnement', () => {
+describe('configuration bootstrap per environment', () => {
   const serviceUrls = ['userServiceUrl', 'hyperliquidGatewayUrl', 'botServiceUrl'] as const;
 
-  it("n'expose aucune URL de service dans le build de production", () => {
+  it('exposes no service URL in the production build', () => {
     for (const key of serviceUrls) {
       expect(prodEnvironment.defaultConfig[key]).toBe('');
     }
   });
 
-  it("garde la seule URL universelle — l'API publique Hyperliquid — dans les deux builds", () => {
+  it('keeps the one universal URL — the public Hyperliquid API — in both builds', () => {
     // Elle n'appartient à personne : c'est le même point d'entrée en dev et en prod.
     expect(prodEnvironment.defaultConfig.hyperliquidPublicUrl).toBe('https://api.hyperliquid.xyz');
     expect(devEnvironment.defaultConfig.hyperliquidPublicUrl).toBe(
@@ -26,14 +26,14 @@ describe('amorçage de la configuration par environnement', () => {
     );
   });
 
-  it('pré-remplit les trois URL de service en développement', () => {
+  it('pre-fills the three service URLs in development', () => {
     // Le bénéfice recherché : un navigateur neuf n'a plus rien à semer dans le storage.
     for (const key of serviceUrls) {
       expect(devEnvironment.defaultConfig[key]).toMatch(/^http:\/\/localhost:\d+$/);
     }
   });
 
-  it('distingue les deux builds par leur drapeau production', () => {
+  it('tells the two builds apart by their production flag', () => {
     // Si ce drapeau se désaligne, c'est que le mauvais fichier a été édité.
     expect(devEnvironment.production).toBe(false);
     expect(prodEnvironment.production).toBe(true);
