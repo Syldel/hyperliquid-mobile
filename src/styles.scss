@@ -96,6 +96,34 @@ ion-content.ion-padding ion-list.list-inset:first-of-type {
   margin-top: 0;
 }
 
+/* Deux gris secondaires d'Ionic passaient juste sous le seuil AA en thème
+   clair — 4,47:1 et 4,45:1 pour 4,5 exigés — et tombaient tous deux sur le même
+   `#777777`. Les deux corrections valent dans les **deux** thèmes : l'échelle
+   `--ion-text-color-step-*` s'éloigne du fond quand le palier baisse, et
+   remonter l'opacité d'un placeholder l'éloigne du fond dans les deux sens.
+   Rien à cantonner au sombre, donc. Mesuré le 2026-09-29. */
+
+/* Le `p` d'une `ion-label` — ici « Ratio: 20% · Interval: 60 » sous chaque
+   paire — prend `--ion-text-color-step-400`. Un cran plus près du texte donne
+   5,24:1.
+
+   Le sélecteur porte `.item` pour une seule raison : Ionic peint ce `p` depuis
+   `.sc-ion-label-md-s p`, et un `ion-label p` nu perd le calcul de spécificité.
+   ⚠️ Si une mise à jour d'Ionic renomme cette classe interne, c'est cette règle
+   qui cesse de s'appliquer — sans rien casser, mais sans plus rien corriger. */
+.item ion-label p {
+  color: var(--ion-text-color-step-350);
+}
+
+/* Le placeholder d'une `ion-select` est `currentColor` à 60 %, ce qui donne
+   `#777777` sur fond clair. `--ion-placeholder-opacity` est la variable de
+   thème qu'Ionic expose pour ça (`:host { --placeholder-opacity:
+   var(--ion-placeholder-opacity, 0.6) }`), et 0,65 suffit : 5,24:1 en clair.
+   Au-delà, le placeholder se confond avec une valeur réellement choisie. */
+:root {
+  --ion-placeholder-opacity: 0.65;
+}
+
 .tv-attr-logo,
 a[href*='tradingview.com'] {
   display: none !important;

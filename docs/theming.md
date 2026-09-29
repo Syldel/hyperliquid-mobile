@@ -101,7 +101,7 @@ combats de spécificité contre `:root:not(.dark-theme):not(.light-theme)` et
 rend des chiffres faux. Recoupement : la reconstitution retrouve à l'identique
 les 1,10 et 2,09 relevés en début de séance, avant toute modification.
 
-## Quatre pièges de couleur, et ce qu'ils ont coûté
+## Cinq pièges de couleur, et ce qu'ils ont coûté
 
 ### Le `shade` d'Ionic va dans le mauvais sens en thème sombre
 
@@ -139,6 +139,35 @@ elle couvre d'un coup les deux composants qui recopient ce bandeau.
 
 Un `shade` n'est pas condamné pour autant : celui de `warning` (`#e0b52b`) tient
 6,56:1 en sombre. C'est la marge de la couleur qui décide, pas le principe.
+
+### Deux gris d'Ionic à 1 % du seuil
+
+Le `p` secondaire d'une `ion-label` — « Ratio: 20% · Interval: 60 » sous chaque
+paire — prend `--ion-text-color-step-400`, et le placeholder d'une `ion-select`
+prend `currentColor` à 60 %. Sur fond clair les deux tombent sur le **même**
+`#777777` : 4,47:1 et 4,45:1, pour 4,5 exigés.
+
+Les deux corrections valent dans les **deux** thèmes, donc rien à cantonner au
+sombre — l'échelle `--ion-text-color-step-*` s'éloigne du fond quand le palier
+baisse, et remonter l'opacité d'un placeholder l'éloigne du fond dans les deux
+sens :
+
+|                                    | avant |    après |
+| ---------------------------------- | ----: | -------: |
+| `p` d'`ion-label`, clair           |  4,47 | **5,24** |
+| `p` d'`ion-label`, sombre          |  6,83 |     7,75 |
+| placeholder d'`ion-select`, clair  |  4,45 | **5,24** |
+| placeholder d'`ion-select`, sombre |  6,80 |     7,75 |
+
+Le placeholder passe par `--ion-placeholder-opacity`, la variable de thème
+qu'Ionic expose pour ça, portée de 0,6 à 0,65 — au-delà il se confond avec une
+valeur réellement choisie.
+
+⚠️ Le `p`, lui, n'a pas de crochet de thème : il faut **sortir un sélecteur plus
+spécifique** que le `.sc-ion-label-md-s p` d'Ionic. `ion-label p` perd le calcul,
+`.item ion-label p` le gagne — vérifié, avec `ion-item ion-label p` et
+`:where(ion-item) ion-label p` qui perdent aussi. Si une version d'Ionic renomme
+cette classe interne, la règle cesse simplement de s'appliquer.
 
 ### Une `opacity` ne remplace pas un rôle
 
@@ -220,11 +249,12 @@ mauvaise direction ne coûte rien.
   la valeur par défaut d'Ionic, jamais reprise par l'app, et elle est illisible
   en clair pour du texte. Non corrigée : changer une couleur de marque est une
   décision, pas un correctif.
-- **`--ion-text-color-step-400`** (`#777777`) sert du texte d'explication à
-  4,06–4,47:1 en clair. Juste sous le seuil.
-- **Encore des `opacity` sur du texte, en clair** : `ion-badge` est passé à 0,75
-  globalement (`.prot-badge` tombe à 3,84:1 sur son fond rouge) et `.select-text`
-  à 0,6 (4,45:1). Même travers que celui décrit plus haut, pas encore traité.
+- Les `opacity` restantes n'ont pas pu être mesurées, faute de données :
+  `.expression-placement` (11 px à 0,6), `&__abs` (12 px à 0,7) et
+  `.expression-gaps` (0,75) vivent dans la watchlist, vide ; `.unsupported`
+  (0,7) et `.dimmed` (0,5) dans le constructeur de règles, sans stratégie
+  enregistrée. Ces deux dernières signalent un **état**, comme un contrôle
+  désactivé — à trancher plutôt qu'à corriger d'office.
 - Deux feuilles dépassent le budget de 4 kB d'Angular
   (`protective-modal.component.scss`, `watchlist-detail.page.scss`). Le
   dépassement **préexistait** — 4581 et 4922 octets compilés compressés à
@@ -235,11 +265,16 @@ mauvaise direction ne coûte rien.
 Le contraste ne s'apprécie pas à l'œil : il se calcule. Dans la console du
 navigateur, une sonde qui compose le fond réel (en remontant les parents
 transparents) et tient compte des `opacity` empilées suffit — c'est ce qui a
-produit tous les chiffres de cette page. Deux erreurs à éviter, toutes deux
-commises ici avant d'être corrigées :
+produit tous les chiffres de cette page. Trois erreurs à éviter, toutes commises
+ici avant d'être corrigées :
 
 - **oublier l'`opacity`** : `getComputedStyle(el).color` ne la reflète pas. Un
   texte annoncé à 5,39:1 en valait 2,87 à l'écran ;
+- **ne la faire porter qu'au texte.** `opacity` compose **tout le sous-arbre**,
+  fond compris, par-dessus ce qui se trouve _hors_ du groupe. Un élément qui a à
+  la fois une opacité et son propre fond voit les deux pâlir ensemble, et leur
+  contraste mutuel se dégrade bien plus lentement. C'est ce qui a fait accuser à
+  tort l'`opacity: 0.75` d'`ion-badge` : annoncée à 3,84:1, elle en vaut 4,56 ;
 - **croire un élément replié** : un titre dans un menu fermé mesure 0 × 0 et se
   compare alors au fond de la page, pas au sien. Vérifier `getBoundingClientRect`
   avant de conclure — un « 1,25:1 » s'est révélé être du noir sur `#4db5a5`,
