@@ -7,6 +7,7 @@ import {
   inject,
   input,
   OnInit,
+  resource,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
@@ -44,6 +45,7 @@ import {
 } from '@ionic/angular/standalone';
 import { TradingPair } from '@models/user.interface';
 import { AvailableCapitalService } from '@services/available-capital.service';
+import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { BotService } from '@services/bot.service';
 import { MarketPickerModalComponent } from '@shared/components/market-picker-modal/market-picker-modal.component';
 import {
@@ -89,6 +91,13 @@ import {
   offeredStrategies,
   resolveStrategyMeta,
 } from '../../domain/exchange-catalogue.util';
+import {
+  dexLabel,
+  dexToLoadFor,
+  isKnownUnexecutableMarket,
+  pairMarketStatus,
+  type PairMarketStatus,
+} from '../../domain/pair-market-status.util';
 import {
   isKnownUnexecutable,
   pairStrategyStatus,
@@ -145,6 +154,7 @@ export class TradingPairModalComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
   private readonly availableCapitalService = inject(AvailableCapitalService);
+  private readonly hlMarket = inject(HyperliquidMarketService);
   private readonly library = inject(StrategyLibraryService);
 
   /** Voir `prefillFromEditedPair` : l'hydratation n'a lieu qu'une fois. */
@@ -301,6 +311,55 @@ export class TradingPairModalComponent implements OnInit {
    */
   readonly showStalledStrategy = computed(
     () => isKnownUnexecutable(this.storedStrategyStatus()) && !this.formValue().strategy,
+  );
+
+  // ------------------------------------------------------------------ //
+  //  Market liveness
+  // ------------------------------------------------------------------ //
+
+  /**
+   * ⚠️ Contrairement à `storedStrategyStatus`, ce verdict porte sur la paire
+   * **du formulaire** et non sur celle qui est enregistrée, et c'est délibéré.
+   *
+   * La bannière de stratégie décrit un sélecteur vide, donc elle doit parler de
+   * ce qui est enregistré et s'effacer dès qu'on choisit. Ici il n'y a rien à
+   * réparer en dessous : la bannière décrit le marché **qu'on s'apprête à
+   * enregistrer**. Juger la valeur du formulaire couvre donc deux cas d'un
+   * coup — ouvrir une paire déjà morte, et en choisir une morte à la création,
+   * que le sélecteur signale mais que rien ne rappelait ensuite.
+   */
+  private readonly marketMeta = resource({
+    params: computed(
+      () => {
+        const dex = dexToLoadFor(this.formValue().pairName ?? '');
+        return dex === null ? undefined : { dex };
+      },
+      { equal: (a, b) => a?.dex === b?.dex },
+    ),
+    loader: async ({ params }) => ({
+      dexes: await firstValueFrom(this.hlMarket.getPerpDexs()),
+      universe: (await firstValueFrom(this.hlMarket.getPerpMeta(params.dex))).universe,
+    }),
+  });
+
+  readonly marketStatus = computed<PairMarketStatus>(() => {
+    const pairName = this.formValue().pairName ?? '';
+    const meta = this.marketMeta.value();
+    const dex = dexToLoadFor(pairName);
+
+    return pairMarketStatus(pairName, {
+      dexNames: meta ? meta.dexes.flatMap((entry) => (entry ? [entry.name] : [])) : null,
+      universeByDex: meta && dex !== null ? new Map([[dex, meta.universe]]) : new Map(),
+    });
+  });
+
+  readonly showDeadMarket = computed(() => isKnownUnexecutableMarket(this.marketStatus()));
+
+  readonly marketDexName = computed(() =>
+    dexLabel(
+      dexToLoadFor(this.formValue().pairName ?? '') ?? '',
+      this.marketMeta.value()?.dexes ?? null,
+    ),
   );
 
   /**

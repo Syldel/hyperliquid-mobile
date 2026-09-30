@@ -62,6 +62,41 @@
       @if (form.get('pairName')?.hasError('pairNameExists')) {
         <ion-note color="danger">This pair already exists for this exchange</ion-note>
       }
+      <!-- Le marché se juge sur la valeur du formulaire, pas sur la paire
+           enregistrée : la bannière décrit ce qu'on s'apprête à enregistrer. -->
+      @if (showDeadMarket()) {
+        <div class="stalled">
+          <ion-icon name="alert-circle-outline" aria-hidden="true" />
+          <div class="stalled__text">
+            <strong class="stalled__title">
+              {{
+                marketStatus() === 'delisted'
+                  ? 'This market is delisted'
+                  : 'This market does not exist'
+              }}
+            </strong>
+            <span class="stalled__why">
+              @if (marketStatus() === 'delisted') {
+                @if (marketDexName()) {
+                  {{ marketDexName() }} has wound down its markets, and Hyperliquid no longer lists
+                  “{{ formValue().pairName }}”.
+                } @else {
+                  Hyperliquid no longer lists “{{ formValue().pairName }}”.
+                }
+                It can no longer trade — no entry, no exit, no signal.
+              } @else {
+                @if (marketDexName()) {
+                  {{ marketDexName() }} does not carry “{{ formValue().pairName }}”.
+                } @else {
+                  No exchange catalogue carries “{{ formValue().pairName }}”.
+                }
+                The bot has nothing to route this pair on.
+              }
+              Pick another market above, or close without saving.
+            </span>
+          </div>
+        </div>
+      }
     </ion-list>
 
     <!-- Strategy -->
