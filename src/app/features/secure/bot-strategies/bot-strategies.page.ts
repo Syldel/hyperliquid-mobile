@@ -1,5 +1,5 @@
 import { TitleCasePipe, UpperCasePipe } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, resource, signal } from '@angular/core';
 import {
   IonBadge,
   IonFab,
@@ -18,6 +18,7 @@ import {
 } from '@ionic/angular/standalone';
 import { TradingPair } from '@models/user.interface';
 import { BotService } from '@services/bot.service';
+import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { UserService } from '@services/user.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
@@ -32,7 +33,7 @@ import {
   trendingDownOutline,
   trendingUpOutline,
 } from 'ionicons/icons';
-import { debounceTime, Subject, switchMap } from 'rxjs';
+import { debounceTime, firstValueFrom, Subject, switchMap } from 'rxjs';
 import {
   ProtectiveModalComponent,
   ProtectiveModalResult,
@@ -41,6 +42,15 @@ import {
   TradingPairModalComponent,
   TradingPairModalResult,
 } from './components/trading-pair-modal/trading-pair-modal.component';
+import {
+  dexesToLoad,
+  dexLabel,
+  dexToLoadFor,
+  isKnownUnexecutableMarket,
+  pairMarketStatus,
+  type PairMarketStatus,
+  type PerpMarketCatalogue,
+} from './domain/pair-market-status.util';
 import {
   isKnownUnexecutable,
   pairStrategyStatus,
@@ -75,6 +85,7 @@ export class BotStrategiesPage extends MenuBasePage {
   private readonly userService = inject(UserService);
   private readonly modalCtrl = inject(ModalController);
   private readonly botService = inject(BotService);
+  private readonly hlMarket = inject(HyperliquidMarketService);
 
   user = signal<ExternalUser | null>(null);
   fetchFn = () => this.userService.getMe();
@@ -132,9 +143,89 @@ export class BotStrategiesPage extends MenuBasePage {
     return pairStrategyStatus(pair.strategy, catalogue ? (catalogue[exchangeKey] ?? []) : null);
   }
 
-  /** `true` quand ce build est certain que le bot laisse cette paire de côté. */
+  /**
+   * `true` quand ce build est certain que le bot laisse cette paire de côté,
+   * **quelle qu'en soit la raison** — marché éteint ou stratégie inconnue.
+   */
   notRunnable(exchangeKey: string, pair: TradingPair): boolean {
-    return isKnownUnexecutable(this.strategyStatus(exchangeKey, pair));
+    return (
+      isKnownUnexecutableMarket(this.marketStatus(pair)) ||
+      isKnownUnexecutable(this.strategyStatus(exchangeKey, pair))
+    );
+  }
+
+  // ------------------------------------------------------------------ //
+  //  Market liveness
+  // ------------------------------------------------------------------ //
+
+  /**
+   * Les dex à interroger pour juger les paires configurées, dédoublonnés.
+   *
+   * L'`equal` explicite n'est pas décoratif : `botEntries` se recalcule à
+   * chaque basculement de toggle, et sans lui chaque clic relancerait le
+   * chargement des univers — donc des requêtes vers Hyperliquid pour une
+   * réponse identique.
+   */
+  private readonly requiredDexes = computed(
+    () => dexesToLoad(this.botEntries().flatMap((entry) => entry.value.pairs.map((p) => p.name))),
+    { equal: (a, b) => a.length === b.length && a.every((dex, i) => dex === b[i]) },
+  );
+
+  /**
+   * ⚠️ Lecture seule, donc un `resource()` est le bon outil ici — l'interdit
+   * de `docs/angular.md` ne vise que les **ordres**, qu'une annulation en vol
+   * laisserait dans un état inconnu.
+   *
+   * Des `params` à `undefined` tant qu'aucune paire n'est configurée : sans
+   * ça, un compte vide déclencherait quand même un appel `perpDexs`.
+   */
+  private readonly marketMeta = resource({
+    params: computed(
+      () => {
+        const dexes = this.requiredDexes();
+        return dexes.length ? { dexes } : undefined;
+      },
+      { equal: (a, b) => a?.dexes === b?.dexes },
+    ),
+    loader: async ({ params }) => {
+      const dexes = await firstValueFrom(this.hlMarket.getPerpDexs());
+      const universes = await Promise.all(
+        params.dexes.map(
+          async (dex) =>
+            [dex, (await firstValueFrom(this.hlMarket.getPerpMeta(dex))).universe] as const,
+        ),
+      );
+
+      return { dexes, universeByDex: new Map(universes) };
+    },
+  });
+
+  /**
+   * Le catalogue sous la forme qu'attend le domaine. Tant que la réponse n'est
+   * pas là, `dexNames: null` fait rendre `unverified` et rien n'est signalé —
+   * même règle que le statut de stratégie : une coupure réseau ne doit pas
+   * allumer toutes les paires en rouge.
+   */
+  private readonly marketCatalogue = computed<PerpMarketCatalogue>(() => {
+    const meta = this.marketMeta.value();
+
+    return {
+      dexNames: meta ? meta.dexes.flatMap((dex) => (dex ? [dex.name] : [])) : null,
+      universeByDex: meta?.universeByDex ?? new Map(),
+    };
+  });
+
+  /** Le marché de cette paire existe-t-il encore, et peut-on encore le savoir ? */
+  marketStatus(pair: TradingPair): PairMarketStatus {
+    return pairMarketStatus(pair.name, this.marketCatalogue());
+  }
+
+  /**
+   * Le nom lisible du dex de cette paire (« Ventuals »), ou `null` quand on ne
+   * l'a pas — le libellé reste alors générique au lieu d'inventer un nom.
+   */
+  marketDexLabel(pair: TradingPair): string | null {
+    return dexLabel(dexToLoadFor(pair.name) ?? '', this.marketMeta.value()?.dexes ?? null);
   }
 
   /**

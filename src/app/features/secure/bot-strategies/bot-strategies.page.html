@@ -18,7 +18,9 @@
       </ion-item-divider>
 
       @for (pair of entry.value.pairs; track pair.name) { @let status = strategyStatus(entry.key,
-      pair); @let notRunning = notRunnable(entry.key, pair);
+      pair); @let notRunning = notRunnable(entry.key, pair); @let market = marketStatus(pair); @let
+      deadMarket = market === 'delisted' || market === 'unknown-market'; @let dexName =
+      marketDexLabel(pair);
       <ion-item-sliding>
         <ion-item [class.pair--stalled]="notRunning">
           <ion-label>
@@ -35,22 +37,36 @@
               type="button"
               class="stalled"
               (click)="fixPair(entry.key, pair, $event)"
-              [attr.aria-label]="'Fix the strategy of ' + pair.name"
+              [attr.aria-label]="(deadMarket ? 'Fix the market of ' : 'Fix the strategy of ') + pair.name"
             >
               <ion-icon name="alert-circle-outline" aria-hidden="true" />
               <span class="stalled__text">
+                <!-- Le motif de marché prime : sans marché, la question de la stratégie
+                     ne se pose plus. -->
                 <strong class="stalled__title">
-                  {{ pair.enabled ? 'Enabled, but the bot is not running it' : 'Not runnable as
-                  configured' }}
+                  @if (market === 'delisted') { {{ pair.enabled ? 'Enabled, but this market is
+                  delisted' : 'This market is delisted' }} } @else if (market === 'unknown-market')
+                  { {{ pair.enabled ? 'Enabled, but this market does not exist' : 'This market does
+                  not exist' }} } @else { {{ pair.enabled ? 'Enabled, but the bot is not running it'
+                  : 'Not runnable as configured' }} }
                 </strong>
                 <span class="stalled__why">
-                  @if (status === 'missing-shortname') { @if (pair.strategy?.name) { Its saved
-                  strategy “{{ pair.strategy?.name }}” carries no identifier the bot can route on. }
-                  @else { No strategy is saved on this pair. } } @else { “{{ pair.strategy?.name }}”
-                  is no longer offered by the bot. } This pair is skipped on every cycle — no entry,
-                  no exit, no signal.
+                  @if (market === 'delisted') { @if (dexName) { {{ dexName }} has wound down its
+                  markets, and Hyperliquid no longer lists “{{ pair.name }}”. } @else { Hyperliquid
+                  no longer lists “{{ pair.name }}”. } The bot cannot enter, exit or signal on it
+                  again. } @else if (market === 'unknown-market') { @if (dexName) { {{ dexName }}
+                  does not carry “{{ pair.name }}”. } @else { No exchange catalogue carries “{{
+                  pair.name }}”. } This pair is skipped on every cycle — no entry, no exit, no
+                  signal. } @else { @if (status === 'missing-shortname') { @if (pair.strategy?.name)
+                  { Its saved strategy “{{ pair.strategy?.name }}” carries no identifier the bot can
+                  route on. } @else { No strategy is saved on this pair. } } @else { “{{
+                  pair.strategy?.name }}” is no longer offered by the bot. } This pair is skipped on
+                  every cycle — no entry, no exit, no signal. }
                 </span>
-                <span class="stalled__cta">Tap to pick a strategy the bot offers</span>
+                <span class="stalled__cta">
+                  {{ deadMarket ? 'Tap to change the pair or remove it' : 'Tap to pick a strategy
+                  the bot offers' }}
+                </span>
               </span>
             </button>
             }
