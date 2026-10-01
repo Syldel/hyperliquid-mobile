@@ -324,6 +324,11 @@
             }
           </ion-note>
         }
+        <!-- Cet écran masquait la ligne quand le capital manquait ; il dit
+             désormais pourquoi, comme le formulaire d'ordre. -->
+        @if (!isLoadingCapital() && capitalGap(); as gap) {
+          <ion-note class="ratio__usd ratio__gap" color="medium">{{ gap }}</ion-note>
+        }
       </ion-label>
       <ion-item>
         <ion-range

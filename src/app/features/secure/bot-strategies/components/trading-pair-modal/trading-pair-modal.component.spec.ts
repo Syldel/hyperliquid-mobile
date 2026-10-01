@@ -82,7 +82,10 @@ describe('TradingPairModalComponent prefill', () => {
         },
         {
           provide: AvailableCapitalService,
-          useValue: { getAvailableCapital: () => of(1000) },
+          useValue: {
+            // La forme réelle du service : un statut, puis un montant.
+            getAvailableCapital: () => of({ status: 'ok', asset: 'USDC', amount: 1000 }),
+          },
         },
       ],
     });
@@ -211,7 +214,10 @@ describe('TradingPairModalComponent stalled strategy notice', () => {
         },
         {
           provide: AvailableCapitalService,
-          useValue: { getAvailableCapital: () => of(1000) },
+          useValue: {
+            // La forme réelle du service : un statut, puis un montant.
+            getAvailableCapital: () => of({ status: 'ok', asset: 'USDC', amount: 1000 }),
+          },
         },
       ],
     });
@@ -321,7 +327,10 @@ describe('TradingPairModalComponent exchange-scoped catalogue', () => {
         },
         {
           provide: AvailableCapitalService,
-          useValue: { getAvailableCapital: () => of(1000) },
+          useValue: {
+            // La forme réelle du service : un statut, puis un montant.
+            getAvailableCapital: () => of({ status: 'ok', asset: 'USDC', amount: 1000 }),
+          },
         },
       ],
     });

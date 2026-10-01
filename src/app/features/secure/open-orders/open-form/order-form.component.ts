@@ -26,6 +26,7 @@ import {
   ToastController,
 } from '@ionic/angular/standalone';
 import { AvailableCapitalService } from '@services/available-capital.service';
+import { describeCapitalGap, type AvailableCapital } from '@utils/available-capital.utils';
 import { HyperliquidGatewayService } from '@services/hyperliquid-gateway.service';
 import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
@@ -190,7 +191,16 @@ export class OrderFormComponent implements OnInit {
   error = signal<string | null>(null);
 
   coinTitle = signal('—');
-  availableCapital = signal<number | null>(null);
+  availableCapital = signal<AvailableCapital | null>(null);
+
+  /** Le montant lu, ou `null` — un statut sans montant ne s'affiche pas comme un chiffre. */
+  readonly capitalAmount = computed(() => {
+    const capital = this.availableCapital();
+    return capital?.status === 'ok' ? capital.amount : null;
+  });
+
+  /** Et la phrase qui dit pourquoi, quand il n'y a pas de chiffre. */
+  readonly capitalGap = computed(() => describeCapitalGap(this.availableCapital()));
 
   isModify = computed(() => this.mode() === 'modify');
 
@@ -347,10 +357,11 @@ export class OrderFormComponent implements OnInit {
       this.availableCapital.set(null);
       return;
     }
-    const dex = this.hlMarket.extractDex(pairName);
-    this.availableCapitalService.getAvailableCapital(dex, pairName).subscribe({
+    // Le dex ne s'extrait plus du nom : le gateway résout le collatéral depuis
+    // le catalogue, lui seul sait de quel dex relève le marché.
+    this.availableCapitalService.getAvailableCapital(pairName).subscribe({
       next: (capital) => this.availableCapital.set(capital),
-      error: () => this.availableCapital.set(null),
+      error: () => this.availableCapital.set({ status: 'unavailable' }),
     });
   }
 

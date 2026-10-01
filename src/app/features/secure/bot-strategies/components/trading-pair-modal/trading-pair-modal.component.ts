@@ -45,6 +45,7 @@ import {
 } from '@ionic/angular/standalone';
 import { TradingPair } from '@models/user.interface';
 import { AvailableCapitalService } from '@services/available-capital.service';
+import { describeCapitalGap, type AvailableCapital } from '@utils/available-capital.utils';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { BotService } from '@services/bot.service';
 import { MarketPickerModalComponent } from '@shared/components/market-picker-modal/market-picker-modal.component';
@@ -557,14 +558,13 @@ export class TradingPairModalComponent implements OnInit {
     if (meta) this.form.patchValue({ strategy: meta });
   }
 
-  availableCapital = signal<number | null>(null);
+  availableCapital = signal<AvailableCapital | null>(null);
   isLoadingCapital = signal(false);
 
-  private extractDex(pairName: string): string {
-    const parts = pairName.split(':');
-    return parts.length > 1 ? parts[0] : '';
-  }
-
+  /**
+   * Le dex ne s'extrait plus du nom : le gateway résout le collatéral depuis le
+   * catalogue, et c'est lui qui sait de quel dex relève le marché.
+   */
   private loadCapital(exchangeKey: string, pairName: string): void {
     if (!pairName) {
       this.availableCapital.set(null);
@@ -572,16 +572,14 @@ export class TradingPairModalComponent implements OnInit {
     }
 
     if (exchangeKey === 'hyperliquid') {
-      const dex = this.extractDex(pairName);
-
       this.isLoadingCapital.set(true);
       this.availableCapitalService
-        .getAvailableCapital(dex, pairName)
+        .getAvailableCapital(pairName)
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
           next: (capital) => this.availableCapital.set(capital),
           error: () => {
-            this.availableCapital.set(null);
+            this.availableCapital.set({ status: 'unavailable' });
             this.isLoadingCapital.set(false);
           },
           complete: () => this.isLoadingCapital.set(false),
@@ -591,12 +589,16 @@ export class TradingPairModalComponent implements OnInit {
     }
   }
 
+  /** Le montant que le ratio représente, ou `null` quand le capital n'est pas un nombre connu. */
   readonly ratioInUsd = computed(() => {
     const capital = this.availableCapital();
     const ratio = this.formValue().ratio;
-    if (capital === null || !ratio) return null;
-    return (capital * ratio) / 100;
+    if (capital?.status !== 'ok' || !ratio) return null;
+    return (capital.amount * ratio) / 100;
   });
+
+  /** Ce que l'écran doit dire quand il n'y a pas de montant à afficher. */
+  readonly capitalGap = computed(() => describeCapitalGap(this.availableCapital()));
 
   // ------------------------------------------------------------------
   //  Dynamic params form builder

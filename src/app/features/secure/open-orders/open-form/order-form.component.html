@@ -88,9 +88,16 @@
               <div class="current-price-hint" [class]="sizeUsdClass()">
                 ≈ {{ usd | number: '1.2-2' }} $
                 <span class="available-capital">
-                  / {{ (availableCapital() | number: '1.2-2') ?? '?' }} $
+                  @if (capitalAmount() !== null) {
+                    / {{ capitalAmount() | number: '1.2-2' }} $
+                  }
                 </span>
               </div>
+            }
+            <!-- Le motif remplace le `?` d'avant, qui ne disait pas lequel des
+                 quatre cas s'était produit. -->
+            @if (capitalGap(); as gap) {
+              <div class="current-price-hint capital-gap">{{ gap }}</div>
             }
             @if (activePosition(); as pos) {
               <div class="current-price-hint">

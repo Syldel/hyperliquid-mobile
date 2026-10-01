@@ -3,6 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { ConfigService } from '@services/config.service';
 import { withWalletToken } from '../interceptors/auth.interceptor';
 import {
+  CollateralBalance,
   HLCancelOrderResponse,
   HLOid,
   HLOrderDetails,
@@ -23,6 +24,30 @@ export class HyperliquidGatewayService {
       `${this.config.hyperliquidGatewayUrl}/${path}`,
       body,
       withWalletToken(),
+    );
+  }
+
+  // ── Account info ───────────────────────────────────────────────────────────
+
+  /**
+   * Le collatéral dans lequel un marché se règle, et le solde du compte dans ce
+   * collatéral.
+   *
+   * ⚠️ Cet appel vit **ici** et non dans `AvailableCapitalService` pour une
+   * raison de contrat : seuls trois fichiers ont le droit de réclamer le jeton
+   * du wallet (`wallet-token-callers.spec.ts`), et celui-ci en fait partie.
+   *
+   * Pourquoi demander plutôt que calculer : le mobile posait en dur « le compte
+   * est TOUJOURS en mode Unified Account » et lisait donc les soldes **spot**
+   * pour une paire perp. Mesuré le 2026-10-01 sur `0x7284…7083` :
+   * `userAbstraction` rend `"default"`, l'état perp vaut `0.0` et le spot
+   * `0.01079182` USDC — l'app affichait donc comme capital perp un argent qui
+   * n'en est pas. Le mode se lit, il ne se suppose pas.
+   */
+  getCollateralBalance(asset: string): Observable<CollateralBalance> {
+    return this.http.get<CollateralBalance>(
+      `${this.config.hyperliquidGatewayUrl}/hyperliquid/info/collateral-balance`,
+      { ...withWalletToken(), params: { asset } },
     );
   }
 
