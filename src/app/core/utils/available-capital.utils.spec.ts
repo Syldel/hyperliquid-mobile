@@ -75,6 +75,23 @@ describe('readAvailableCapital', () => {
     });
   });
 
+  // ⚠️ Ce mode n'a pas pu être **exercé** : le compte de développement est
+  // unifié. Ce que ce test fige, c'est que l'app relaie le refus du gateway
+  // sans le transformer en chiffre — pas que le refus soit le bon verdict sur
+  // un vrai compte en portfolio margin.
+  it('never turns a mode the gateway cannot read into an amount', () => {
+    const balance: CollateralBalance = {
+      status: 'unsupported-mode',
+      mode: 'portfolioMargin',
+      asset: 'BTC',
+    };
+
+    expect(readAvailableCapital(balance)).toEqual({
+      status: 'unsupported-mode',
+      mode: 'portfolioMargin',
+    });
+  });
+
   it('never turns an unresolved collateral into an amount', () => {
     const balance: CollateralBalance = {
       status: 'unknown-collateral',
@@ -121,6 +138,14 @@ describe('describeCapitalGap', () => {
 
   it('says the gateway is what failed, not the balance', () => {
     expect(describeCapitalGap({ status: 'unavailable' })).toContain('gateway');
+  });
+
+  // Le mode est nommé parce qu'il désigne le remède : en portfolio margin le
+  // capital existe, il s'étale simplement sur plusieurs actifs.
+  it('names the account mode it cannot read', () => {
+    expect(describeCapitalGap({ status: 'unsupported-mode', mode: 'portfolioMargin' })).toContain(
+      'portfolioMargin',
+    );
   });
 
   it('distinguishes an unreadable balance from a missing one', () => {

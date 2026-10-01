@@ -1,4 +1,4 @@
-import type { CollateralBalance } from '@syldel/hl-shared-types';
+import type { AccountAbstractionMode, CollateralBalance } from '@syldel/hl-shared-types';
 
 /**
  * ============================================================================
@@ -36,6 +36,12 @@ export type AvailableCapital =
   | { status: 'unknown-collateral' }
   /** Gateway injoignable, jeton refusé, réseau coupé — l'app n'a pas pu demander. */
   | { status: 'unavailable' }
+  /**
+   * Le compte est dans un mode dont le gateway ne sait pas lire le collatéral.
+   * Le mode est porté pour que le message le nomme : « portfolio margin » et
+   * « dex abstraction » n'appellent pas la même suite.
+   */
+  | { status: 'unsupported-mode'; mode: AccountAbstractionMode }
   /** La réponse du gateway porte des montants qui ne sont pas des nombres. */
   | { status: 'unreadable-amounts'; asset: string };
 
@@ -49,6 +55,9 @@ export type AvailableCapital =
  */
 export function readAvailableCapital(balance: CollateralBalance): AvailableCapital {
   if (balance.status === 'unknown-collateral') return { status: 'unknown-collateral' };
+  if (balance.status === 'unsupported-mode') {
+    return { status: 'unsupported-mode', mode: balance.mode };
+  }
   if (balance.status === 'no-balance-entry') {
     return { status: 'no-balance-entry', asset: balance.collateral };
   }
@@ -90,6 +99,11 @@ export function describeCapitalGap(capital: AvailableCapital | null): string | n
       return 'The exchange catalogue does not say what this market settles in';
     case 'unreadable-amounts':
       return `The ${capital.asset} balance came back unreadable`;
+    case 'unsupported-mode':
+      // Le mode est nommé parce qu'il désigne le remède : en portfolio margin
+      // le capital existe mais s'étale sur plusieurs actifs, ce que rien ici ne
+      // sait additionner.
+      return `This account is in ${capital.mode} mode, whose collateral cannot be read yet`;
     default:
       return 'Capital unavailable — the gateway could not be reached';
   }
