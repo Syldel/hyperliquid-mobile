@@ -26,21 +26,41 @@ import {
  * droit de prendre.
  */
 
-/** Le dex principal tel que l'API le rend : des noms nus, sans préfixe. */
+/**
+ * Un marché arrivé du fil avec `isDelisted: false` — forme que
+ * `hl-shared-types` interdit depuis la 0.0.22 (`isDelisted?: true`) et que
+ * l'exchange n'a jamais rendue sur les 434 marchés relevés.
+ *
+ * `JSON.parse` n'est pas un contournement du type : c'est ce que fait la
+ * réponse HTTP, qui ne vérifie rien à l'exécution. Le `?: true` empêche
+ * d'**écrire** cette forme — il ne la rend pas impossible à **recevoir**, et la
+ * lecture du drapeau doit y survivre.
+ */
+const ETH_FROM_WIRE: HLPerpMarketInfo = JSON.parse(
+  '{"name":"ETH","szDecimals":4,"maxLeverage":25,"marginTableId":55,"isDelisted":false}',
+);
+
+/**
+ * Le dex principal tel que l'API le rend : des noms nus, sans préfixe. Valeurs
+ * relevées le 2026-10-01, `marginTableId` compris — il est présent sur 434/434
+ * marchés, donc un univers qui l'omettrait ne ressemblerait à aucun vrai.
+ */
 const MAIN_UNIVERSE: HLPerpMarketInfo[] = [
-  { name: 'BTC', szDecimals: 5, maxLeverage: 40 },
-  { name: 'ETH', szDecimals: 4, maxLeverage: 25, isDelisted: false },
-  { name: 'SOL', szDecimals: 2, maxLeverage: 20 },
+  { name: 'BTC', szDecimals: 5, maxLeverage: 40, marginTableId: 56 },
+  ETH_FROM_WIRE,
+  { name: 'SOL', szDecimals: 2, maxLeverage: 20, marginTableId: 54 },
 ];
 
 /** Ventuals, relevé le 2026-09-30 : tout l'univers est délisté. */
 const VNTL_UNIVERSE: HLPerpMarketInfo[] = [
-  { name: 'vntl:ROBOT', szDecimals: 2, maxLeverage: 5, isDelisted: true },
-  { name: 'vntl:SPACEX', szDecimals: 2, maxLeverage: 5, isDelisted: true },
+  { name: 'vntl:ROBOT', szDecimals: 2, maxLeverage: 5, marginTableId: 5, isDelisted: true },
+  { name: 'vntl:SPACEX', szDecimals: 2, maxLeverage: 5, marginTableId: 5, isDelisted: true },
 ];
 
-/** Paragon, vivant au même relevé. */
-const PARA_UNIVERSE: HLPerpMarketInfo[] = [{ name: 'para:TOTAL2', szDecimals: 2, maxLeverage: 5 }];
+/** Paragon, vivant au relevé du 2026-10-01. */
+const PARA_UNIVERSE: HLPerpMarketInfo[] = [
+  { name: 'para:TOTAL2', szDecimals: 3, maxLeverage: 20, marginTableId: 20 },
+];
 
 function catalogue(over: Partial<PerpMarketCatalogue> = {}): PerpMarketCatalogue {
   return {
@@ -65,8 +85,9 @@ describe('pairMarketStatus', () => {
     expect(pairMarketStatus('BTC', catalogue())).toBe('ok');
   });
 
-  // `isDelisted` est optionnel : absent et `false` doivent se valoir.
-  it('treats an explicit isDelisted false exactly like an absent flag', () => {
+  // Le type interdit désormais d'écrire `false`, mais pas de le recevoir : ce
+  // marché vient du fil. Le drapeau se lit en vérité, pas en présence de clé.
+  it('treats an isDelisted false arriving from the wire like an absent flag', () => {
     expect(pairMarketStatus('ETH', catalogue())).toBe('ok');
   });
 
@@ -80,8 +101,10 @@ describe('pairMarketStatus', () => {
   });
 
   it('reports a delisted market of the main dex', () => {
-    const universeByDex = new Map([
-      ['', [{ name: 'XMR', szDecimals: 2, maxLeverage: 5, isDelisted: true }]],
+    // Annotée, et non inférée : sans annotation TypeScript élargit
+    // `isDelisted: true` en `boolean`, que `HLPerpMarketInfo` refuse désormais.
+    const universeByDex = new Map<string, HLPerpMarketInfo[]>([
+      ['', [{ name: 'XMR', szDecimals: 2, maxLeverage: 5, marginTableId: 5, isDelisted: true }]],
     ]);
 
     expect(pairMarketStatus('XMR', catalogue({ universeByDex }))).toBe('delisted');
