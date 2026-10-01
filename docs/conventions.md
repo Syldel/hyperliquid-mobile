@@ -313,6 +313,29 @@ qu'il tombe pour la bonne raison, sans emporter les autres. Un test qui passe da
 deux cas ne protège de rien et donne une fausse assurance, ce qui est pire que pas de test
 du tout.
 
+### Une mutation qui ne compile pas n'est pas une lacune
+
+Deux issues se ressemblent et ne veulent pas dire la même chose :
+
+- **la mutation compile et ne casse rien** → lacune. Soit un test manque, soit le code
+  muté ne sert à rien et doit partir. C'est ce qui a fait retirer le garde `!dex` de
+  `dexLabel` et ajouter le test du dex principal dans `pair-market-status.util` ;
+- **la mutation ne compile pas** → le compilateur couvre déjà le cas, et plus solidement
+  qu'un test : il le vérifie à chaque build, pas seulement quand la suite tourne.
+
+Le cas typique est une **union discriminée**. Dans `readAvailableCapital`, supprimer la
+sortie anticipée sur `no-balance-entry` rend `balance.total` inaccessible — ce membre ne
+porte pas ce champ, et TypeScript refuse. La branche est donc indéboulonnable.
+
+Ce qu'il faut faire alors, et qui vaut mieux que de forcer la mutation avec un `as any` —
+lequel mesurerait la couverture d'une forme de code qui ne partirait jamais en production :
+
+1. **muter le sens plutôt que la structure** : garder la branche, lui faire rendre le
+   mauvais statut ou le mauvais actif. Ça compile, et ça doit faire rougir ;
+2. **l'écrire** là où quelqu'un le lira. Un refactoring qui assouplirait l'union — rendre
+   un champ optionnel sur tous les membres, par exemple — retirerait ce garde en silence,
+   et aucun test ne s'en apercevrait.
+
 ## Où porte l'effort
 
 **Le domaine d'abord, les services ensuite** — mais ce n'est pas un classement
