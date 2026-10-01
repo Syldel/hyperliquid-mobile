@@ -2,7 +2,6 @@ import type { HLPerpMarketInfo } from '@syldel/hl-shared-types';
 import {
   dexesToLoad,
   dexLabel,
-  dexToLoadFor,
   isKnownUnexecutableMarket,
   pairMarketStatus,
   type PerpMarketCatalogue,
@@ -55,34 +54,11 @@ function catalogue(over: Partial<PerpMarketCatalogue> = {}): PerpMarketCatalogue
   };
 }
 
-describe('dexToLoadFor', () => {
-  it('maps a bare perp name to the main dex', () => {
-    expect(dexToLoadFor('BTC')).toBe('');
-  });
-
-  it('maps a HIP-3 pair to the dex carried by its prefix', () => {
-    expect(dexToLoadFor('vntl:ROBOT')).toBe('vntl');
-  });
-
-  // Le catalogue perp ne parle pas des marchés spot : Hyperliquid ne publie
-  // aucun drapeau de délistage pour eux (`spotMeta.universe` porte
-  // `tokens`, `name`, `index`, `isCanonical` — relevé le 2026-09-30).
-  it('has nothing to load for a canonical spot pair', () => {
-    expect(dexToLoadFor('PURR/USDC')).toBeNull();
-  });
-
-  // Le piège mesuré : sur 330 paires spot, la grande majorité s'appelle `@N`
-  // et ne porte donc **ni** barre oblique **ni** deux-points. Les traiter par
-  // défaut comme des perps les ferait chercher — et manquer — dans l'univers
-  // du dex principal, donc accuser à tort un marché parfaitement vivant.
-  it('has nothing to load for a spot pair named by its index', () => {
-    expect(dexToLoadFor('@107')).toBeNull();
-  });
-
-  it('has nothing to load for an empty pair name', () => {
-    expect(dexToLoadFor('')).toBeNull();
-  });
-});
+// La règle de nommage elle-même (`{dex}:{coin}`, `@<index>`, nom nu) est
+// éprouvée là où elle vit désormais : `test/market-name.spec.ts` dans
+// `@syldel/hl-shared-types`. La recopier ici n'apprendrait rien et figerait
+// une seconde définition — ce que le déplacement servait justement à éviter.
+// Ce qui suit vérifie donc ce que *ce module* décide, pas comment un nom se lit.
 
 describe('pairMarketStatus', () => {
   it('accepts a live market of the main dex', () => {

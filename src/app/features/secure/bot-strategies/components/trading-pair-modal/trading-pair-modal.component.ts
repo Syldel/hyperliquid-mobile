@@ -91,9 +91,9 @@ import {
   offeredStrategies,
   resolveStrategyMeta,
 } from '../../domain/exchange-catalogue.util';
+import { hlPerpDexOf } from '@syldel/hl-shared-types';
 import {
   dexLabel,
-  dexToLoadFor,
   isKnownUnexecutableMarket,
   pairMarketStatus,
   type PairMarketStatus,
@@ -331,7 +331,7 @@ export class TradingPairModalComponent implements OnInit {
   private readonly marketMeta = resource({
     params: computed(
       () => {
-        const dex = dexToLoadFor(this.formValue().pairName ?? '');
+        const dex = hlPerpDexOf(this.formValue().pairName ?? '');
         return dex === null ? undefined : { dex };
       },
       { equal: (a, b) => a?.dex === b?.dex },
@@ -345,7 +345,7 @@ export class TradingPairModalComponent implements OnInit {
   readonly marketStatus = computed<PairMarketStatus>(() => {
     const pairName = this.formValue().pairName ?? '';
     const meta = this.marketMeta.value();
-    const dex = dexToLoadFor(pairName);
+    const dex = hlPerpDexOf(pairName);
 
     return pairMarketStatus(pairName, {
       dexNames: meta ? meta.dexes.flatMap((entry) => (entry ? [entry.name] : [])) : null,
@@ -357,7 +357,7 @@ export class TradingPairModalComponent implements OnInit {
 
   readonly marketDexName = computed(() =>
     dexLabel(
-      dexToLoadFor(this.formValue().pairName ?? '') ?? '',
+      hlPerpDexOf(this.formValue().pairName ?? '') ?? '',
       this.marketMeta.value()?.dexes ?? null,
     ),
   );

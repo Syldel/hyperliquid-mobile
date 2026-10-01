@@ -1,4 +1,4 @@
-import type { HLPerpMarketInfo } from '@syldel/hl-shared-types';
+import { hlPerpDexOf, type HLPerpMarketInfo } from '@syldel/hl-shared-types';
 
 /**
  * ============================================================================
@@ -36,6 +36,15 @@ import type { HLPerpMarketInfo } from '@syldel/hl-shared-types';
  * état compris, et pour la même raison : le catalogue arrive du réseau.
  * Condamner une paire parce que la réponse n'est pas encore là serait
  * exactement la décision qu'un client n'a pas le droit de prendre.
+ *
+ * ⚠️ **La règle de nommage ne vit plus ici.** Savoir de quel univers relève un
+ * nom de marché (`{dex}:{coin}`, `@<index>`, nom nu) est une connaissance du
+ * protocole Hyperliquid, pas de cette application : elle est dans
+ * `hlPerpDexOf` (`@syldel/hl-shared-types`), que le bot consomme aussi. Le
+ * verdict à quatre états, lui, reste local — c'est un choix d'affichage, pas
+ * un fait du protocole. Deux copies de la règle de nommage auraient fini par
+ * diverger, et l'écran aurait alors signalé comme morte une paire que le
+ * moteur continuait de trader.
  * ============================================================================
  */
 
@@ -71,36 +80,11 @@ export interface PerpMarketCatalogue {
   readonly universeByDex: ReadonlyMap<string, readonly HLPerpMarketInfo[]>;
 }
 
-/**
- * Le dex dont il faut charger l'univers pour juger cette paire, ou `null`
- * quand le catalogue perp n'a rien à en dire.
- *
- * Les deux formes de nom sont **documentées**, elles ne sont pas déduites :
- * la doc « Asset IDs » pose qu'un perp déployé par un builder porte
- * *toujours* un nom `{dex}:{coin}`, et qu'une paire spot se désigne par
- * `10000 + spotInfo.index` — d'où la forme protocolaire `@<index>`. Son
- * exemple HYPE (token 150, spot 107) recoupe exactement le relevé du
- * 2026-09-30 : le solde porte `token: 150`, la paire s'appelle `@107`.
- *
- * ⚠️ La détection du spot ne peut donc pas se réduire à la barre oblique :
- * sur 330 paires spot, seules les canoniques portent un nom `BASE/QUOTE`.
- * Sans le test sur `@`, toutes les autres tomberaient dans la branche perp,
- * seraient cherchées en vain dans l'univers du dex principal, et un marché
- * vivant serait signalé comme inexistant.
- */
-export function dexToLoadFor(pairName: string): string | null {
-  if (!pairName) return null;
-  if (pairName.includes('/') || pairName.startsWith('@')) return null;
-
-  const separator = pairName.indexOf(':');
-  return separator === -1 ? '' : pairName.slice(0, separator);
-}
-
 export function pairMarketStatus(
   pairName: string,
   catalogue: PerpMarketCatalogue,
 ): PairMarketStatus {
-  const dex = dexToLoadFor(pairName);
+  const dex = hlPerpDexOf(pairName);
   if (dex === null) return 'unverified';
 
   const universe = catalogue.universeByDex.get(dex);
@@ -143,7 +127,7 @@ export function dexesToLoad(pairNames: readonly string[]): string[] {
   const dexes = new Set<string>();
 
   for (const pairName of pairNames) {
-    const dex = dexToLoadFor(pairName);
+    const dex = hlPerpDexOf(pairName);
     if (dex !== null) dexes.add(dex);
   }
 

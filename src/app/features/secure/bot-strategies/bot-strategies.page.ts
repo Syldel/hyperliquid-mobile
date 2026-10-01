@@ -22,6 +22,7 @@ import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { UserService } from '@services/user.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
+import { hlPerpDexOf } from '@syldel/hl-shared-types';
 import { ExternalUser, IExchange, ProtectiveOrderEntry } from '@syldel/trading-shared-types';
 import { addIcons } from 'ionicons';
 import {
@@ -45,7 +46,6 @@ import {
 import {
   dexesToLoad,
   dexLabel,
-  dexToLoadFor,
   isKnownUnexecutableMarket,
   pairMarketStatus,
   type PairMarketStatus,
@@ -225,7 +225,7 @@ export class BotStrategiesPage extends MenuBasePage {
    * l'a pas — le libellé reste alors générique au lieu d'inventer un nom.
    */
   marketDexLabel(pair: TradingPair): string | null {
-    return dexLabel(dexToLoadFor(pair.name) ?? '', this.marketMeta.value()?.dexes ?? null);
+    return dexLabel(hlPerpDexOf(pair.name) ?? '', this.marketMeta.value()?.dexes ?? null);
   }
 
   /**
