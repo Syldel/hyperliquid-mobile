@@ -6,7 +6,7 @@ import { formatSmartDecimal } from '../utils/format-smart-decimal';
 export class SmartDecimalPipe implements PipeTransform {
   private readonly preferences = inject(PreferencesService);
 
-  transform(value: string | number): string {
+  transform(value: string | number | null | undefined): string {
     return formatSmartDecimal(value, this.preferences.locale());
   }
 }

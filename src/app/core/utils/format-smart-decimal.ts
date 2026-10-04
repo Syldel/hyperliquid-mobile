@@ -1,4 +1,17 @@
-export function formatSmartDecimal(value: string | number, locale = 'en-US'): string {
+/**
+ * `null` et `undefined` sont acceptés parce que l'exchange en envoie :
+ * `liquidationPx` vaut `null` quand aucun prix de liquidation n'est atteignable
+ * (relevé le 2026-09-22, 14 positions sur 22). La signature l'ignorait, et
+ * seul `strictTemplates` du compilateur Angular l'a signalé — `tsc` ne vérifie
+ * pas les gabarits.
+ *
+ * Le corps, lui, le traitait déjà : le tiret cadratin est le trou visible que
+ * `CLAUDE.md` réclame, et non un `0` interpolé.
+ */
+export function formatSmartDecimal(
+  value: string | number | null | undefined,
+  locale = 'en-US',
+): string {
   if (!value) return '—';
 
   const num = typeof value === 'string' ? parseFloat(value) : value;
