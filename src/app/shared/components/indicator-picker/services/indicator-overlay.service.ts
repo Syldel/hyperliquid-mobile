@@ -10,10 +10,19 @@ import {
   Time,
 } from 'lightweight-charts';
 import { IndicatorHlineStyles, SubFieldStyle } from '../models/indicator.model';
+import { indicatorFieldPoints } from '../utils/indicator-field-points.util';
 
-/** Point brut renvoyé par /analysis pour un indicateur : au moins `time`, plus un ou plusieurs
- *  champs numériques selon l'indicateur (`value` pour EMA/RSI, `upper/middle/lower` pour BB, etc.). */
-export type IndicatorPoint = { time: number } & Record<string, number | undefined>;
+/**
+ * Point brut renvoyé par `/analysis` pour un indicateur : au moins `time`, plus
+ * un ou plusieurs champs selon l'indicateur (`value` pour EMA/RSI,
+ * `upper/middle/lower` pour BB…).
+ *
+ * `null` autant qu'`undefined` : le bot envoie `null` quand une valeur est
+ * indéterminée à ce point — `SimpleValue.value` est `number | null` dans les
+ * types partagés, « jamais comblé par une valeur de repli ». Depuis le
+ * 2026-10-05, `bbw` et `bbp` en produisent sur une bande plate.
+ */
+export type IndicatorPoint = { time: number } & Record<string, number | null | undefined>;
 
 interface PaneEntry {
   /** Pas de paneIndex mis en cache ici : lightweight-charts retire lui-même les panes
@@ -66,21 +75,11 @@ export class IndicatorOverlayService {
         return;
       }
 
-      // Ce filtre exclut silencieusement tout point où `field` n'est pas un
-      // nombre — aujourd'hui sans conséquence : un indicateur mono/multi-ligne
-      // classique (EMA/RSI/BB/...) ne produit jamais `null` une fois amorcé, sa
-      // période d'amorçage est simplement absente de la série. Mais
-      // `AnalysisResponse.expressions` (transformations glissantes ZScore/
-      // Percentile/... — voir `SimpleValue` dans @syldel/trading-shared-types
-      // >= v0.16.0) PEUT redevenir `null` en plein milieu d'une série déjà
-      // amorcée (fenêtre dégénérée), pas seulement à son tout début. Le jour où
-      // ce composant affichera une `expression`, ce filtre transformerait un
-      // "valeur indéterminée à cet instant" en trou silencieux dans le tracé
-      // plutôt que de le signaler — à revoir explicitement à ce moment-là, pas
-      // à laisser drifter en silence jusque-là.
-      const fieldPoints = points
-        .filter((p) => typeof p[field] === 'number')
-        .map((p) => ({ time: p.time, value: p[field] as number }));
+      // La décision — garder le point sans valeur plutôt que l'écarter — vit
+      // dans une fonction pure, testée : tant qu'elle était ici, elle n'était
+      // pas vérifiable sans un faux graphique, et elle ne l'était pas. Le
+      // pourquoi est dans `indicator-field-points.util.ts`.
+      const fieldPoints = indicatorFieldPoints(points, field);
 
       const lineStyle = this.toLightweightLineStyle(style.lineStyle);
 
@@ -124,8 +123,15 @@ export class IndicatorOverlayService {
     }
   }
 
-  private toChartPoints(points: { time: number; value: number }[]) {
-    return points.map((p) => ({ time: Math.floor(p.time / 1000) as Time, value: p.value }));
+  /**
+   * Le point est **étalé**, et non reconstruit champ par champ : un whitespace
+   * n'a pas de clé `value`, et écrire `value: p.value` la reposerait à
+   * `undefined`. lightweight-charts distingue les deux — une clé présente mais
+   * vide n'est pas un temps sans valeur. Même forme que
+   * `expressions-pane.service.ts`.
+   */
+  private toChartPoints(points: { time: number; value?: number }[]) {
+    return points.map((p) => ({ ...p, time: Math.floor(p.time / 1000) as Time }));
   }
 
   /** Position réelle ACTUELLE du pane où vit déjà cet indicateur dédié, ou
@@ -139,7 +145,7 @@ export class IndicatorOverlayService {
   private renderOnMainPane(
     id: string,
     field: string,
-    points: { time: number; value: number }[],
+    points: { time: number; value?: number }[],
     color: string,
     lineStyle: LineStyle,
   ): void {
@@ -162,7 +168,7 @@ export class IndicatorOverlayService {
   private renderOnDedicatedPane(
     id: string,
     field: string,
-    points: { time: number; value: number }[],
+    points: { time: number; value?: number }[],
     color: string,
     lineStyle: LineStyle,
   ): void {
