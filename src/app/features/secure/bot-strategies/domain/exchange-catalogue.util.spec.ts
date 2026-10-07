@@ -15,9 +15,19 @@ import {
  * deux portent une stratégie de même famille mais de `shortname` distinct,
  * pour qu'une résolution qui cherche « partout » se trahisse.
  */
-const TOL_LANGIT: StrategyMeta = {
-  name: 'Tol Langit ATR v7 Pro',
-  shortname: 'tol-langit-atr-v7-pro',
+/**
+ * Une stratégie codée en dur, donc sans paramètre : le pendant d'une stratégie
+ * à règles dans toutes les assertions qui suivent.
+ *
+ * Elle s'appelait `tol-langit-atr-v7-pro` jusqu'au 2026-10-07, date à laquelle
+ * le bot l'a retirée — le rule-builder l'exprimant intégralement. Un double qui
+ * nomme une stratégie que le serveur ne sert plus décrit une réponse
+ * impossible, et ce dépôt tient qu'une simulation qui mente est pire que pas de
+ * simulation.
+ */
+const ORACLE_FLOW: StrategyMeta = {
+  name: 'Oracle Flow Reversion',
+  shortname: 'oracle-flow-reversion',
 };
 
 const ADVANCED_RULES: StrategyMeta = {
@@ -34,7 +44,7 @@ const BINANCE_ONLY: StrategyMeta = {
 };
 
 const BY_EXCHANGE: Record<string, StrategyMeta[]> = {
-  hyperliquid: [TOL_LANGIT, ADVANCED_RULES],
+  hyperliquid: [ORACLE_FLOW, ADVANCED_RULES],
   binance: [BINANCE_ONLY],
 };
 
@@ -47,7 +57,7 @@ describe('exchangeCatalogue', () => {
       exchangeKey: 'binance',
       strategies: [BINANCE_ONLY],
     });
-    expect(offeredStrategies(catalogue)).not.toContain(TOL_LANGIT);
+    expect(offeredStrategies(catalogue)).not.toContain(ORACLE_FLOW);
   });
 
   it('separates “not loaded yet” from “nothing declared for this exchange”', () => {
@@ -103,7 +113,7 @@ describe('resolveStrategyMeta', () => {
   it('resolves within the exchange, never across the whole catalogue', () => {
     const hyperliquid = exchangeCatalogue(BY_EXCHANGE, 'hyperliquid');
 
-    expect(resolveStrategyMeta(hyperliquid, 'tol-langit-atr-v7-pro')).toBe(TOL_LANGIT);
+    expect(resolveStrategyMeta(hyperliquid, 'oracle-flow-reversion')).toBe(ORACLE_FLOW);
     // Servie par le bot, mais pas sur cet exchange : la résoudre reviendrait à
     // charger le sélecteur d'une valeur absente de ses propres options.
     expect(resolveStrategyMeta(hyperliquid, 'spot-grid')).toBeUndefined();

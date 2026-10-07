@@ -13,9 +13,19 @@ import {
  * paires réellement trouvées sur le compte de développement — une stratégie
  * codée en dur sans le moindre paramètre, et un vestige qui ne porte qu'un nom.
  */
-const TOL_LANGIT: StrategyMeta = {
-  name: 'Tol Langit ATR v7 Pro',
-  shortname: 'tol-langit-atr-v7-pro',
+/**
+ * Une stratégie codée en dur, donc sans paramètre : le pendant d'une stratégie
+ * à règles dans toutes les assertions qui suivent.
+ *
+ * Elle s'appelait `tol-langit-atr-v7-pro` jusqu'au 2026-10-07, date à laquelle
+ * le bot l'a retirée — le rule-builder l'exprimant intégralement. Un double qui
+ * nomme une stratégie que le serveur ne sert plus décrit une réponse
+ * impossible, et ce dépôt tient qu'une simulation qui mente est pire que pas de
+ * simulation.
+ */
+const ORACLE_FLOW: StrategyMeta = {
+  name: 'Oracle Flow Reversion',
+  shortname: 'oracle-flow-reversion',
 };
 
 const ADVANCED_RULES: StrategyMeta = {
@@ -26,7 +36,7 @@ const ADVANCED_RULES: StrategyMeta = {
   ],
 };
 
-const CATALOGUE: readonly StrategyMeta[] = [TOL_LANGIT, ADVANCED_RULES];
+const CATALOGUE: readonly StrategyMeta[] = [ORACLE_FLOW, ADVANCED_RULES];
 
 /** Le vestige trouvé sur BTC et XRP : un nom, et rien d'autre. */
 const LEGACY: StoredPairStrategy = { name: 'Neural Momentum Strategy' };
@@ -86,7 +96,7 @@ describe('pairStrategyStatus', () => {
     // `rules` ni `settings`. Confondre « pas de règles » et « cassée » ferait
     // clignoter une paire parfaitement saine.
     expect(
-      pairStrategyStatus({ name: TOL_LANGIT.name, shortname: TOL_LANGIT.shortname }, CATALOGUE),
+      pairStrategyStatus({ name: ORACLE_FLOW.name, shortname: ORACLE_FLOW.shortname }, CATALOGUE),
     ).toBe('ok');
   });
 

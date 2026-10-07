@@ -27,15 +27,25 @@ const ADVANCED_RULES: StrategyMeta = {
   ],
 };
 
-const TOL_LANGIT: StrategyMeta = {
-  name: 'Tol Langit ATR v7 Pro',
-  shortname: 'tol-langit-atr-v7-pro',
+/**
+ * Une stratégie codée en dur, donc sans paramètre : le pendant d'une stratégie
+ * à règles dans toutes les assertions qui suivent.
+ *
+ * Elle s'appelait `tol-langit-atr-v7-pro` jusqu'au 2026-10-07, date à laquelle
+ * le bot l'a retirée — le rule-builder l'exprimant intégralement. Un double qui
+ * nomme une stratégie que le serveur ne sert plus décrit une réponse
+ * impossible, et ce dépôt tient qu'une simulation qui mente est pire que pas de
+ * simulation.
+ */
+const ORACLE_FLOW: StrategyMeta = {
+  name: 'Oracle Flow Reversion',
+  shortname: 'oracle-flow-reversion',
 };
 
 const META = {
   intervals: ['60', '240'],
   exchanges: ['hyperliquid'],
-  strategies: { hyperliquid: [TOL_LANGIT, ADVANCED_RULES] },
+  strategies: { hyperliquid: [ORACLE_FLOW, ADVANCED_RULES] },
   globalOptions: {
     exitBehaviors: [{ label: 'No Algo Exit', value: 'NO_ALGO_EXIT', description: '' }],
   },
@@ -48,7 +58,7 @@ function pair(overrides: Partial<TradingPair> = {}): TradingPair {
     interval: '60',
     enabled: true,
     exitBehavior: 'NO_ALGO_EXIT',
-    strategy: { name: 'Tol Langit ATR v7 Pro', shortname: 'tol-langit-atr-v7-pro' },
+    strategy: { name: 'Oracle Flow Reversion', shortname: 'oracle-flow-reversion' },
     ...overrides,
   } as TradingPair;
 }
@@ -153,7 +163,7 @@ describe('TradingPairModalComponent prefill', () => {
   it('resolves the strategy from the catalogue rather than from the stored pair', () => {
     mount(pair());
 
-    expect(component.form.getRawValue().strategy).toBe(TOL_LANGIT);
+    expect(component.form.getRawValue().strategy).toBe(ORACLE_FLOW);
   });
 
   // Le bot aiguille sur `shortname` : une paire héritée qui n'en a pas ne peut
@@ -302,7 +312,7 @@ describe('TradingPairModalComponent exchange-scoped catalogue', () => {
   const TWO_EXCHANGES = {
     intervals: ['60', '240'],
     exchanges: ['hyperliquid', 'binance'],
-    strategies: { hyperliquid: [TOL_LANGIT, ADVANCED_RULES], binance: [SPOT_GRID] },
+    strategies: { hyperliquid: [ORACLE_FLOW, ADVANCED_RULES], binance: [SPOT_GRID] },
     globalOptions: {
       exitBehaviors: [{ label: 'No Algo Exit', value: 'NO_ALGO_EXIT', description: '' }],
     },
@@ -383,7 +393,7 @@ describe('TradingPairModalComponent exchange-scoped catalogue', () => {
 
   it('drops a strategy the newly chosen exchange does not offer', () => {
     mount(pair());
-    expect(component.form.getRawValue().strategy).toBe(TOL_LANGIT);
+    expect(component.form.getRawValue().strategy).toBe(ORACLE_FLOW);
 
     component.form.patchValue({ exchangeKey: 'binance' });
 
@@ -396,13 +406,13 @@ describe('TradingPairModalComponent exchange-scoped catalogue', () => {
     // choix devenu faux.
     const bothExchanges = {
       ...TWO_EXCHANGES,
-      strategies: { hyperliquid: [TOL_LANGIT], binance: [TOL_LANGIT] },
+      strategies: { hyperliquid: [ORACLE_FLOW], binance: [ORACLE_FLOW] },
     } as unknown as ExchangesMetaResponse;
     mount(pair(), 'hyperliquid', of(bothExchanges));
 
     component.form.patchValue({ exchangeKey: 'binance' });
 
-    expect(component.form.getRawValue().strategy).toBe(TOL_LANGIT);
+    expect(component.form.getRawValue().strategy).toBe(ORACLE_FLOW);
   });
 
   it('keeps the rules built so far when the strategy is dropped', () => {
