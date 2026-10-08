@@ -109,6 +109,54 @@ describe('BacktestReportModalComponent', () => {
     });
   });
 
+  /**
+   * Le drawdown n'avait aucun test : toutes les fixtures le laissaient à 0, donc
+   * rien ne vérifiait qu'il s'affiche, ni avec quel signe.
+   *
+   * Depuis la version 0.26.0 des types partagés, `depthPercent` est le drawdown
+   * **relatif standard** — un pourcentage du sommet, et non plus un écart de
+   * points cumulés sans dénominateur. Un chiffre qui veut enfin dire quelque
+   * chose mérite d'être épinglé.
+   */
+  it('shows the max drawdown as a loss, with its sign', () => {
+    const host = mount(
+      report({
+        long: stats({ maxDrawdown: { depthPercent: 25.24, peakTime: H, troughTime: 5 * H } }),
+        short: stats(),
+        total: stats({ maxDrawdown: { depthPercent: 25.24, peakTime: H, troughTime: 5 * H } }),
+      }),
+    );
+
+    const row = [...host.querySelectorAll('tbody tr')].find((tr) =>
+      tr.querySelector('th')?.textContent?.includes('Max drawdown'),
+    );
+
+    expect([...(row?.querySelectorAll('td') ?? [])].map((td) => td.textContent?.trim())).toEqual([
+      '-25.24%',
+      '0.00%',
+      '-25.24%',
+    ]);
+  });
+
+  it('leaves a drawdown too small to display uncoloured', () => {
+    // La règle que `percentTone` porte : un 0,004 % s'affiche `0.00%`, et le
+    // colorer en rouge annoncerait une perte que le texte ne montre pas.
+    const host = mount(
+      report({
+        long: stats({ maxDrawdown: { depthPercent: 0.004, peakTime: H, troughTime: 2 * H } }),
+        short: stats(),
+        total: null,
+      }),
+    );
+
+    const cell = [...host.querySelectorAll('tbody tr')]
+      .find((tr) => tr.querySelector('th')?.textContent?.includes('Max drawdown'))
+      ?.querySelector('td');
+
+    expect(cell?.textContent?.trim()).toBe('0.00%');
+    expect(cell?.classList.contains('down')).toBe(false);
+  });
+
   it('shows a total column when the report gives one', () => {
     const host = mount(report());
 

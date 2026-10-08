@@ -102,7 +102,14 @@
       <tr>
         <th>Max drawdown</th>
         @for (column of columns(); track column.label) {
-          <td [class.down]="column.stats.maxDrawdown.depthPercent > 0">
+          <!--
+            La teinte passe par `percentTone`, comme toutes les autres cellules
+            de pourcentage : un drawdown de 0,004 % s'affiche `0.00%`, et le
+            colorer en rouge annoncerait une perte que le texte ne montre pas.
+            Cette cellule jugeait sur la valeur brute et était la seule à le
+            faire.
+          -->
+          <td [class.down]="percentTone(-column.stats.maxDrawdown.depthPercent) === 'down'">
             {{ formatPercent(-column.stats.maxDrawdown.depthPercent) }}
           </td>
         }

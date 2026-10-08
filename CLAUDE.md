@@ -41,14 +41,20 @@ Ce qui en découle **ici**, où le chiffre est lu plutôt que produit :
   **ni frais, ni funding, ni slippage** — son en-tête le dit, et les frais ont valu jusqu'à
   27 points de rendement sur 302 trades (mesuré le 2026-10-07). Un écran qui affiche
   `+15 %` sans dire de quoi ce chiffre est net invite à une décision fausse ;
+- **un chiffre qui porte le nom d'une métrique connue doit en être une.** `Max drawdown` a
+  affiché pendant des mois `sommet − valeur` sur une courbe de points cumulés, sans
+  dénominateur — mesuré, « 562 » là où le drawdown réel était de 76,67 %. Corrigé dans les
+  types partagés 0.26.0 le 2026-10-08, et c'est la validation d'une lecture, pas un
+  ajustement d'affichage ;
 - un rendement seul ne permet pas de décider. Drawdown, exposition, régularité entre
   périodes, taux de réussite : ce sont eux qui distinguent deux stratégies au même
   rendement. Les afficher est un travail d'interface autant que de calcul ;
 - **l'achat-conservation est la référence à battre.** Si l'écran ne la montre pas, il laisse
   croire qu'un rendement positif est un succès.
 
-⚠️ Aucun de ces points n'est tenu aujourd'hui côté app. C'est de la dette connue, pas un
-acquis : voir [docs/roadmap.md](docs/roadmap.md) et
+⚠️ Le troisième point est tenu depuis le 2026-10-08 ; les autres non. Drawdown, exposition,
+régularité et taux de réussite ne sont pas affichés, et rien ne dit de quoi un rendement est
+net. C'est de la dette connue, pas un acquis : voir [docs/roadmap.md](docs/roadmap.md) et
 `nest-trading-bot/docs/known-gaps.md`.
 
 ## Stade du projet : casser est permis, et souvent souhaitable
