@@ -28,8 +28,10 @@ function stats(overrides: Partial<BacktestStats> = {}): BacktestStats {
     losses: 0,
     breakeven: 0,
     winRatePercent: null,
-    realizedPercent: 0,
-    unrealizedPercent: 0,
+    realizedGrossPercent: 0,
+    realizedNetPercent: 0,
+    unrealizedGrossPercent: 0,
+    unrealizedNetPercent: 0,
     maxDrawdown: { depthPercent: 0, peakTime: null, troughTime: null },
     ...overrides,
   };
@@ -49,7 +51,8 @@ function report(overrides: Partial<BacktestReport> = {}): BacktestReport {
         entryPrice: 100,
         exitTime: 3 * H,
         exitPrice: 101,
-        returnPercent: 1,
+        grossReturnPercent: 1,
+        netReturnPercent: 1,
       },
       {
         side: 'LONG',
@@ -57,7 +60,8 @@ function report(overrides: Partial<BacktestReport> = {}): BacktestReport {
         entryPrice: 100,
         exitTime: 7 * H,
         exitPrice: 98,
-        returnPercent: -2,
+        grossReturnPercent: -2,
+        netReturnPercent: -2,
       },
     ],
     openPositions: [],
@@ -155,6 +159,68 @@ describe('BacktestReportModalComponent', () => {
 
     expect(cell?.textContent?.trim()).toBe('0.00%');
     expect(cell?.classList.contains('down')).toBe(false);
+  });
+
+  /**
+   * Le brut et le net rendus **distincts**, parce que toutes les fixtures les
+   * laissaient egaux a zero : rien ne verifiait donc lequel la vue affiche.
+   * C'est le meme trou que celui trouve sur le drawdown le 2026-10-08.
+   */
+  it('shows the net figure where it matters, and the gross beside it', () => {
+    const host = mount(
+      report({
+        long: stats({
+          trades: 1,
+          realizedGrossPercent: 10,
+          realizedNetPercent: 9.8,
+          unrealizedGrossPercent: 4,
+          unrealizedNetPercent: 3.9,
+        }),
+        short: stats(),
+        total: null,
+      }),
+    );
+
+    const row = (label: string) =>
+      [...host.querySelectorAll('tbody tr')]
+        .find((tr) => tr.querySelector('th')?.textContent?.trim() === label)
+        ?.querySelector('td')
+        ?.textContent?.trim();
+
+    expect(row('Realized, gross')).toBe('+10.00%');
+    expect(row('Realized, net of fees')).toBe('+9.80%');
+    expect(row('Open, net of fees')).toBe('+3.90%');
+  });
+
+  it('shows a trade return net of fees, never gross', () => {
+    // Un trade a +1 brut et -0,2 net est une **perte** : l'afficher en vert a
+    // +1 dirait l'inverse de ce que le compte a fait.
+    const host = mount(
+      report({
+        trades: [
+          {
+            side: 'LONG',
+            entryTime: 2 * H,
+            entryPrice: 100,
+            exitTime: 3 * H,
+            exitPrice: 101,
+            grossReturnPercent: 1,
+            netReturnPercent: -0.2,
+          },
+        ],
+      }),
+    );
+
+    expect(host.textContent).toContain('-0.20%');
+    expect(host.textContent).not.toContain('+1.00%');
+  });
+
+  it('says the curve figures are net of fees', () => {
+    // Sans ca, l'ecran affiche un pourcentage dont rien ne dit de quoi il est
+    // net - le defaut que ce changement corrige.
+    const host = mount(report());
+
+    expect(host.textContent).toContain('net of the trading fees');
   });
 
   it('shows a total column when the report gives one', () => {

@@ -187,16 +187,22 @@
       <div class="backtest-block__line">
         <span
           class="backtest-block__pnl"
-          [class.up]="percentTone(total.realizedPercent) === 'up'"
-          [class.down]="percentTone(total.realizedPercent) === 'down'"
+          [class.up]="percentTone(total.realizedNetPercent) === 'up'"
+          [class.down]="percentTone(total.realizedNetPercent) === 'down'"
         >
-          {{ formatPercent(total.realizedPercent) }}
+          {{ formatPercent(total.realizedNetPercent) }}
         </span>
         <span>{{ total.trades }} {{ total.trades === 1 ? 'trade' : 'trades' }}</span>
         @if (total.winRatePercent !== null) {
         <span>{{ total.winRatePercent.toFixed(0) }}% win</span>
         }
         <span>DD {{ formatPercent(-total.maxDrawdown.depthPercent) }}</span>
+        <!--
+          Dit une fois, sur la ligne : sans ça, ce resume affiche un pourcentage
+          dont rien ne dit de quoi il est net. Le palier n'est pas nomme parce
+          que l'app ne le connait pas - c'est le serveur qui l'applique.
+        -->
+        <span>net of fees</span>
       </div>
       } @else {
       <!-- Le rapport refuse le total : le bot ne tient qu'une position par paire. -->
@@ -208,7 +214,7 @@
       <div class="backtest-block__sides">
         @for (side of sides; track side) { @let stats = statsOf(report, side);
         <span>
-          {{ sideLabel(side) }} {{ formatPercent(stats.realizedPercent) }} · {{ stats.trades }}
+          {{ sideLabel(side) }} {{ formatPercent(stats.realizedNetPercent) }} · {{ stats.trades }}
         </span>
         }
       </div>

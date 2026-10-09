@@ -82,25 +82,39 @@
           </td>
         }
       </tr>
+      <!--
+        Le brut d'abord, le net ensuite : l'écart entre les deux est ce que les
+        frais coûtent, et c'est la seule façon de le lire. Jusqu'au 2026-10-09
+        cet écran n'affichait que le brut, sans le nommer — mesuré, les frais
+        valaient jusqu'à 27 points de rendement sur 302 trades.
+      -->
       <tr>
-        <th>Realized</th>
+        <th>Realized, gross</th>
         @for (column of columns(); track column.label) {
-          <td
-            [class.up]="percentTone(column.stats.realizedPercent) === 'up'"
-            [class.down]="percentTone(column.stats.realizedPercent) === 'down'"
-          >
-            {{ formatPercent(column.stats.realizedPercent) }}
+          <td>
+            {{ formatPercent(column.stats.realizedGrossPercent) }}
           </td>
         }
       </tr>
       <tr>
-        <th>Open</th>
+        <th>Realized, net of fees</th>
         @for (column of columns(); track column.label) {
-          <td>{{ formatPercent(column.stats.unrealizedPercent) }}</td>
+          <td
+            [class.up]="percentTone(column.stats.realizedNetPercent) === 'up'"
+            [class.down]="percentTone(column.stats.realizedNetPercent) === 'down'"
+          >
+            {{ formatPercent(column.stats.realizedNetPercent) }}
+          </td>
         }
       </tr>
       <tr>
-        <th>Max drawdown</th>
+        <th>Open, net of fees</th>
+        @for (column of columns(); track column.label) {
+          <td>{{ formatPercent(column.stats.unrealizedNetPercent) }}</td>
+        }
+      </tr>
+      <tr>
+        <th>Max drawdown, net</th>
         @for (column of columns(); track column.label) {
           <!--
             La teinte passe par `percentTone`, comme toutes les autres cellules
@@ -130,7 +144,8 @@
     </div>
     <p class="note">
       Cumulated at each candle close, open positions included — the drawdown is measured on this
-      curve.
+      curve, and it is net of the trading fees the server applies. Funding and slippage are not
+      counted.
     </p>
     @if (lastPointProvisional()) {
       <p class="note note--provisional">
@@ -162,7 +177,9 @@
           </ion-label>
           <ion-note slot="end">
             {{
-              position.unrealizedPercent === null ? '—' : formatPercent(position.unrealizedPercent)
+              position.unrealizedNetPercent === null
+                ? '—'
+                : formatPercent(position.unrealizedNetPercent)
             }}
           </ion-note>
         </ion-item>
@@ -221,10 +238,10 @@
           </ion-label>
           <ion-note
             slot="end"
-            [class.up]="percentTone(trade.returnPercent) === 'up'"
-            [class.down]="percentTone(trade.returnPercent) === 'down'"
+            [class.up]="percentTone(trade.netReturnPercent) === 'up'"
+            [class.down]="percentTone(trade.netReturnPercent) === 'down'"
           >
-            {{ formatPercent(trade.returnPercent) }}
+            {{ formatPercent(trade.netReturnPercent) }}
           </ion-note>
           <ion-icon slot="end" name="locate-outline" color="medium" />
         </ion-item>
