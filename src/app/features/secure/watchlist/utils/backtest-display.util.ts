@@ -22,10 +22,17 @@ import type {
  * Les écarts connus entre la simulation et le bot. Affichés **avec** les
  * chiffres, jamais seuls : ils se lisent sinon comme « ce que la stratégie
  * aurait rapporté ». Voir docs/watchlist/chart-overlays.md.
+ *
+ * ⚠️ C'est le seul endroit qui dise **de quoi** un chiffre est net : cette liste
+ * doit suivre `buildBacktestReport`, sinon elle dément l'écran qui la porte.
+ * Vérifié dans le navigateur le 2026-10-11, après que le rapport soit passé net
+ * de frais (types partagés 0.27.0) : le résumé affichait la puce « net of fees »
+ * à deux lignes d'une note qui disait encore « with no fees », les deux dans le
+ * même bloc. Aucun test ne l'avait vu — il y en a un maintenant.
  */
 export const BACKTEST_LIMITS: readonly string[] = [
   'Simplified simulation — not what the bot would have earned.',
-  "Trades fill at the signal candle's close, with no fees, funding or slippage.",
+  "Trades fill at the signal candle's close, net of the trading fees the server applies; funding and slippage are not counted.",
   "Take-profit / stop-loss, latent orders and the pair's exit behaviour are not simulated yet.",
   'Each trade counts at the same size; returns are added, not compounded.',
 ];

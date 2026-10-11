@@ -1,5 +1,6 @@
 import type { BacktestReport, BacktestStats } from '@syldel/trading-shared-types';
 import {
+  BACKTEST_LIMITS,
   definedSides,
   equityLines,
   formatPercent,
@@ -50,6 +51,31 @@ function report(overrides: Partial<BacktestReport> = {}): BacktestReport {
     ...overrides,
   };
 }
+
+describe('BACKTEST_LIMITS', () => {
+  const joined = BACKTEST_LIMITS.join(' ').toLowerCase();
+
+  it('never claims the figures ignore fees', () => {
+    /**
+     * Le rapport est net de frais depuis les types partagés 0.27.0, et l'écran
+     * l'annonce par une puce « net of fees ». Une note qui dit le contraire,
+     * dans le même bloc, est pire qu'une note absente : elle fait lire un brut
+     * là où un net est affiché. Constaté dans le navigateur le 2026-10-11.
+     */
+    expect(joined).not.toMatch(/no fees|without fees|fees are not/);
+  });
+
+  it('says the figures are net of fees', () => {
+    expect(joined).toContain('net of the trading fees');
+  });
+
+  it('still names what is not counted', () => {
+    // Le funding et le slippage restent hors de portée : les taire les ferait
+    // oublier, et le chiffre serait lu comme un résultat complet.
+    expect(joined).toContain('funding');
+    expect(joined).toContain('slippage');
+  });
+});
 
 describe('formatPercent', () => {
   it('always writes the sign of a non-zero value', () => {
