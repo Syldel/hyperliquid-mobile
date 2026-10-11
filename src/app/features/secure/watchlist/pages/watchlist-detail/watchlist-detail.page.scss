@@ -294,12 +294,17 @@
     color: var(--ion-color-medium);
   }
 
+  // `--ion-color-medium` tombait à 4,43:1 sur le fond de ce bloc en sombre —
+  // mesuré le 2026-10-11, pour 4,5 exigés sur du texte de 12 px. L'échelle
+  // `--ion-text-color-step-*` s'éloigne du fond dans les deux thèmes, et le
+  // palier 300 est le plus discret qui passe des deux côtés : 6,47:1 en sombre,
+  // 5,05:1 en clair. Les paliers plus hauts (350 : 4,29 en clair) échouent.
   &__line,
   &__sides {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    color: var(--ion-color-medium);
+    color: var(--ion-text-color-step-300);
     font-variant-numeric: tabular-nums;
   }
 

@@ -169,6 +169,29 @@ spécifique** que le `.sc-ion-label-md-s p` d'Ionic. `ion-label p` perd le calcu
 `:where(ion-item) ion-label p` qui perdent aussi. Si une version d'Ionic renomme
 cette classe interne, la règle cesse simplement de s'appliquer.
 
+### Un gris secondaire se choisit **par fond**, pas une fois pour toutes
+
+Le bandeau de résumé du backtest (`.backtest-block`) pose son texte secondaire
+sur `--ion-background-color-step-100`, et non sur le fond de page. Sur ce fond
+relevé, `--ion-color-medium` tombait à **4,43:1** en sombre — mesuré le
+2026-10-11, pour 4,5 exigés sur du 12 px. Le même `medium` tient pourtant 5,21:1
+en clair : c'est le fond qui a bougé, pas la couleur.
+
+Le piège est que l'échelle `--ion-text-color-step-*` ne va pas dans le même sens
+dans les deux thèmes par rapport à **ce** fond. Mesuré, palier par palier :
+
+| palier sur `.backtest-block` | sombre | clair |
+| ---------------------------- | -----: | ----: |
+| `--ion-color-medium`         |   4,43 |  5,21 |
+| `step-300`                   |   6,47 |  5,05 |
+| `step-350`                   |   5,73 |  4,29 |
+| `step-400`                   |   5,04 |  3,65 |
+
+`step-400`, qui est le palier retenu ailleurs dans ce document, **échouerait ici
+en clair**. `step-300` est le plus discret qui passe des deux côtés : c'est lui
+qui a été posé. La leçon porte plus loin que ce bloc — un palier qui marche sur
+le fond de page ne se recopie pas tel quel sur une carte.
+
 ### Une `opacity` ne remplace pas un rôle
 
 Atténuer avec `opacity` un texte qui porte **déjà** une couleur secondaire
@@ -249,6 +272,26 @@ mauvaise direction ne coûte rien.
   la valeur par défaut d'Ionic, jamais reprise par l'app, et elle est illisible
   en clair pour du texte. Non corrigée : changer une couleur de marque est une
   décision, pas un correctif.
+
+  ⚠️ **Ce n'est plus un cas théorique.** Mesuré le 2026-10-11 sur une watchlist
+  enfin peuplée (stratégie « Basic SMA 20 » sur BTC, 1 an en 1 D), le vert porte
+  désormais le chiffre que l'écran existe pour montrer :
+
+  | texte en vert, thème clair                          | mesuré |
+  | --------------------------------------------------- | -----: |
+  | `Realized, net of fees` dans la modale (13 px)      |   1,94 |
+  | le rendement du bandeau de résumé (12 px, sur gris) |   1,59 |
+
+  Le rouge du même couple ne pose pas le problème, et c'est ce qui rend le vert
+  réparable : `--ion-color-danger` est surchargé **par thème** — `#c5000f` en
+  clair, `#ff6b75` en sombre — et `Max drawdown, net` tient 6,20:1 et 6,11:1.
+  Seul le vert est resté sur la valeur d'Ionic. Le correctif cohérent avec ce qui
+  a déjà été fait pour `danger` serait donc un `--ion-color-success` propre au
+  thème clair — une décision à prendre, pas un correctif à glisser dans un commit
+  d'affichage.
+  Le même avertissement vaut pour `--ion-color-warning-shade` (`#e0ac08`), à
+  2,08:1 sur la note « last point sits on a candle that had not closed yet ».
+
 - Les `opacity` restantes n'ont pas pu être mesurées, faute de données :
   `.expression-placement` (11 px à 0,6), `&__abs` (12 px à 0,7) et
   `.expression-gaps` (0,75) vivent dans la watchlist, vide ; `.unsupported`

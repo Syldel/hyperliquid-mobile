@@ -70,6 +70,15 @@ h2 {
   color: var(--ion-color-danger);
 }
 
+// Le brut est une pièce de comparaison, pas le résultat : il se lit dans la
+// même teinte que les libellés, pendant que le net garde le vert et le rouge.
+// Écrit le 2026-10-11 parce que la classe existait dans le gabarit sans aucune
+// règle derrière — mesuré dans le navigateur, le brut s'affichait exactement
+// comme le net, donc aussi affirmatif que lui.
+.muted {
+  color: var(--ion-color-medium);
+}
+
 .legend {
   display: flex;
   gap: 12px;

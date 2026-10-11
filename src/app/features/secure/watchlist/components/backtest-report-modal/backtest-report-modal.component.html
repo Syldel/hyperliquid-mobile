@@ -91,7 +91,8 @@
       <tr>
         <th>Realized, gross</th>
         @for (column of columns(); track column.label) {
-          <td>
+          <!-- `muted` : le brut est une pièce de comparaison, pas le résultat. -->
+          <td class="muted">
             {{ formatPercent(column.stats.realizedGrossPercent) }}
           </td>
         }
