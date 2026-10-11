@@ -97,6 +97,39 @@ $dark-text: #feffff;
   --ion-color-tertiary-shade: #e07046;
   --ion-color-tertiary-tint: #ff8c62;
 
+  // Le vert d'Ionic (`#2dd55b`) est calibré pour un fond sombre : sur du clair
+  // il donne 1,68:1 contre le fond de page. Longtemps resté là faute de pouvoir
+  // le mesurer en situation — la watchlist était vide. Elle ne l'est plus, et
+  // le 2026-10-11 ce vert portait le **rendement du backtest**, c'est-à-dire le
+  // chiffre que l'écran existe pour montrer : 1,94:1 dans la modale, 1,59:1 sur
+  // le bandeau de résumé. Un gain illisible est un gain qui ne se lit pas.
+  //
+  // `#166f2e` garde la teinte d'Ionic (136,4°) et sa saturation (66,7 %), et
+  // n'en baisse que la clarté — 51 % → 26 %. Choisi en mesurant les **trois**
+  // fonds sur lesquels l'app pose ce vert, et non le seul fond de page :
+  //
+  //   fond de page `#feffff`                        6,26:1
+  //   `--ion-background-color-step-100` `#e8e8e8`   5,12:1   ← bandeau backtest
+  //   `rgba(success-rgb, .1)` sur blanc             5,43:1   ← puces user-fills
+  //
+  // Le vert le plus clair qui passe les trois est `#187732` (4,60 sur le palier
+  // 100), à 0,1 du seuil : un fond un peu différent le ferait retomber. Deux
+  // points de clarté en moins ne coûtent rien à l'œil et rendent la marge
+  // réelle — c'est le choix fait ici. C'est aussi le piège que
+  // `danger` avait tendu en sombre — l'idiome « fond teinté à 10 % + texte de la
+  // même couleur » fait monter le fond **vers** le texte, et se mesure donc à
+  // part.
+  //
+  // `contrast` passe au blanc : le noir ne tient plus que 3,35:1 sur ce vert, et
+  // `ion-button color="success"` en plein l'écrirait. `shade` et `tint` suivent
+  // la formule d'Ionic (base × 0,88 ; base + 10 % vers le blanc).
+  --ion-color-success: #166f2e;
+  --ion-color-success-rgb: 22, 111, 46;
+  --ion-color-success-contrast: #ffffff;
+  --ion-color-success-contrast-rgb: 255, 255, 255;
+  --ion-color-success-shade: #136228;
+  --ion-color-success-tint: #2d7d43;
+
   --ion-background-color: #{$light-background};
   --ion-background-color-rgb: #{rgb-channels($light-background)};
   --ion-text-color: #{$light-text};
@@ -167,8 +200,24 @@ $dark-text: #feffff;
   // (`@ionic/core/css/palettes/dark.class.css`), recopiées plutôt qu'importées
   // pour que les deux branches du sombre appliquent exactement le même bloc.
   //
-  // `success` n'y figure pas : `#2dd55b` est identique en clair et en sombre, et
-  // donne déjà 8,65:1 sur `#1d1d1d`. Le redéclarer ne dirait rien.
+  // `success` **y figure désormais**, alors qu'il n'y figurait pas : `#2dd55b`
+  // donne 8,65:1 sur `#1d1d1d` et n'a jamais posé de problème ici. C'est le
+  // thème clair qui a dû s'en éloigner (voir `:root`) — et le sombre doit donc
+  // le réécrire, sans quoi il hériterait du vert foncé du clair, 2,69:1 sur
+  // `#1d1d1d`. On aurait déplacé le défaut au lieu de le corriger. C'est la
+  // règle de ce fichier : ce qui distingue le sombre du clair vit ici, et
+  // nulle part ailleurs.
+  //
+  // Les six valeurs sont celles de la palette **claire** d'Ionic 8.8.2, qui
+  // était jusqu'ici le défaut des deux thèmes — relues dans `core.css`, pas
+  // recalculées.
+  --ion-color-success: #2dd55b;
+  --ion-color-success-rgb: 45, 213, 91;
+  --ion-color-success-contrast: #000000;
+  --ion-color-success-contrast-rgb: 0, 0, 0;
+  --ion-color-success-shade: #28bb50;
+  --ion-color-success-tint: #42d96b;
+
   //
   // `tertiary` non plus : l'app le marque en corail `#ff7f50`, que la palette
   // Ionic remplaçait par un violet en sombre — c'est-à-dire que l'accent de

@@ -101,7 +101,7 @@ combats de spécificité contre `:root:not(.dark-theme):not(.light-theme)` et
 rend des chiffres faux. Recoupement : la reconstitution retrouve à l'identique
 les 1,10 et 2,09 relevés en début de séance, avant toute modification.
 
-## Cinq pièges de couleur, et ce qu'ils ont coûté
+## Sept pièges de couleur, et ce qu'ils ont coûté
 
 ### Le `shade` d'Ionic va dans le mauvais sens en thème sombre
 
@@ -264,33 +264,56 @@ aucun échec dans la modale). La variante `--warning` du même bandeau garde son
 `warning-shade` : `#e0b52b` tient 6,56:1, le jaune est assez clair pour que la
 mauvaise direction ne coûte rien.
 
+### Le vert de succès, descendu pour le thème clair
+
+Le vert d'Ionic `#2dd55b` est calibré pour un fond sombre : il y tient 8,65:1,
+et il tombe à **1,68:1** sur blanc. Ce document l'a longtemps laissé ainsi en
+notant « changer une couleur de marque est une décision, pas un correctif » — la
+watchlist était vide, le vert ne portait rien de mesurable.
+
+Elle ne l'est plus. Mesuré le 2026-10-11 (stratégie « Basic SMA 20 » sur BTC, un
+an en 1 D), le vert portait **le rendement du backtest** : le chiffre pour lequel
+l'écran existe.
+
+| texte en vert, thème clair                          | avant | après |
+| --------------------------------------------------- | ----: | ----: |
+| `Realized, net of fees` dans la modale (13 px)      |  1,94 |  6,26 |
+| le rendement du bandeau de résumé (12 px, sur gris) |  1,59 |  5,12 |
+| `PnL All` de `user-fills` (fond teinté à 10 %)      |     — |  5,41 |
+| badge `TP` plein de `bot-strategies` (texte blanc)  |     — |  6,27 |
+
+Ce qui a rendu la correction possible sans toucher au sombre, c'est que `danger`
+avait déjà ouvert la voie : il est surchargé **par thème** (`#c5000f` en clair,
+`#ff6b75` en sombre). `success` ne l'était dans aucun des deux — il tombait donc
+sur le défaut d'Ionic partout. Posé `#166f2e` dans `:root`, et le `#2dd55b`
+d'Ionic **réécrit** dans `dark-mode-vars` : sans cette réécriture, le sombre
+héritait du vert foncé et retombait à 2,69:1. Déplacer un défaut n'est pas le
+corriger.
+
+Deux choses que cette correction apprend, et qui ne se devinent pas :
+
+- **le vert se mesure sur trois fonds, pas un.** Le fond de page, le palier
+  `step-100` d'une carte, et le fond teinté à 10 % de l'idiome ci-dessus. Le
+  vert le plus clair qui passe le fond de page échoue sur les deux autres ;
+- **`contrast` doit suivre.** À `#166f2e`, le noir ne tient plus que 3,35:1 —
+  et `ion-badge color="success"` l'écrit en plein. Passé au blanc, 6,27:1.
+  Vérifié sur les badges `TP` de `bot-strategies`, qui sont pleins.
+
+⚠️ Non observés dans le navigateur, faute d'avoir ouvert la modale : les
+`.tp-label` et `.tp-card` de `protective-modal`, le bouton `Add TP` en `outline`,
+et `order-form`. Tous posent le vert sur un fond de page blanc, donc 6,26:1 par
+le même calcul — mais c'est un calcul, pas une mesure.
+
 ## Ce qui reste
 
 - **`danger` plein reste à 4,39:1 en sombre** sur une puce — la seule des douze
   combinaisons à rester sous le seuil.
-- **Le vert de succès en thème clair** : `#2dd55b` sur blanc donne 1,68:1. C'est
-  la valeur par défaut d'Ionic, jamais reprise par l'app, et elle est illisible
-  en clair pour du texte. Non corrigée : changer une couleur de marque est une
-  décision, pas un correctif.
-
-  ⚠️ **Ce n'est plus un cas théorique.** Mesuré le 2026-10-11 sur une watchlist
-  enfin peuplée (stratégie « Basic SMA 20 » sur BTC, 1 an en 1 D), le vert porte
-  désormais le chiffre que l'écran existe pour montrer :
-
-  | texte en vert, thème clair                          | mesuré |
-  | --------------------------------------------------- | -----: |
-  | `Realized, net of fees` dans la modale (13 px)      |   1,94 |
-  | le rendement du bandeau de résumé (12 px, sur gris) |   1,59 |
-
-  Le rouge du même couple ne pose pas le problème, et c'est ce qui rend le vert
-  réparable : `--ion-color-danger` est surchargé **par thème** — `#c5000f` en
-  clair, `#ff6b75` en sombre — et `Max drawdown, net` tient 6,20:1 et 6,11:1.
-  Seul le vert est resté sur la valeur d'Ionic. Le correctif cohérent avec ce qui
-  a déjà été fait pour `danger` serait donc un `--ion-color-success` propre au
-  thème clair — une décision à prendre, pas un correctif à glisser dans un commit
-  d'affichage.
-  Le même avertissement vaut pour `--ion-color-warning-shade` (`#e0ac08`), à
-  2,08:1 sur la note « last point sits on a candle that had not closed yet ».
+- **Le jaune d'avertissement en thème clair** : `--ion-color-warning-shade`
+  (`#e0ac08`) donne **2,08:1** sur le fond de page — mesuré le 2026-10-11 sur la
+  note « The last point sits on a candle that had not closed yet », c'est-à-dire
+  sur un texte dont le métier est d'être remarqué. C'est le dernier échec de
+  contraste du rapport de backtest en clair. Non corrigé : c'est le même genre de
+  décision que le vert ci-dessous, et elle n'a pas été prise.
 
 - Les `opacity` restantes n'ont pas pu être mesurées, faute de données :
   `.expression-placement` (11 px à 0,6), `&__abs` (12 px à 0,7) et
