@@ -130,6 +130,49 @@ $dark-text: #feffff;
   --ion-color-success-shade: #136228;
   --ion-color-success-tint: #2d7d43;
 
+  // Le jaune se traite autrement que le vert, parce que l'app lui donne **deux
+  // rôles** et un seul des deux pose problème :
+  //
+  //   `--ion-color-warning`       un aplat ou une bordure — pastille d'une paire,
+  //                               bandeau de version, bordure d'avertissement ;
+  //   `--ion-color-warning-shade` du **texte** — note « the last point sits on a
+  //                               candle that had not closed yet », bandeau de
+  //                               `trading-pair-modal`, avertissements du
+  //                               rapport de backtest.
+  //
+  // Le `shade` d'Ionic (`#e0ac08`) n'est qu'à 12 % sous sa base : il donne
+  // 2,08:1 sur le fond de page et 1,96:1 sur le fond teinté à 12 % de
+  // `trading-pair-modal` — mesuré le 2026-10-11, sur des textes dont le métier
+  // est précisément d'être remarqués.
+  //
+  // Un jaune ne peut pas atteindre 4,5:1 sur du blanc en restant jaune : il
+  // faut descendre dans l'ambre foncé. C'est ce que fait Primer (GitHub) avec
+  // son `attention-fg` `#9a6700`, qui garde l'aplat jaune et ne descend que le
+  // texte — 4,86:1 ici, 4,57:1 sur le fond teinté. `#856500` tient la même
+  // teinte (45,6°) et laisse une marge réelle : 5,43:1 et 5,11:1.
+  //
+  // ⚠️ Ce correctif ne couvre **que** le rôle de texte que les feuilles de
+  // l'app écrivent elles-mêmes. Un `color="warning"` posé sur un `ion-text`,
+  // un `ion-note` ou un `ion-icon` prend la **base**, pas le `shade`, et reste
+  // donc à ~1,7:1 sur du clair. Les déplacer demanderait de descendre la base,
+  // ce qui repeindrait aussi les aplats (pastille d'une paire, badges
+  // `Reduce` / `newer version`, bandeau de version) et forcerait leur
+  // `contrast` au blanc — le jaune cesserait d'être jaune. C'est une décision
+  // d'identité, pas un correctif de contraste : voir `docs/theming.md`.
+  //
+  // `shade` sert aussi à Ionic pour l'état actif d'un composant
+  // `color="warning"` ; l'appui se peindra donc en ambre foncé.
+  //
+  // La base, `contrast` et `tint` restent les valeurs d'Ionic 8.8.2 : elles sont
+  // écrites ici pour qu'une mise à jour d'Ionic ne ramène pas le `shade` clair
+  // sans que rien ne le dise.
+  --ion-color-warning: #ffc409;
+  --ion-color-warning-rgb: 255, 196, 9;
+  --ion-color-warning-contrast: #000000;
+  --ion-color-warning-contrast-rgb: 0, 0, 0;
+  --ion-color-warning-shade: #856500;
+  --ion-color-warning-tint: #ffca22;
+
   --ion-background-color: #{$light-background};
   --ion-background-color-rgb: #{rgb-channels($light-background)};
   --ion-text-color: #{$light-text};

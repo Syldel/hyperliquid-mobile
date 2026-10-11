@@ -101,7 +101,7 @@ combats de spécificité contre `:root:not(.dark-theme):not(.light-theme)` et
 rend des chiffres faux. Recoupement : la reconstitution retrouve à l'identique
 les 1,10 et 2,09 relevés en début de séance, avant toute modification.
 
-## Sept pièges de couleur, et ce qu'ils ont coûté
+## Huit pièges de couleur, et ce qu'ils ont coûté
 
 ### Le `shade` d'Ionic va dans le mauvais sens en thème sombre
 
@@ -304,16 +304,61 @@ Deux choses que cette correction apprend, et qui ne se devinent pas :
 et `order-form`. Tous posent le vert sur un fond de page blanc, donc 6,26:1 par
 le même calcul — mais c'est un calcul, pas une mesure.
 
+### Le jaune a deux rôles, et un seul était cassé
+
+Même journée, même écran, le dernier échec du rapport de backtest en clair : la
+note « The last point sits on a candle that had not closed yet », à **2,08:1**.
+Un avertissement dont le métier est d'être remarqué.
+
+Mais le jaune ne se traite pas comme le vert, parce que l'app lui donne **deux
+rôles** :
+
+| variable                    | rôle dans l'app                                      |
+| --------------------------- | ---------------------------------------------------- |
+| `--ion-color-warning`       | un aplat ou une bordure — pastille, bandeau, contour |
+| `--ion-color-warning-shade` | du **texte** — six règles, dans trois feuilles       |
+
+Le `shade` d'Ionic n'est qu'à 12 % sous sa base : il reste un jaune. Et un jaune
+ne peut pas atteindre 4,5:1 sur du blanc **en restant jaune** — il faut descendre
+dans l'ambre foncé. C'est exactement ce que fait Primer (GitHub) avec son
+`attention-fg` `#9a6700` : l'aplat reste jaune, seul le texte descend. Mesuré
+ici, `#9a6700` donnerait 4,86:1 sur le fond de page et 4,57:1 sur le fond teinté
+à 12 % de `trading-pair-modal`. `#856500` tient la même teinte (45,6°) avec une
+marge réelle : **5,43:1** et 5,11:1.
+
+Donc : `--ion-color-warning-shade: #856500` dans `:root`, et la base, `contrast`
+et `tint` laissées aux valeurs d'Ionic — écrites quand même, pour qu'une mise à
+jour d'Ionic ne ramène pas le `shade` clair en silence. Le sombre déclarait déjà
+son bloc `warning` complet, il n'avait donc rien à rattraper.
+
+Mesuré après : le rapport de backtest passe de **1 échec à 0** en clair (50
+éléments), et le sombre reste à 0 (la note y tient 8,68:1, inchangée).
+
+⚠️ Ce que cela **ne** corrige pas : tout ce qui arrive par `color="warning"`,
+qui prend la base et non le `shade` — voir « Ce qui reste ». Et le bandeau teinté
+de `trading-pair-modal` n'a pas été observé dans le navigateur, seulement calculé
+(5,11:1) : l'ouvrir demande de naviguer dans la configuration d'une paire du bot.
+
 ## Ce qui reste
 
 - **`danger` plein reste à 4,39:1 en sombre** sur une puce — la seule des douze
   combinaisons à rester sous le seuil.
-- **Le jaune d'avertissement en thème clair** : `--ion-color-warning-shade`
-  (`#e0ac08`) donne **2,08:1** sur le fond de page — mesuré le 2026-10-11 sur la
-  note « The last point sits on a candle that had not closed yet », c'est-à-dire
-  sur un texte dont le métier est d'être remarqué. C'est le dernier échec de
-  contraste du rapport de backtest en clair. Non corrigé : c'est le même genre de
-  décision que le vert ci-dessous, et elle n'a pas été prise.
+- **Le jaune d'Ionic quand il arrive par `color="warning"`**, et non par une
+  feuille de l'app : un `ion-text`, un `ion-note` ou un `ion-icon` ainsi marqué
+  prend la **base** (`#ffc409`), pas le `shade` corrigé ci-dessous : **1,59:1**
+  sur le fond de page. Dix emplacements, relevés le 2026-10-11 — trois en texte
+  (`anchor-editor-modal` en `ion-note`, `trading-pair-modal` et
+  `market-picker-modal` en `ion-text`), deux en icône (`watchlist-detail`,
+  `market-picker-modal` — seuil 3:1, échec quand même), et cinq en badge **plein**
+  (`Reduce`, `Reduce Only`, `newer version`, plus le `[color]` dynamique de
+  `protective-modal`), qui eux ne posent pas de problème : le texte y est noir sur
+  le jaune, 13,15:1.
+
+  Les corriger voudrait dire descendre `--ion-color-warning` elle-même, ce qui
+  repeindrait aussi les aplats — pastille d'une paire, bandeau de version — et
+  forcerait leur `contrast` au blanc. Autrement dit : **le jaune cesserait d'être
+  jaune**. C'est une décision d'identité visuelle, pas un correctif de contraste,
+  et elle n'a pas été prise.
 
 - Les `opacity` restantes n'ont pas pu être mesurées, faute de données :
   `.expression-placement` (11 px à 0,6), `&__abs` (12 px à 0,7) et
