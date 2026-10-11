@@ -299,10 +299,22 @@ Deux choses que cette correction apprend, et qui ne se devinent pas :
   et `ion-badge color="success"` l'écrit en plein. Passé au blanc, 6,27:1.
   Vérifié sur les badges `TP` de `bot-strategies`, qui sont pleins.
 
-⚠️ Non observés dans le navigateur, faute d'avoir ouvert la modale : les
-`.tp-label` et `.tp-card` de `protective-modal`, le bouton `Add TP` en `outline`,
-et `order-form`. Tous posent le vert sur un fond de page blanc, donc 6,26:1 par
-le même calcul — mais c'est un calcul, pas une mesure.
+Et une **troisième** leçon, trouvée en voulant vérifier les surfaces laissées de
+côté : le `.tp-label` de `protective-modal` ne vit **pas** sur le fond de page.
+Ses cartes (`.entry-card`) posent `--ion-background-color-step-50`, soit
+`#f3f4f4` en clair. Le vert y donne **5,69:1** après correction — et **1,77:1**
+avant, contre 1,68 sur le fond de page : la modale était donc concernée elle
+aussi. Écrire « 6,26:1 par le même calcul » aurait été faux sur le fond, juste
+sur la conclusion. Le rouge voisin (`.sl-label`) y tient 5,64:1.
+
+⚠️ Reste **non observé dans le navigateur** : `order-form` (`.diff--success`),
+dont la feuille ne déclare aucun fond — donc impossible de dire lequel il hérite
+sans le rendre. La page `open-orders/detail` affiche « No data found » tant
+qu'aucun ordre n'existe, et fabriquer un ordre pour mesurer une couleur n'est
+pas une option. La modale `protective-modal` elle-même n'a pas été ouverte non
+plus : elle ne s'atteint que par les options glissantes d'une paire, dont l'une
+est **Supprimer**. Les chiffres ci-dessus viennent donc des jetons et du fond
+lus dans la feuille, pas du DOM rendu.
 
 ### Le jaune a deux rôles, et un seul était cassé
 
@@ -335,9 +347,14 @@ Mesuré après : le rapport de backtest passe de **1 échec à 0** en clair (50
 éléments), et le sombre reste à 0 (la note y tient 8,68:1, inchangée).
 
 ⚠️ Ce que cela **ne** corrige pas : tout ce qui arrive par `color="warning"`,
-qui prend la base et non le `shade` — voir « Ce qui reste ». Et le bandeau teinté
-de `trading-pair-modal` n'a pas été observé dans le navigateur, seulement calculé
-(5,11:1) : l'ouvrir demande de naviguer dans la configuration d'une paire du bot.
+qui prend la base et non le `shade` — voir « Ce qui reste ».
+
+⚠️ Le bandeau teinté de `trading-pair-modal` n'a pas été observé non plus, pour
+la même raison que `protective-modal` ci-dessus. Calculé sur les deux fonds
+possibles, puisque la feuille ne dit pas sur lequel il atterrit : **5,11:1** s'il
+tombe sur le fond de page, **4,68:1** s'il tombe sur une carte en `step-50`. Les
+deux passent, mais le second de justesse — c'est la mesure qui trancherait, et
+elle n'a pas été faite.
 
 ## Ce qui reste
 

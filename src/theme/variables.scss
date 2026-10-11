@@ -105,12 +105,17 @@ $dark-text: #feffff;
   // le bandeau de résumé. Un gain illisible est un gain qui ne se lit pas.
   //
   // `#166f2e` garde la teinte d'Ionic (136,4°) et sa saturation (66,7 %), et
-  // n'en baisse que la clarté — 51 % → 26 %. Choisi en mesurant les **trois**
+  // n'en baisse que la clarté — 51 % → 26 %. Choisi en mesurant les **quatre**
   // fonds sur lesquels l'app pose ce vert, et non le seul fond de page :
   //
   //   fond de page `#feffff`                        6,26:1
   //   `--ion-background-color-step-100` `#e8e8e8`   5,12:1   ← bandeau backtest
   //   `rgba(success-rgb, .1)` sur blanc             5,43:1   ← puces user-fills
+  //   `--ion-background-color-step-50` `#f3f4f4`    5,69:1   ← protective-modal
+  //
+  // Le quatrième a été trouvé après coup, en relisant les feuilles : les cartes
+  // de `protective-modal` ont leur propre fond, et le vert d'Ionic y tombait à
+  // 1,77:1. Une liste de fonds ne se devine pas, elle se relit.
   //
   // Le vert le plus clair qui passe les trois est `#187732` (4,60 sur le palier
   // 100), à 0,1 du seuil : un fond un peu différent le ferait retomber. Deux
