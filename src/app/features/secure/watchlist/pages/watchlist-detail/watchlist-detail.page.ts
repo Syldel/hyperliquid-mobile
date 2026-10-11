@@ -125,7 +125,7 @@ import {
   type BacktestFocus,
 } from '../../components/backtest-report-modal/backtest-report-modal.component';
 import {
-  BACKTEST_LIMITS,
+  backtestLimits,
   definedSides,
   formatPercent,
   percentTone,
@@ -1331,7 +1331,14 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
 
   // ── Backtest report ────────────────────────────────────────────────────────
 
-  readonly backtestLimits = BACKTEST_LIMITS;
+  /**
+   * Le palier vient de chaque rapport, et la note parle pour **tous** ceux qui
+   * sont à l'écran : deux stratégies pourraient porter deux paliers, et une
+   * note qui n'en nommerait qu'un serait fausse pour l'autre.
+   */
+  readonly backtestLimits = computed(() =>
+    backtestLimits(this.visibleStrategyResults().map((result) => result.report.feePerSide)),
+  );
   readonly formatPercent = formatPercent;
   readonly percentTone = percentTone;
   readonly statsOf = statsOf;

@@ -41,6 +41,9 @@ function report(overrides: Partial<BacktestReport> = {}): BacktestReport {
   return {
     from: H,
     to: 10 * H,
+    // Palier taker de base, écrit en clair : un test ne gagne rien à relire
+    // la constante du paquet, et il dirait alors la même chose qu'elle.
+    feePerSide: 0.00045,
     long: stats({ trades: 2 }),
     short: stats(),
     total: stats({ trades: 2 }),

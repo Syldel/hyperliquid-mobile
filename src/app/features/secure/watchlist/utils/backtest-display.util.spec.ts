@@ -1,6 +1,6 @@
 import type { BacktestReport, BacktestStats } from '@syldel/trading-shared-types';
 import {
-  BACKTEST_LIMITS,
+  backtestLimits,
   definedSides,
   equityLines,
   formatPercent,
@@ -36,6 +36,9 @@ function report(overrides: Partial<BacktestReport> = {}): BacktestReport {
   return {
     from: H,
     to: 2 * H,
+    // Palier taker de base, écrit en clair : un test ne gagne rien à relire
+    // la constante du paquet, et il dirait alors la même chose qu'elle.
+    feePerSide: 0.00045,
     long: stats(),
     short: stats(),
     total: stats(),
@@ -52,28 +55,93 @@ function report(overrides: Partial<BacktestReport> = {}): BacktestReport {
   };
 }
 
-describe('BACKTEST_LIMITS', () => {
-  const joined = BACKTEST_LIMITS.join(' ').toLowerCase();
+describe('backtestLimits', () => {
+  const TAKER = 0.00045;
+  const MAKER = 0.00015;
+  const joined = (fees: readonly number[]) => backtestLimits(fees).join(' ').toLowerCase();
 
-  it('never claims the figures ignore fees', () => {
+  it('never claims the figures ignore fees when a fee was charged', () => {
     /**
      * Le rapport est net de frais depuis les types partagés 0.27.0, et l'écran
      * l'annonce par une puce « net of fees ». Une note qui dit le contraire,
      * dans le même bloc, est pire qu'une note absente : elle fait lire un brut
      * là où un net est affiché. Constaté dans le navigateur le 2026-10-11.
      */
-    expect(joined).not.toMatch(/no fees|without fees|fees are not/);
+    expect(joined([TAKER])).not.toMatch(/no fees|without fees|fees are not/);
   });
 
-  it('says the figures are net of fees', () => {
-    expect(joined).toContain('net of the trading fees');
+  it('names the tier the report applied, rather than staying vague', () => {
+    // Le point de ce changement : l'écran disait « the trading fees the server
+    // applies », ce qu'aucun lecteur ne peut vérifier.
+    expect(joined([TAKER])).toContain('net of 0.045% per side');
+  });
+
+  it('writes the tier without the tail of a floating-point product', () => {
+    /**
+     * ⚠️ Le palier de base **tombe juste** : `0.00045 * 100` vaut exactement
+     * `0.045`. Éprouver l'arrondi sur lui ne prouve donc rien — la mutation qui
+     * retire l'arrondi y survit. Les paliers de volume, eux, ne tombent pas
+     * juste : `0.00035 * 100` rend `0.034999999999999996`.
+     */
+    expect(joined([0.00035])).toContain('0.035% per side');
+    expect(joined([0.0007])).toContain('0.07% per side');
+  });
+
+  it('says a zero fee is no fee, instead of announcing a net of zero', () => {
+    /**
+     * Un palier nul est un palier choisi — celui qui isole ce que les frais
+     * coûtent. Annoncer « net of 0% » ferait lire un net là où il y a un brut.
+     */
+    const text = joined([0]);
+
+    expect(text).toContain('no fees charged');
+    expect(text).not.toContain('net of 0%');
+  });
+
+  it('refuses to name one tier when the strategies on screen carry two', () => {
+    /**
+     * La note est rendue **une fois** pour toutes les stratégies visibles. En
+     * nommer une seule serait faux pour l'autre — et une note fausse est pire
+     * qu'une note vague.
+     */
+    const text = joined([TAKER, MAKER]);
+
+    expect(text).toContain('different tiers per strategy');
+    expect(text).toContain('0.015%');
+    expect(text).toContain('0.045%');
+  });
+
+  it('names a tier once when every strategy carries the same one', () => {
+    // Deux rapports au même palier ne sont pas une divergence.
+    expect(joined([TAKER, TAKER])).toContain('net of 0.045% per side');
+    expect(joined([TAKER, TAKER])).not.toContain('different tiers');
+  });
+
+  it('stays vague rather than invent a tier it cannot read', () => {
+    /**
+     * `buildBacktestReport` refuse un palier non fini ou négatif, donc un
+     * rapport ne devrait jamais en porter. L'écran ne doit pas pour autant
+     * afficher `NaN%` ni `-1%` : il retombe sur la formulation sans chiffre.
+     */
+    for (const fees of [[], [Number.NaN], [-1], [Number.POSITIVE_INFINITY]]) {
+      expect(joined(fees)).toContain('net of the trading fees the server applies');
+    }
   });
 
   it('still names what is not counted', () => {
     // Le funding et le slippage restent hors de portée : les taire les ferait
     // oublier, et le chiffre serait lu comme un résultat complet.
-    expect(joined).toContain('funding');
-    expect(joined).toContain('slippage');
+    for (const fees of [[TAKER], [0], [TAKER, MAKER], []]) {
+      expect(joined(fees)).toContain('funding');
+      expect(joined(fees)).toContain('slippage');
+    }
+  });
+
+  it('keeps the three limits that do not depend on the tier', () => {
+    expect(backtestLimits([TAKER])).toHaveLength(4);
+    expect(joined([TAKER])).toContain('simplified simulation');
+    expect(joined([TAKER])).toContain('take-profit / stop-loss');
+    expect(joined([TAKER])).toContain('added, not compounded');
   });
 });
 

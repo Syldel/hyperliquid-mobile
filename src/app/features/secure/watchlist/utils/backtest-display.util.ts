@@ -29,13 +29,73 @@ import type {
  * de frais (types partagés 0.27.0) : le résumé affichait la puce « net of fees »
  * à deux lignes d'une note qui disait encore « with no fees », les deux dans le
  * même bloc. Aucun test ne l'avait vu — il y en a un maintenant.
+ *
+ * C'est aussi pourquoi ce n'est plus une constante : depuis la version 0.28.0
+ * le rapport porte le palier qu'il a appliqué, et la liste le **lit** au lieu
+ * de le taire. Une liste figée ne peut pas suivre une donnée qui vient du
+ * serveur.
  */
-export const BACKTEST_LIMITS: readonly string[] = [
-  'Simplified simulation — not what the bot would have earned.',
-  "Trades fill at the signal candle's close, net of the trading fees the server applies; funding and slippage are not counted.",
-  "Take-profit / stop-loss, latent orders and the pair's exit behaviour are not simulated yet.",
-  'Each trade counts at the same size; returns are added, not compounded.',
-];
+export function backtestLimits(fees: readonly number[]): readonly string[] {
+  return [
+    'Simplified simulation — not what the bot would have earned.',
+    fillLine(fees),
+    "Take-profit / stop-loss, latent orders and the pair's exit behaviour are not simulated yet.",
+    'Each trade counts at the same size; returns are added, not compounded.',
+  ];
+}
+
+/**
+ * La ligne qui dit **de quoi** les chiffres sont nets, et sous quelle hypothèse.
+ *
+ * Le palier vient du rapport (`BacktestReport.feePerSide`, types partagés
+ * 0.28.0) et jamais d'ici : le reproduire côté app en ferait une seconde source
+ * de vérité, qui divergerait en silence le jour où le bot passerait au palier
+ * réel de l'utilisateur. D'où une fonction plutôt qu'une constante.
+ */
+function fillLine(fees: readonly number[]): string {
+  const FILL = "Trades fill at the signal candle's close";
+  const REST = 'funding and slippage are not counted';
+  const distinct = [...new Set(fees.filter(isUsableFee))].sort((a, b) => a - b);
+
+  // Aucun palier lisible : on ne nomme rien plutôt que de nommer au hasard. Le
+  // cas ne devrait pas se produire — `buildBacktestReport` refuse un palier non
+  // fini ou négatif — mais l'écran ne doit pas inventer pour autant.
+  if (distinct.length === 0) {
+    return `${FILL}, net of the trading fees the server applies; ${REST}.`;
+  }
+
+  // Un palier nul est un palier **choisi** : celui qui isole ce que les frais
+  // coûtent. Annoncer « net de 0 % » ferait lire un net là où il y a un brut.
+  if (distinct.length === 1 && distinct[0] === 0) {
+    return `${FILL}, with no fees charged; ${REST} either.`;
+  }
+
+  if (distinct.length === 1) {
+    return `${FILL}, net of ${percentPerSide(distinct[0]!)} per side; ${REST}.`;
+  }
+
+  // Deux stratégies au même écran peuvent porter deux paliers : une note qui
+  // n'en nommerait qu'un serait fausse pour l'autre.
+  return (
+    `${FILL}, net of fees charged at different tiers per strategy ` +
+    `(${distinct.map(percentPerSide).join(', ')}); ${REST}.`
+  );
+}
+
+function isUsableFee(fee: number): boolean {
+  return Number.isFinite(fee) && fee >= 0;
+}
+
+/**
+ * `0.00035` → `0.035%`. Tous les paliers ne tombent pas juste : `0.00035 * 100`
+ * rend `0.034999999999999996`, et `0.0007 * 100` rend `0.06999999999999999`.
+ * Sans l'arrondi, l'écran afficherait cette queue — et le palier de base
+ * (`0.00045`), lui, tombe juste, ce qui rend le défaut invisible si on ne
+ * l'éprouve que sur celui-là. C'est ce qui est arrivé : la mutation a survécu.
+ */
+function percentPerSide(fee: number): string {
+  return `${Number((fee * 100).toFixed(6))}%`;
+}
 
 /** `+1.23%`, `-0.40%` : le signe toujours écrit, pour qu'un gain ne se lise pas comme une perte. */
 export function formatPercent(value: number, digits = 2): string {

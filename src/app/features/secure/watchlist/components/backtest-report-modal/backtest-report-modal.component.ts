@@ -1,5 +1,13 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, input, OnInit, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  OnInit,
+  signal,
+} from '@angular/core';
 import {
   IonButton,
   IonButtons,
@@ -20,7 +28,7 @@ import { addIcons } from 'ionicons';
 import { locateOutline } from 'ionicons/icons';
 import { POSITION_COLORS } from '../../services/strategy-positions-pane.service';
 import {
-  BACKTEST_LIMITS,
+  backtestLimits,
   equityLines,
   formatPercent,
   formatPriceForDisplay,
@@ -85,7 +93,7 @@ export class BacktestReportModalComponent implements OnInit {
 
   private readonly modalCtrl = inject(ModalController);
 
-  readonly limits = BACKTEST_LIMITS;
+  readonly limits = computed(() => backtestLimits([this.report().feePerSide]));
   readonly formatPercent = formatPercent;
   readonly formatPriceForDisplay = formatPriceForDisplay;
   readonly percentTone = percentTone;

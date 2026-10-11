@@ -225,7 +225,7 @@
          rapporté ». Ils ne le sont pas, et chaque ligne nomme un écart réel avec
          le bot — voir docs/watchlist/chart-overlays.md. -->
     <ul class="backtest-limits">
-      @for (limit of backtestLimits; track limit) {
+      @for (limit of backtestLimits(); track limit) {
       <li>{{ limit }}</li>
       }
     </ul>
