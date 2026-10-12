@@ -35,6 +35,33 @@
   }
 }
 
+// Le bandeau des taux se range comme celui du PnL, mais sans teinte : il
+// n'annonce ni gain ni perte, il donne la règle qui explique la colonne `Fee`.
+.fee-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px;
+  font-size: 0.8rem;
+  // Le même gris que `.fill-row`, qui porte la ligne `Fee:` que ce bandeau
+  // explique : même rôle, même page, donc même teinte. Mesuré sur ce fond,
+  // 6,00:1 en sombre et 5,21:1 en clair — une première version prenait
+  // `--ion-text-color-step-300` en invoquant un contraste insuffisant, ce qui
+  // est vrai sur un fond relevé (`.backtest-block` de la watchlist) mais pas
+  // ici, où le fond est celui de la page. Voir docs/theming.md.
+  color: var(--ion-color-medium);
+  font-variant-numeric: tabular-nums;
+
+  &__label {
+    font-weight: 500;
+  }
+
+  &__value--missing {
+    font-style: italic;
+  }
+}
+
 .pnl-banner {
   display: flex;
   justify-content: space-between;

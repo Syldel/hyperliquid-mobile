@@ -77,6 +77,23 @@
     </ion-item>
   </div>
 
+  <!--
+    Les taux du compte, à côté des frais qu'ils expliquent : chaque ligne de la
+    liste porte un `Fee` en USDC que rien ne permettait de vérifier. Avec les
+    deux taux, `fee / (px × sz)` doit tomber sur l'un d'eux — ou sur sa version
+    HIP-3, qui vaut `× 2 × 0,1` sur un marché en growth mode.
+  -->
+  <div filters class="fee-banner">
+    @if (feeRates(); as rates) {
+    <span class="fee-banner__label">Your rates</span>
+    <span class="fee-banner__value">taker {{ rates.taker }} · maker {{ rates.maker }}</span>
+    } @else {
+    <!-- Un trou visible plutôt qu'un taux inventé : voir docs/conventions.md. -->
+    <span class="fee-banner__label">Your rates</span>
+    <span class="fee-banner__value fee-banner__value--missing">{{ feeRatesNote() }}</span>
+    }
+  </div>
+
   <div
     filters
     class="pnl-banner"

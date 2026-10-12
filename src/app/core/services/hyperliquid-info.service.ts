@@ -5,6 +5,7 @@ import type {
   CandleSnapshot,
   CandleSnapshotRequest,
   HlActiveAssetData,
+  HlUserFees,
   HLClearinghouseState,
   HLFrontendOpenOrder,
   HLOpenOrder,
@@ -94,6 +95,31 @@ export class HyperliquidInfoService {
       type: 'userFillsByTime',
       user: this.auth.currentAddress(),
       ...req,
+    });
+  }
+
+  /**
+   * Le barème de frais du compte dont l'adresse est mémorisée.
+   *
+   * Ici et non via le gateway, parce que `userFees` est une **information**, pas
+   * une action : il prend l'adresse en paramètre et ne demande aucune signature.
+   * `docs/ecosystem.md` pose la frontière — le gateway sert « ce qui engage un
+   * compte », l'API publique sert l'information de marché et de compte, et c'est
+   * déjà par elle que cette page lit `userFillsByTime`.
+   *
+   * La conséquence pratique compte autant que le principe : cette page se
+   * consulte **sans jeton valide** (`/secure` est gardé par `WalletGuard`, qui
+   * n'exige qu'une adresse mémorisée). Passer par le gateway rendait le bandeau
+   * vide dans le mode de fonctionnement normal de l'app.
+   *
+   * ⚠️ `userCrossRate` et `userAddRate` sont déjà nets du palier de volume sur 14
+   * jours et de la remise de staking, mais **pas** de la remise de parrainage ni
+   * du barème propre à un marché HIP-3.
+   */
+  getUserFees(): Observable<HlUserFees> {
+    return this.post<HlUserFees>({
+      type: 'userFees',
+      user: this.auth.currentAddress(),
     });
   }
 

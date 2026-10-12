@@ -4,6 +4,7 @@ import type {
   PositionSide,
   StrategyRules,
 } from '@syldel/trading-shared-types';
+import { formatRatePercent } from '@utils/fee-rate.utils';
 
 /**
  * ============================================================================
@@ -87,14 +88,16 @@ function isUsableFee(fee: number): boolean {
 }
 
 /**
- * `0.00035` → `0.035%`. Tous les paliers ne tombent pas juste : `0.00035 * 100`
- * rend `0.034999999999999996`, et `0.0007 * 100` rend `0.06999999999999999`.
- * Sans l'arrondi, l'écran afficherait cette queue — et le palier de base
- * (`0.00045`), lui, tombe juste, ce qui rend le défaut invisible si on ne
- * l'éprouve que sur celui-là. C'est ce qui est arrivé : la mutation a survécu.
+ * `0.00035` → `0.035%`.
+ *
+ * Délègue à `@utils/fee-rate.utils`, qui porte la même règle pour l'écran des
+ * frais : deux copies d'un même arrondi finissent par diverger. Et celle-ci
+ * avait déjà son piège — tous les paliers ne tombent pas juste (`0.00035 * 100`
+ * rend `0.034999999999999996`), mais le palier de base (`0.00045`) si, de sorte
+ * qu'une mutation retirant l'arrondi y a survécu jusqu'au 2026-10-11.
  */
 function percentPerSide(fee: number): string {
-  return `${Number((fee * 100).toFixed(6))}%`;
+  return formatRatePercent(fee);
 }
 
 /** `+1.23%`, `-0.40%` : le signe toujours écrit, pour qu'un gain ne se lise pas comme une perte. */

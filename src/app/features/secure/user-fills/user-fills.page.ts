@@ -1,6 +1,7 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, computed, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { formatDecimalRate } from '@utils/fee-rate.utils';
 import {
   IonBadge,
   IonButton,
@@ -43,9 +44,27 @@ import { interval, Observable } from 'rxjs';
   styleUrls: ['./user-fills.page.scss'],
 })
 export class UserFillsPage extends MenuBasePage {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly hlInfo = inject(HyperliquidInfoService);
   private readonly hlMarket = inject(HyperliquidMarketService);
   private readonly lifecycle = inject(AppLifecycleService);
+
+  /**
+   * Les taux de ce compte, ou la raison pour laquelle ils ne sont pas là.
+   *
+   * ⚠️ Lus sur l'**API publique**, comme les remplissages de cette page :
+   * `userFees` prend l'adresse en paramètre et ne demande aucune signature.
+   * Une première version passait par le gateway, donc par son `UserAuthGuard` —
+   * et `/secure` étant gardé par `WalletGuard`, qui n'exige qu'une adresse
+   * mémorisée, le bandeau était vide dans le mode normal de l'app. La frontière
+   * est posée par `docs/ecosystem.md` : le gateway sert ce qui **engage** un
+   * compte, l'API publique sert l'information.
+   *
+   * `null` tant que la réponse n'est pas là, **et** si elle est illisible : un
+   * écran de frais qui affiche `0%` sur une lecture ratée annonce la gratuité.
+   */
+  readonly feeRates = signal<{ taker: string; maker: string } | null>(null);
+  readonly feeRatesNote = signal('…');
 
   fills = signal<HLUserFill[]>([]);
   coinFilter = signal<string>('');
@@ -82,11 +101,21 @@ export class UserFillsPage extends MenuBasePage {
 
   constructor() {
     super();
+
     // Met à jour maxDate chaque minute
     interval(60_000)
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.maxDate.set(this.getCurrentMaxDate()));
 
+    /**
+     * Au premier passage **et** à chaque retour en avant-plan.
+     *
+     * Les taux ont rejoint cet effet plutôt que d'en avoir un à eux : ils
+     * dépendent du même et unique signal. Le barème est réévalué à la fin de
+     * chaque jour UTC, donc une app laissée ouverte la nuit afficherait sinon le
+     * palier de la veille — exactement la raison qui fait aussi reculer les
+     * dates du filtre.
+     */
     effect(() => {
       this.lifecycle.foregroundCount();
       untracked(() => {
@@ -97,6 +126,7 @@ export class UserFillsPage extends MenuBasePage {
         }
         this.endDateStr.set(this.toLocalISO(new Date()));
         this.fetchFn.set(this.buildFetchFn());
+        this.loadFeeRates();
       });
     });
   }
@@ -105,6 +135,37 @@ export class UserFillsPage extends MenuBasePage {
     const d = new Date();
     d.setSeconds(0, 0);
     return this.toLocalISO(d);
+  }
+
+  /**
+   * Lit les deux taux du compte, et ne garde que ce qui est **lisible**.
+   *
+   * Hyperliquid rend ses taux en chaînes décimales ; `Number('')` vaudrait `0`,
+   * soit un taux parfaitement plausible. `parseDecimalRate` refuse donc tout ce
+   * qui n'est pas un décimal, et l'écran montre un trou plutôt qu'un chiffre
+   * inventé.
+   */
+  private loadFeeRates(): void {
+    this.feeRatesNote.set('…');
+    this.hlInfo
+      .getUserFees()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (fees) => {
+          const taker = formatDecimalRate(fees?.userCrossRate);
+          const maker = formatDecimalRate(fees?.userAddRate);
+          if (taker === null || maker === null) {
+            this.feeRates.set(null);
+            this.feeRatesNote.set('unreadable');
+            return;
+          }
+          this.feeRates.set({ taker, maker });
+        },
+        error: () => {
+          this.feeRates.set(null);
+          this.feeRatesNote.set('unavailable');
+        },
+      });
   }
 
   private buildFetchFn() {
