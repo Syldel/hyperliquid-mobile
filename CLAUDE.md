@@ -154,6 +154,14 @@ npx ng build              # build de production
 npx tsc -p tsconfig.app.json --noEmit
 ```
 
+**Un `npm install` d'une dépendance n'atteint pas un `ng serve` déjà lancé.** Angular
+pré-bundle les dépendances au démarrage, et ce cache ne s'invalide pas : le serveur
+continue de servir l'ancienne version pendant que `tsc`, `ng build` et les tests, eux,
+voient la nouvelle. Rencontré **trois fois en deux jours** — une fois en faisant
+disparaître un bloc entier du DOM sans erreur à l'écran. Redémarrer le serveur après
+chaque installation, ici comme sur le bot et le gateway en mode `watch`. Voir
+[docs/conventions.md](docs/conventions.md).
+
 Les fins de ligne sont **LF partout**, imposées par `.gitattributes` et non par la
 config locale de git : le MacBook, le PC et une CI doivent se comporter à l'identique.
 `npm run format` peut donc réécrire tout `src/` sans bruit — le piège où

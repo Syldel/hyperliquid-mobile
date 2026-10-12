@@ -441,6 +441,37 @@ git ls-files --eol <chemin>  # i/ = index, w/ = copie de travail ; les deux en l
 ⚠️ La même règle vaut pour `trading-shared-types` et le dépôt du bot, qui n'ont pas
 encore de `.gitattributes` : le problème vient du poste Windows, pas de ce dépôt-ci.
 
+## Un `npm install` ne suffit pas : `ng serve` resert l'ancienne version
+
+Mettre à jour une dépendance **pendant** qu'un serveur de développement tourne ne
+change rien à ce qu'il sert. Angular pré-bundle les dépendances au démarrage (cache
+`.angular/`), et `npm install` n'invalide pas ce cache : le processus continue de
+servir la version d'avant.
+
+**Rencontré trois fois en deux jours**, les 2026-10-11 et 2026-10-12, sur
+`trading-shared-types` 0.28.0 puis `hl-shared-types` 0.0.25 et 0.0.26. Les symptômes ne
+désignent pas la cause :
+
+- `tsc`, `ng build` et les tests passent — ils lisent `node_modules`, pas le cache ;
+- l'écran, lui, se comporte comme avant, ou **pire** : un bloc entier peut disparaître
+  du DOM sans erreur visible, parce que la compilation du composant a échoué côté
+  serveur et que le navigateur garde l'ancien module ;
+- `VersionMismatchBannerComponent` l'a signalé une fois — « local 0.27.0, server
+  0.28.0 » — alors que `node_modules` portait bien la 0.28.0. Le bandeau disait vrai :
+  c'est le **bundle** qui était vieux, pas le paquet.
+
+Le remède est le même à chaque fois :
+
+```bash
+# après tout npm install d'une dépendance, redémarrer le serveur
+npm start
+```
+
+⚠️ La même chose vaut pour le bot et le gateway en mode `watch` : ils recompilent le
+TypeScript à chaque écriture, mais ne relisent pas `node_modules`. Une tournée de tag
+qui traverse les dépôts se termine donc par un redémarrage de chaque processus, pas
+seulement par des `npm install`.
+
 ## Prettier
 
 `npm run format` réécrit tout `src/` — sans bruit depuis la normalisation ci-dessus.
