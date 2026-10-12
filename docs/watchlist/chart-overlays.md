@@ -214,7 +214,7 @@ aurait rapporté » :
 | Écart                                                            | D'où il vient                                                  |
 | ---------------------------------------------------------------- | -------------------------------------------------------------- |
 | trades au prix de clôture de la bougie du signal                 | le moteur ; un live ne peut pas traiter à une clôture déjà vue |
-| ni frais, ni funding, ni slippage                                | la simulation, chiffres bruts                                  |
+| ni funding, ni slippage                                          | la simulation ; les **frais**, eux, sont comptés depuis 0.27.0 |
 | TP/SL (`protective`), ordres latents, `exitBehavior` non simulés | `/analysis` ne reçoit que les règles                           |
 | taille constante, rendements additionnés                         | le rapport ; ni levier ni réinvestissement                     |
 

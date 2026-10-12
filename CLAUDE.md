@@ -37,10 +37,12 @@ pertinente ».
 
 Ce qui en découle **ici**, où le chiffre est lu plutôt que produit :
 
-- **un backtest brut ne se présente pas comme un résultat.** `buildBacktestReport` ne compte
-  **ni frais, ni funding, ni slippage** — son en-tête le dit, et les frais ont valu jusqu'à
-  27 points de rendement sur 302 trades (mesuré le 2026-10-07). Un écran qui affiche
-  `+15 %` sans dire de quoi ce chiffre est net invite à une décision fausse ;
+- **un backtest brut ne se présente pas comme un résultat.** `buildBacktestReport` ne
+  comptait **ni frais, ni funding, ni slippage**, et les frais ont valu jusqu'à 27 points
+  de rendement sur 302 trades (mesuré le 2026-10-07). Il compte les **frais** depuis les
+  types partagés 0.27.0 ; le funding et le slippage restent dehors. Un écran qui affiche
+  `+15 %` sans dire de quoi ce chiffre est net invite à une décision fausse — et c'est
+  pour ça que la note nomme désormais le palier appliqué ;
 - **un chiffre qui porte le nom d'une métrique connue doit en être une.** `Max drawdown` a
   affiché pendant des mois `sommet − valeur` sur une courbe de points cumulés, sans
   dénominateur — mesuré, « 562 » là où le drawdown réel était de 76,67 %. Corrigé dans les
@@ -52,9 +54,18 @@ Ce qui en découle **ici**, où le chiffre est lu plutôt que produit :
 - **l'achat-conservation est la référence à battre.** Si l'écran ne la montre pas, il laisse
   croire qu'un rendement positif est un succès.
 
-⚠️ Le troisième point est tenu depuis le 2026-10-08 ; les autres non. Drawdown, exposition,
-régularité et taux de réussite ne sont pas affichés, et rien ne dit de quoi un rendement est
-net. C'est de la dette connue, pas un acquis : voir [docs/roadmap.md](docs/roadmap.md) et
+⚠️ État au 2026-10-13, point par point — ce paragraphe a affirmé le contraire pendant
+plusieurs jours, et une dette qu'on croit ouverte fait « corriger » un affichage juste :
+
+|                                       |                                                                                                                                         |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| de quoi un rendement est net          | **tenu** — la modale écrit `Realized, net of fees` et nomme le palier (« net of 0.045 % per side »), lu sur `BacktestReport.feePerSide` |
+| une métrique porte son vrai nom       | **tenu** depuis les types partagés 0.26.0                                                                                               |
+| drawdown et taux de réussite affichés | **tenus** — `Max drawdown, net` et `Win rate` dans la modale, `DD` et `% win` dans le bandeau                                           |
+| **exposition et régularité**          | **non** — ni l'une ni l'autre n'apparaît à l'écran                                                                                      |
+| **l'achat-conservation**              | **non** — le harnais la calcule, l'app ne la demande pas                                                                                |
+
+Les deux derniers restent de la dette connue : voir [docs/roadmap.md](docs/roadmap.md) et
 `nest-trading-bot/docs/known-gaps.md`.
 
 ## Stade du projet : casser est permis, et souvent souhaitable
