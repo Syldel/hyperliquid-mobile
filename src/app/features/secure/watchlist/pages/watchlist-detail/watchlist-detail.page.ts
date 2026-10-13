@@ -218,7 +218,43 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   private volumeSeries?: ISeriesApi<'Histogram'>;
   private resizeObserver?: ResizeObserver;
   private lastCandles: CandleSnapshot[] = [];
+  /**
+   * Le numéro du dernier chargement lancé. Une réponse qui ne le porte plus ne
+   * peint rien.
+   *
+   * ⚠️ Sans lui, **la réponse d'un intervalle qu'on vient de quitter écrasait
+   * celle qu'on attend**. Tracé le 2026-10-14 en enchaînant 1H puis 4H :
+   *
+   * ```
+   * setData 253 bougies  interval='4h'   <- la réponse du 1H, posée après coup
+   * render  31 signaux   interval='4h'
+   * setData 127 bougies  interval='4h'   <- la réponse du 4H
+   * render  11 signaux   interval='4h'
+   * ```
+   *
+   * La requête du 1 h est la plus lourde (253 bougies contre 127) : elle revient
+   * donc souvent **en dernier**, et c'est elle qui gagne. Les marqueurs posés
+   * sont alors ceux du 1 h sur des bougies de 4 h — des horaires impairs qui ne
+   * tombent sur aucune bougie, donc **aucune flèche à l'écran**. Depuis 2H, seuls
+   * les signaux tombant sur un multiple de 4 h survivaient : une seule paire.
+   */
+  private loadToken = 0;
   private displayRangeStart = 0;
+  /**
+   * La plage que l'app **demande** au chart, en millisecondes.
+   *
+   * ⚠️ Elle existe parce que `renderCandles` posait un `fitContent()` dans un
+   * `requestAnimationFrame`, qui s'exécutait **après** le `setVisibleRange` de
+   * l'appelant et l'effaçait. Tracé le 2026-10-14 sur un changement
+   * d'intervalle : `fitContent` à t+0, `setVisibleRange` à t+1, `fitContent` à
+   * t+6. Le chart montrait donc toujours la série **amorçage compris** — en 4 h,
+   * trois semaines pour une plage « 1W » — et avec elle des flèches d'entrée et
+   * de sortie qu'aucun chiffre de la modale ne compte.
+   *
+   * `null` tant qu'aucune plage n'a été demandée : le chart se cale alors sur
+   * son contenu, comme avant.
+   */
+  private requestedRange: { from: number; to: number } | null = null;
 
   // ── Indicators ────────────────────────────────────────────────────────
   activeIndicators = signal<ActiveIndicator[]>([]);
@@ -495,6 +531,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       this.loading.set(true);
       this.hasError.set(false);
 
+      const token = ++this.loadToken;
       const preset = this.selectedPreset();
       const endTime = Date.now();
       /**
@@ -515,14 +552,16 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
 
       try {
         if (hasOverlayData) {
-          await this.fetchViaAnalysis(item, startTime, endTime);
+          await this.fetchViaAnalysis(item, startTime, endTime, token);
         } else {
-          await this.fetchViaCandles(item, startTime, endTime);
+          await this.fetchViaCandles(item, startTime, endTime, token);
         }
       } catch {
-        this.hasError.set(true);
+        if (token === this.loadToken) this.hasError.set(true);
       } finally {
-        this.loading.set(false);
+        // Un chargement périmé ne rend pas la main à l'écran : le suivant est
+        // encore en cours, et éteindre le voile ferait croire qu'il a fini.
+        if (token === this.loadToken) this.loading.set(false);
       }
     };
   }
@@ -531,6 +570,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     item: WatchlistItem,
     displayStartTime: number,
     endTime: number,
+    token: number,
   ): Promise<void> {
     const active = this.activeIndicators();
     // Une stratégie sans côté à évaluer fait rejeter la requête d'analyse
@@ -559,7 +599,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
      */
     const chartInterval = chartIntervalFor(interval);
     if (chartInterval === null) {
-      await this.fetchViaCandles(item, displayStartTime, endTime);
+      await this.fetchViaCandles(item, displayStartTime, endTime, token);
       await this.notifyOverlaysUnavailable(
         `the bot cannot analyse ${INTERVAL_LABELS[interval]} candles.`,
       );
@@ -598,9 +638,18 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       // de nouveau le droit de se faire entendre.
       this.announcedFailure = null;
 
+      // Une réponse qui n'est plus celle qu'on attend ne peint rien : voir
+      // `loadToken`. Elle est simplement abandonnée — pas d'erreur, rien n'a
+      // échoué, c'est l'écran qui est passé à autre chose.
+      if (token !== this.loadToken) return;
+
       const candles = this.toCandleSnapshots(res.candles);
       this.lastCandles = candles;
       this.displayRangeStart = displayStartTime;
+      // La fenêtre demandée, et non la série reçue : le bot ajoute devant les
+      // bougies d'amorçage dont les indicateurs ont besoin, et les montrer
+      // ferait lire des entrées et des sorties qu'aucun chiffre ne compte.
+      this.requestedRange = { from: displayStartTime, to: endTime };
 
       this.renderCandles(candles);
       this.computeStats(candles.filter((c) => c.t >= displayStartTime));
@@ -618,17 +667,13 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       this.cacheExpressionSeries(res);
       this.applyExpressionVisibility();
       this.scheduleOverlayDraw();
-
-      this.chart?.timeScale().setVisibleRange({
-        from: Math.floor(displayStartTime / 1000) as Time,
-        to: Math.floor(endTime / 1000) as Time,
-      });
     } catch (error) {
       // Repli ANNONCÉ. Le chart reste utilisable en bougies nues, mais les
       // indicateurs et les signaux disparaissaient jusqu'ici sans un mot : une
       // panne du service d'analyse se lisait comme « cet indicateur ne donne
       // rien », ce qui est le pire diagnostic possible sur un outil de trading.
-      await this.fetchViaCandles(item, displayStartTime, endTime);
+      if (token !== this.loadToken) return;
+      await this.fetchViaCandles(item, displayStartTime, endTime, token);
       await this.notifyOverlaysUnavailable(overlayFailureReason(error));
     }
   }
@@ -776,6 +821,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     item: WatchlistItem,
     startTime: number,
     endTime: number,
+    token: number,
   ): Promise<void> {
     const candles = await firstValueFrom(
       this.hlCandle.getCandles({
@@ -791,8 +837,13 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       return;
     }
 
+    // Même garde que dans `fetchViaAnalysis` : la réponse d'un intervalle qu'on a
+    // quitté ne doit pas repeindre le chart de celui qu'on regarde.
+    if (token !== this.loadToken) return;
+
     this.lastCandles = candles;
     this.displayRangeStart = startTime;
+    this.requestedRange = { from: startTime, to: endTime };
     this.renderCandles(candles);
     this.computeStats(candles);
     // Les résultats de backtest décrivent la fenêtre du dernier appel réussi,
@@ -895,16 +946,60 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       })),
     );
 
-    this.chart?.timeScale().fitContent();
+    this.applyChartRange();
 
+    // La taille réelle n'est connue qu'après la mise en page : ce cycle sert à
+    // la corriger, et **rien d'autre**. Il refaisait un `fitContent()` qui
+    // effaçait la plage demandée juste avant (voir `requestedRange`).
     requestAnimationFrame(() => {
       const el = this.chartEl()?.nativeElement;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      if (rect.height > 0) {
-        this.chart?.applyOptions({ width: rect.width, height: rect.height });
-        this.chart?.timeScale().fitContent();
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        if (rect.height > 0) {
+          this.chart?.applyOptions({ width: rect.width, height: rect.height });
+          this.applyChartRange();
+        }
       }
+
+      /**
+       * Les marqueurs sont **reposés** une fois les bougies engagées, et ce
+       * n'est pas une précaution : posés dans le même tour que `setData`, le
+       * greffon les garde en mémoire sans jamais les dessiner.
+       *
+       * Mesuré le 2026-10-14 après un passage 1H → 4H : `markers()` rendait bien
+       * les 11 marqueurs, aux bonnes dates, sur la bonne série, à des
+       * coordonnées dans la fenêtre (704, 1559, 1687 px sur 1838 de large) — et
+       * le chart n'en dessinait **aucun**. Les reposer à l'identique
+       * (`setMarkers(markers())`) les faisait apparaître sans rien changer
+       * d'autre : c'est donc l'instant de la pose qui était en cause, pas leur
+       * contenu.
+       *
+       * ⚠️ Trois corrections de la plage d'affichage ont précédé celle-ci sans
+       * jamais toucher le vrai défaut : les contrôles portaient sur les
+       * coordonnées calculées, jamais sur ce qui était peint. Une capture aurait
+       * tranché en une minute.
+       */
+      this.applyStrategyVisibility();
+    });
+  }
+
+  /**
+   * Replace le chart sur la plage demandée, ou sur son contenu à défaut.
+   *
+   * Appelée partout où la taille ou les données changent : une plage demandée
+   * doit survivre à un redimensionnement, sinon l'écran repart sur l'amorçage
+   * sans que personne ne l'ait voulu.
+   */
+  private applyChartRange(): void {
+    const range = this.requestedRange;
+    if (range === null) {
+      this.chart?.timeScale().fitContent();
+      return;
+    }
+
+    this.chart?.timeScale().setVisibleRange({
+      from: Math.floor(range.from / 1000) as Time,
+      to: Math.floor(range.to / 1000) as Time,
     });
   }
 
@@ -973,6 +1068,19 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       canvas.width = rect.width;
       canvas.height = rect.height || 400;
       this.chart?.applyOptions({ width: rect.width, height: rect.height || 400 });
+      /**
+       * ⚠️ Sans ça, un changement de largeur **réduit la fenêtre** au lieu de la
+       * redessiner : `lightweight-charts` garde l'espacement entre bougies et
+       * montre donc moins de bougies sur un chart plus étroit.
+       *
+       * Mesuré le 2026-10-14 en passant de 1134 à 344 px de large : la plage
+       * affichée tombait de 42 bougies (6 au 13 octobre) à 13 (11 au 13), et les
+       * flèches d'entrée et de sortie visibles de 6 à 4 — sans qu'aucune donnée
+       * n'ait changé. Le prochain rendu complet (un changement d'intervalle, par
+       * exemple) réappliquait la plage et les faisait réapparaître : d'où des
+       * flèches qui « ne sont pas les mêmes » au chargement et au retour.
+       */
+      this.applyChartRange();
       this.drawOverlay();
     });
     this.resizeObserver.observe(container);
@@ -1420,10 +1528,11 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
 
     const intervalMs = CANDLE_INTERVAL_MINUTES[this.selectedInterval()] * 60_000;
     const { from, to } = tradeFocusRange(focus, intervalMs, lastCandleTime);
-    this.chart.timeScale().setVisibleRange({
-      from: Math.floor(from / 1000) as Time,
-      to: Math.floor(to / 1000) as Time,
-    });
+    // Le zoom devient la plage demandée : sans ça, le prochain redimensionnement
+    // le remplacerait par la fenêtre du backtest, et le trade qu'on venait de
+    // toucher disparaîtrait de l'écran.
+    this.requestedRange = { from, to };
+    this.applyChartRange();
   }
 
   async openStrategyPicker(): Promise<void> {
