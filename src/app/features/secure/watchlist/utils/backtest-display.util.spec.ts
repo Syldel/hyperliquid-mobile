@@ -138,10 +138,12 @@ describe('backtestLimits', () => {
   });
 
   it('keeps the three limits that do not depend on the tier', () => {
-    expect(backtestLimits([TAKER])).toHaveLength(4);
+    expect(backtestLimits([TAKER])).toHaveLength(5);
     expect(joined([TAKER])).toContain('simplified simulation');
     expect(joined([TAKER])).toContain('take-profit / stop-loss');
     expect(joined([TAKER])).toContain('added, not compounded');
+    // Le drawdown se lit sur des clotures : TradingView nomme la meme distinction.
+    expect(joined([TAKER])).toContain('measured on candle closes');
   });
 });
 

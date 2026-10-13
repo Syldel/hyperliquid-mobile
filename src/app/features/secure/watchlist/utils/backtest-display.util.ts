@@ -31,6 +31,14 @@ import { formatRatePercent } from '@utils/fee-rate.utils';
  * à deux lignes d'une note qui disait encore « with no fees », les deux dans le
  * même bloc. Aucun test ne l'avait vu — il y en a un maintenant.
  *
+ * La ligne sur les drawdowns dit un écart que TradingView prend soin de nommer
+ * — il publie un « max drawdown (close-to-close) » **et** un « (intrabar) »,
+ * le second mesurant le creux sur le plus bas de la bougie. Mesuré le
+ * 2026-10-13 sur nos cinq jeux, en achat-conservation, l'intrabar est plus
+ * profond de **0,76 à 2,79 points** (l'écart grandit sur les séries courtes :
+ * `xyz:BRENTOIL` en 1 j est le pire). Toujours dans le même sens, donc une
+ * sous-estimation systématique.
+ *
  * C'est aussi pourquoi ce n'est plus une constante : depuis la version 0.28.0
  * le rapport porte le palier qu'il a appliqué, et la liste le **lit** au lieu
  * de le taire. Une liste figée ne peut pas suivre une donnée qui vient du
@@ -40,6 +48,8 @@ export function backtestLimits(fees: readonly number[]): readonly string[] {
   return [
     'Simplified simulation — not what the bot would have earned.',
     fillLine(fees),
+    'Drawdowns are measured on candle closes: a dip inside a candle that recovered before ' +
+      'its close is invisible, so the real one is deeper.',
     "Take-profit / stop-loss, latent orders and the pair's exit behaviour are not simulated yet.",
     'Each trade counts at the same size; returns are added, not compounded.',
   ];
