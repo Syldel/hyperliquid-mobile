@@ -47,7 +47,7 @@ import {
   IndicatorMetadata,
   PositionSide,
 } from '@syldel/trading-shared-types';
-import { chartIntervalFor } from '@utils/hl-interval.utils';
+import { chartIntervalFor, snapToCandleGrid } from '@utils/hl-interval.utils';
 import { addIcons } from 'ionicons';
 import {
   addOutline,
@@ -497,7 +497,17 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
 
       const preset = this.selectedPreset();
       const endTime = Date.now();
-      const startTime = endTime - preset.days * 86_400_000;
+      /**
+       * Calé sur la grille de l'intervalle, et pas seulement pour la propreté de
+       * la date affichée : la fenêtre se calculait à la seconde, donc sa
+       * première bougie changeait à l'instant où l'horloge franchissait une
+       * ouverture — et le **prix de référence de l'achat-conservation** avec
+       * elle. Voir `snapToCandleGrid`, qui porte la mesure.
+       */
+      const startTime = snapToCandleGrid(
+        endTime - preset.days * 86_400_000,
+        this.selectedInterval(),
+      );
       const hasOverlayData =
         this.activeIndicators().some((i) => i.visible) ||
         this.strategyRefs().some((r) => r.visible) ||

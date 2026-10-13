@@ -1,4 +1,4 @@
-import { CandleInterval } from '@syldel/hl-shared-types';
+import { CANDLE_INTERVAL_MINUTES, CandleInterval } from '@syldel/hl-shared-types';
 import { ChartInterval } from '@syldel/trading-shared-types';
 
 /**
@@ -53,4 +53,43 @@ export function chartIntervalFor(interval: CandleInterval): ChartInterval | null
   };
 
   return mapping[interval];
+}
+
+/**
+ * La durée d'une bougie, ou `null` quand elle n'en a pas de fixe.
+ *
+ * Seul `1M` est dans ce cas : un mois vaut 28 à 31 jours, et les 43 200 minutes
+ * de `CANDLE_INTERVAL_MINUTES` en sont une approximation commode — fausse dès
+ * qu'on s'en sert pour poser une grille. Le bot refuse la même valeur pour la
+ * même raison (`HlIntervalMapper.candleDurationMs`).
+ */
+export function candleDurationMs(interval: CandleInterval): number | null {
+  if (interval === '1M') return null;
+  return CANDLE_INTERVAL_MINUTES[interval] * 60_000;
+}
+
+/**
+ * Un instant ramené à l'ouverture de la bougie qui le contient.
+ *
+ * ⚠️ **Ce n'est pas cosmétique.** La fenêtre d'un chart se calculait en
+ * `Date.now() − n jours`, donc elle glissait à la seconde : la première bougie
+ * de la fenêtre changeait à l'instant où l'horloge franchissait une ouverture,
+ * et avec elle le **prix de référence de l'achat-conservation** — mesuré le
+ * 2026-10-14 sur BTC en 4 h, deux clôtures consécutives s'écartent de 0,25 % en
+ * médiane et jusqu'à 1,25 %. Le `vs hold` affiché sautait donc d'un quart à la
+ * moitié de sa valeur sans qu'aucune bougie ne se soit fermée.
+ *
+ * Calé, ce saut arrive quand une bougie **se ferme**, en même temps qu'une
+ * nouvelle apparaît : il reste, mais il s'explique.
+ *
+ * Vers le bas, jamais vers le haut : la fenêtre peut gagner une bougie, elle
+ * n'en perd aucune. Et la grille d'Hyperliquid est bien celle de l'époque Unix —
+ * mesuré sur le gateway le 2026-10-14, les bougies 8 h tombent sur 00:00 / 08:00
+ * / 16:00 UTC, les 3 j et les 1 s sur un multiple exact de leur durée (la semaine
+ * commence donc le **jeudi**, comme l'époque).
+ */
+export function snapToCandleGrid(time: number, interval: CandleInterval): number {
+  const duration = candleDurationMs(interval);
+  if (duration === null) return time;
+  return Math.floor(time / duration) * duration;
 }

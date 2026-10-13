@@ -170,6 +170,19 @@ de performance, positions ouvertes, positions héritées, liste des trades.
 l'affichage — un chiffre recalculé ici pourrait diverger du bot en silence, un chiffre
 arrondi ne le peut pas.
 
+**La fenêtre demandée est calée sur la grille de l'intervalle** (`snapToCandleGrid`), et pas
+pour faire joli. Elle se calculait en `Date.now() − n jours`, donc elle glissait à la
+seconde : sa première bougie changeait à l'instant où l'horloge franchissait une ouverture,
+et avec elle le **prix de référence de l'achat-conservation**, puisque le hold se mesure
+depuis la clôture de cette bougie-là. Mesuré le 2026-10-14 sur BTC en 4 h, deux clôtures
+consécutives s'écartent de **0,25 % en médiane et jusqu'à 1,25 %** — le `vs hold` sautait
+donc d'un quart à la moitié de sa valeur sans qu'aucune bougie ne se soit fermée. Calé, le
+saut arrive quand une bougie se ferme, en même temps qu'une nouvelle apparaît.
+
+⚠️ Ça ne fige pas les chiffres pour autant : la **dernière** bougie est en cours, sa clôture
+bouge avec le prix, et l'écran le dit déjà. Seul le bord gauche est stabilisé. Et `1M` n'est
+pas calé du tout — un mois n'a pas de durée fixe.
+
 Ce que le rapport garantit, et que l'écran respecte :
 
 - **la fenêtre affichée, rien d'autre** — un trade ouvert dans l'amorçage n'est pas

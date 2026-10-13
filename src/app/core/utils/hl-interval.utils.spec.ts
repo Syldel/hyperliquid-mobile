@@ -1,5 +1,5 @@
 import { CANDLE_INTERVALS, type CandleInterval } from '@syldel/hl-shared-types';
-import { chartIntervalFor } from './hl-interval.utils';
+import { candleDurationMs, chartIntervalFor, snapToCandleGrid } from './hl-interval.utils';
 
 /**
  * La règle que ce fichier garde : **ne jamais rendre un intervalle que
@@ -80,5 +80,62 @@ describe('chartIntervalFor', () => {
       expect(code).not.toBeNull();
       expect(minutesOf[code as string]).toBe(minutes);
     }
+  });
+});
+
+/**
+ * La fenêtre d'un chart partait de `Date.now() − n jours`, donc elle glissait à
+ * la seconde. Ce que ça coûtait n'est pas la date affichée : c'est que la
+ * **première bougie** de la fenêtre changeait à l'instant où l'horloge
+ * franchissait une ouverture, et avec elle le prix de référence de
+ * l'achat-conservation.
+ */
+describe('snapToCandleGrid', () => {
+  // 2026-10-13T19:40:45Z, le relevé qui a servi à mesurer le défaut.
+  const T = Date.UTC(2026, 9, 13, 19, 40, 45);
+
+  it('brings an instant back to the opening of its candle', () => {
+    expect(new Date(snapToCandleGrid(T, '4h')).toISOString()).toBe('2026-10-13T16:00:00.000Z');
+    expect(new Date(snapToCandleGrid(T, '1h')).toISOString()).toBe('2026-10-13T19:00:00.000Z');
+    expect(new Date(snapToCandleGrid(T, '1d')).toISOString()).toBe('2026-10-13T00:00:00.000Z');
+  });
+
+  it('follows the grid Hyperliquid actually serves, which is the epoch', () => {
+    /**
+     * Mesuré sur le gateway le 2026-10-14 : les bougies 8 h s'ouvrent à
+     * 00:00 / 08:00 / 16:00 UTC, les 3 j et les hebdomadaires tombent sur un
+     * multiple exact de leur durée. La semaine commence donc le **jeudi**, comme
+     * l'époque Unix — et non le lundi, qu'un calendrier ferait supposer.
+     */
+    expect(new Date(snapToCandleGrid(T, '8h')).toISOString()).toBe('2026-10-13T16:00:00.000Z');
+    expect(new Date(snapToCandleGrid(T, '1w')).getUTCDay()).toBe(4);
+  });
+
+  it('never moves an instant forward', () => {
+    // Vers le bas : la fenêtre peut gagner une bougie, elle n'en perd aucune.
+    for (const interval of CANDLE_INTERVALS) {
+      expect(snapToCandleGrid(T, interval)).toBeLessThanOrEqual(T);
+    }
+  });
+
+  it('gives the same window twice within one candle', () => {
+    // La propriété qui compte : deux ouvertures de l'écran à une minute d'écart
+    // doivent décrire la même fenêtre, donc le même prix de référence.
+    expect(snapToCandleGrid(T + 60_000, '4h')).toBe(snapToCandleGrid(T, '4h'));
+    expect(snapToCandleGrid(T + 4 * 3_600_000, '4h')).not.toBe(snapToCandleGrid(T, '4h'));
+  });
+
+  it('leaves the month alone, having no fixed length', () => {
+    // Un mois vaut 28 à 31 jours : poser une grille de 30 jours ferait dériver
+    // la borne d'un mois sur l'autre, sans que rien ne le signale.
+    expect(snapToCandleGrid(T, '1M')).toBe(T);
+    expect(candleDurationMs('1M')).toBeNull();
+  });
+
+  it('gives every other interval its real duration', () => {
+    expect(candleDurationMs('1m')).toBe(60_000);
+    expect(candleDurationMs('4h')).toBe(4 * 3_600_000);
+    expect(candleDurationMs('3d')).toBe(3 * 86_400_000);
+    expect(candleDurationMs('1w')).toBe(7 * 86_400_000);
   });
 });
