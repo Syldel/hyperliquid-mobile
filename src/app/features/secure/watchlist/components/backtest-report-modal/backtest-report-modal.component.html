@@ -153,6 +153,48 @@
         The last point sits on a candle that had not closed yet: it may still move.
       </p>
     }
+
+    <!--
+      Les bornes de la pire baisse, sous la courbe qu'elles décrivent plutôt que
+      dans le tableau : une date dans une cellule partagée avec deux autres
+      colonnes ne se lit pas sur un téléphone.
+
+      « Range start » quand le sommet est le début de la fenêtre — la courbe
+      n'est jamais remontée au capital intact, donc aucune bougie n'a touché ce
+      sommet. L'écran le dit plutôt que d'attribuer la date de la première
+      bougie à un sommet qu'elle n'a pas atteint.
+    -->
+    <!-- Le même nom que le tableau — « Max drawdown » y donne le chiffre, ici
+         ses bornes. Un second nom pour la même métrique ferait chercher une
+         deuxième mesure. -->
+    <h2>When the max drawdown happened</h2>
+    <ul class="drawdowns">
+      @for (row of drawdownRows(); track row.label) {
+        <li>
+          <span class="drawdowns__label">{{ row.label }}</span>
+          @if (row.window === null) {
+            <span>never fell below its peak</span>
+          } @else {
+            <span [class.down]="percentTone(-row.depthPercent) === 'down'">
+              {{ formatPercent(-row.depthPercent) }}
+            </span>
+            <span>
+              @if (row.window.fromRangeStart) {
+                Range start
+              } @else {
+                {{ row.window.fromTime | date: 'MMM d, HH:mm' }}
+              }
+              → {{ row.window.toTime | date: 'MMM d, HH:mm' }}
+              @if (row.window.durationMs > 0) {
+                · {{ formatDuration(row.window.durationMs) }}
+              } @else {
+                · within one candle
+              }
+            </span>
+          }
+        </li>
+      }
+    </ul>
   }
 
   @if (report().openPositions.length > 0) {

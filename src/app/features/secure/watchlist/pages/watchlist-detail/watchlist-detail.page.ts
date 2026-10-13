@@ -127,6 +127,8 @@ import {
 import {
   backtestLimits,
   definedSides,
+  drawdownWindow,
+  formatDuration,
   formatPercent,
   percentTone,
   statsOf,
@@ -1342,6 +1344,8 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   readonly formatPercent = formatPercent;
   readonly percentTone = percentTone;
   readonly statsOf = statsOf;
+  readonly drawdownWindow = drawdownWindow;
+  readonly formatDuration = formatDuration;
 
   /** Les côtés que la stratégie évalue, lus dans le document de la bibliothèque. */
   sidesOf(strategyId: string): PositionSide[] {

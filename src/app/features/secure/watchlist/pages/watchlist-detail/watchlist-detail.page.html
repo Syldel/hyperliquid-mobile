@@ -196,7 +196,21 @@
         @if (total.winRatePercent !== null) {
         <span>{{ total.winRatePercent.toFixed(0) }}% win</span>
         }
-        <span>DD {{ formatPercent(-total.maxDrawdown.depthPercent) }}</span>
+        <!--
+          La durée dans le même `span` que la profondeur : séparées, le retour à
+          la ligne les éloignerait et « over 2 d 4 h » se lirait comme la durée
+          du backtest. Une chute de 12 % en trois heures et la même en trois
+          mois ne disent pas la même chose d'une stratégie.
+
+          Omise quand elle est nulle — le creux tombe alors sur la première
+          bougie, et l'annoncer « over 0 min » nierait la bougie. La modale, qui
+          a la place, l'écrit « within one candle ».
+        -->
+        @let dd = drawdownWindow(total.maxDrawdown, report.from); @let lasted = dd !== null &&
+        dd.durationMs > 0 ? formatDuration(dd.durationMs) : null;
+        <span>
+          DD {{ formatPercent(-total.maxDrawdown.depthPercent) }} @if (lasted) { over {{ lasted }} }
+        </span>
         <!--
           Dit une fois, sur la ligne : sans ça, ce resume affiche un pourcentage
           dont rien ne dit de quoi il est net. Le palier n'est pas nomme parce

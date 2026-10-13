@@ -165,6 +165,74 @@ describe('BacktestReportModalComponent', () => {
   });
 
   /**
+   * Les bornes de la baisse : la profondeur seule ne dit pas si 25 % se sont
+   * joués en quatre heures ou en quatre mois, et c'est cette durée que
+   * Freqtrade comme TradingView publient à côté du chiffre.
+   */
+  it('dates the deepest drawdown and says how long it lasted', () => {
+    const host = mount(
+      report({
+        long: stats({ maxDrawdown: { depthPercent: 25.24, peakTime: 2 * H, troughTime: 9 * H } }),
+        short: stats(),
+        total: stats({ maxDrawdown: { depthPercent: 25.24, peakTime: 2 * H, troughTime: 9 * H } }),
+      }),
+    );
+
+    const lines = [...host.querySelectorAll('.drawdowns li')].map((li) =>
+      li.textContent?.replace(/\s+/g, ' ').trim(),
+    );
+
+    expect(lines[0]).toContain('-25.24%');
+    expect(lines[0]).toContain('7 h');
+    // Le côté qui n'a jamais baissé ne reçoit pas une borne inventée.
+    expect(lines[1]).toContain('never fell below its peak');
+  });
+
+  /**
+   * `peakTime: null` ne veut pas dire « pas de sommet » depuis les types
+   * partagés 0.30.0 : le sommet est le **début de la fenêtre**, que la courbe
+   * n'a jamais regagné. Rendu tel quel à un `DatePipe`, ce `null` afficherait
+   * « Jan 1, 01:00 » — une date de 1970 présentée comme un sommet de marché.
+   */
+  it('says the peak is the range start rather than dating it in 1970', () => {
+    const host = mount(
+      report({
+        long: stats({ maxDrawdown: { depthPercent: 8, peakTime: null, troughTime: 4 * H } }),
+        short: stats(),
+        total: null,
+      }),
+    );
+
+    const line = host.querySelector('.drawdowns li')?.textContent?.replace(/\s+/g, ' ').trim();
+
+    // La borne gauche est mesurée **avant** la flèche : une date rendue là y
+    // apparaîtrait, et les dates de ce fixture tombent justement en 1970.
+    expect(line).toMatch(/-8\.00% Range start → /);
+  });
+
+  it('names the candle instead of a duration when the fall fits inside one', () => {
+    /**
+     * Creux sur la première bougie, sommet au début de la fenêtre : la durée
+     * vaut 0, et « over 0 min » nierait la bougie dans laquelle la chute s'est
+     * jouée. Le cas se produit dès qu'une position est ouverte sur la première
+     * bougie de la fenêtre — son frais d'entrée met la courbe sous le capital
+     * intact.
+     */
+    const host = mount(
+      report({
+        long: stats({ maxDrawdown: { depthPercent: 0.045, peakTime: null, troughTime: H } }),
+        short: stats(),
+        total: null,
+      }),
+    );
+
+    const line = host.querySelector('.drawdowns li')?.textContent?.replace(/\s+/g, ' ').trim();
+
+    expect(line).toContain('within one candle');
+    expect(line).not.toContain('min');
+  });
+
+  /**
    * Le brut et le net rendus **distincts**, parce que toutes les fixtures les
    * laissaient egaux a zero : rien ne verifiait donc lequel la vue affiche.
    * C'est le meme trou que celui trouve sur le drawdown le 2026-10-08.

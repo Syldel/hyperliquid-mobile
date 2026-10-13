@@ -203,6 +203,25 @@ La courbe vit dans un petit chart à part (`EquityCurveComponent`), pas dans un 
 principal, dont la hauteur est déjà rationnée. Son dernier point est signalé provisoire
 quand il tombe sur la bougie en cours.
 
+**Sous la courbe, les bornes de la pire baisse** : « Deepest drawdown » date le sommet et le
+creux de chaque colonne et donne la durée entre les deux (`drawdownWindow`,
+`formatDuration`). La profondeur seule ne permet pas de décider — 12 % perdus en trois
+heures et les mêmes 12 % perdus en trois mois ne disent pas la même chose d'une stratégie —
+et c'est bien cette durée que Freqtrade (« Drawdown start / end / duration ») comme
+TradingView (« max drawdown duration ») publient à côté du chiffre. Le bandeau compact, lui,
+n'a la place que pour la durée : `DD -12.34% over 2 d 12 h`.
+
+Deux formulations valent une explication :
+
+- **« Range start »** au lieu d'une date — le sommet est planché au capital intact depuis
+  les types partagés 0.30.0, donc `peakTime` vaut `null` quand la courbe n'est jamais
+  remontée à ce capital. Ce n'est pas une absence de sommet : c'est un sommet qu'aucune
+  bougie n'a touché, et l'écran y substitue le début de la fenêtre plutôt que de dater la
+  baisse de 1970 ;
+- **« within one candle »** au lieu d'une durée — sommet et creux au même instant. Le cas
+  courant est une position ouverte sur la première bougie de la fenêtre, dont le frais
+  d'entrée fait passer la courbe sous le capital intact avant tout autre point.
+
 ## Ce que le backtest ne dit pas
 
 Le rapport vient de `POST /analysis`, qui fait tourner le **même** moteur que le bot en live

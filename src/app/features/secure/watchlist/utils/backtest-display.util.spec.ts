@@ -2,7 +2,9 @@ import type { BacktestReport, BacktestStats } from '@syldel/trading-shared-types
 import {
   backtestLimits,
   definedSides,
+  drawdownWindow,
   equityLines,
+  formatDuration,
   formatPercent,
   formatPriceForDisplay,
   percentTone,
@@ -144,6 +146,79 @@ describe('backtestLimits', () => {
     expect(joined([TAKER])).toContain('added, not compounded');
     // Le drawdown se lit sur des clotures : TradingView nomme la meme distinction.
     expect(joined([TAKER])).toContain('measured on candle closes');
+  });
+});
+
+describe('drawdownWindow', () => {
+  it('reports no window when the curve never fell below its peak', () => {
+    // Pas de couple sommet/creux : il n'y a rien à dater, et inventer une borne
+    // ferait lire une chute là où il n'y en a pas eu.
+    expect(drawdownWindow({ depthPercent: 0, peakTime: null, troughTime: null }, H)).toBeNull();
+  });
+
+  it('dates the fall from the candle that reached the peak', () => {
+    expect(drawdownWindow({ depthPercent: 12, peakTime: 2 * H, troughTime: 5 * H }, H)).toEqual({
+      fromTime: 2 * H,
+      toTime: 5 * H,
+      durationMs: 3 * H,
+      fromRangeStart: false,
+    });
+  });
+
+  it('dates it from the range start when no candle reached the peak', () => {
+    /**
+     * Le cas courant, et non un bord : depuis les types partagés 0.30.0 le
+     * sommet est planché au capital intact, donc une position ouverte sur la
+     * première bougie met la courbe sous 1 avant qu'aucun point ne l'ait valu —
+     * `peakTime` reste `null` et le sommet est le début de la fenêtre. Rendre ce
+     * `null` à un `DatePipe` afficherait le 1er janvier 1970.
+     */
+    expect(drawdownWindow({ depthPercent: 8, peakTime: null, troughTime: 4 * H }, H)).toEqual({
+      fromTime: H,
+      toTime: 4 * H,
+      durationMs: 3 * H,
+      fromRangeStart: true,
+    });
+  });
+
+  it('reports a zero duration rather than a fall that lasted nothing', () => {
+    // Creux sur la première bougie, sommet au début de la fenêtre : la chute
+    // s'est jouée **dans** cette bougie. L'écran a cette borne à dire, et une
+    // durée de 0 est ce qui la lui fait dire plutôt que d'écrire « 0 min ».
+    expect(drawdownWindow({ depthPercent: 0.045, peakTime: null, troughTime: H }, H)).toMatchObject(
+      {
+        durationMs: 0,
+        fromRangeStart: true,
+      },
+    );
+  });
+});
+
+describe('formatDuration', () => {
+  it('writes at most two units', () => {
+    expect(formatDuration(2 * 24 * H + 12 * H + 30 * 60_000)).toBe('2 d 12 h');
+    expect(formatDuration(4 * H + 30 * 60_000)).toBe('4 h 30 min');
+    expect(formatDuration(45 * 60_000)).toBe('45 min');
+  });
+
+  it('drops a unit worth zero instead of writing it', () => {
+    expect(formatDuration(3 * 24 * H)).toBe('3 d');
+    expect(formatDuration(5 * H)).toBe('5 h');
+  });
+
+  it('never rounds a span down to no time at all', () => {
+    // Aucune bougie ne dure moins d'une minute : une telle durée vient d'un
+    // intervalle qu'Hyperliquid ne sert pas, et « 0 min » le nierait.
+    expect(formatDuration(30_000)).toBe('< 1 min');
+    expect(formatDuration(0)).toBe('< 1 min');
+  });
+
+  it('leaves a visible hole rather than inventing a duration', () => {
+    // Une durée négative ou non finie ne peut venir que d'un rapport
+    // incohérent ; « -2 d » se lirait comme une mesure.
+    for (const impossible of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(formatDuration(impossible)).toBe('?');
+    }
   });
 });
 

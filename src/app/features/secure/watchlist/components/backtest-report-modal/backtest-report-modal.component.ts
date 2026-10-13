@@ -29,7 +29,10 @@ import { locateOutline } from 'ionicons/icons';
 import { POSITION_COLORS } from '../../services/strategy-positions-pane.service';
 import {
   backtestLimits,
+  drawdownWindow,
+  type DrawdownWindow,
   equityLines,
+  formatDuration,
   formatPercent,
   formatPriceForDisplay,
   percentTone,
@@ -46,6 +49,18 @@ export interface BacktestFocus {
 interface StatsColumn {
   label: string;
   stats: BacktestStats;
+}
+
+/**
+ * Une ligne du bloc « Deepest drawdown » : la profondeur que le tableau donne
+ * déjà, et surtout ses bornes, que le tableau ne peut pas porter — trois dates
+ * dans une cellule de 13 px sur un téléphone ne se lisent pas. `window` à `null`
+ * est une information : la courbe n'est jamais passée sous son sommet.
+ */
+interface DrawdownRow {
+  label: string;
+  depthPercent: number;
+  window: DrawdownWindow | null;
 }
 
 const SIDE_LABELS: Record<PositionSide, string> = { LONG: 'Long', SHORT: 'Short' };
@@ -95,6 +110,7 @@ export class BacktestReportModalComponent implements OnInit {
 
   readonly limits = computed(() => backtestLimits([this.report().feePerSide]));
   readonly formatPercent = formatPercent;
+  readonly formatDuration = formatDuration;
   readonly formatPriceForDisplay = formatPriceForDisplay;
   readonly percentTone = percentTone;
   readonly sideLabel = (side: PositionSide) => SIDE_LABELS[side];
@@ -108,6 +124,7 @@ export class BacktestReportModalComponent implements OnInit {
   readonly curve = signal<EquityCurveLine[]>([]);
   readonly tradesNewestFirst = signal<BacktestReport['trades']>([]);
   readonly lastPointProvisional = signal(false);
+  readonly drawdownRows = signal<DrawdownRow[]>([]);
 
   constructor() {
     addIcons({ locateOutline });
@@ -117,10 +134,21 @@ export class BacktestReportModalComponent implements OnInit {
     const report = this.report();
     const sides = this.sides().length > 0 ? this.sides() : (['LONG', 'SHORT'] as const);
 
-    this.columns.set([
+    const columns: StatsColumn[] = [
       ...sides.map((side) => ({ label: SIDE_LABELS[side], stats: statsOf(report, side) })),
       ...(report.total ? [{ label: 'Total', stats: report.total }] : []),
-    ]);
+    ];
+    this.columns.set(columns);
+
+    // Le sommet peut être le début de la fenêtre et non une bougie : c'est
+    // `report.from` qui le datera alors — voir `drawdownWindow`.
+    this.drawdownRows.set(
+      columns.map((column) => ({
+        label: column.label,
+        depthPercent: column.stats.maxDrawdown.depthPercent,
+        window: drawdownWindow(column.stats.maxDrawdown, report.from),
+      })),
+    );
 
     this.curve.set(
       equityLines(report, sides).map((line) => ({

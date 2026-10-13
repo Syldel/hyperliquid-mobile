@@ -1,4 +1,5 @@
 import type {
+  BacktestDrawdown,
   BacktestReport,
   BacktestStats,
   PositionSide,
@@ -126,6 +127,80 @@ export function formatPercent(value: number, digits = 2): string {
 export function percentTone(value: number, digits = 2): 'up' | 'down' | null {
   const rounded = Number(value.toFixed(digits));
   return rounded > 0 ? 'up' : rounded < 0 ? 'down' : null;
+}
+
+/**
+ * Les bornes de la pire baisse, prêtes à l'affichage.
+ *
+ * `BacktestDrawdown` porte `peakTime` et `troughTime` depuis les types partagés
+ * 0.26.0 et aucun écran ne les lisait — alors que la profondeur seule ne dit pas
+ * si une chute de 12 % s'est jouée en trois heures ou en trois mois. Les deux
+ * références publient cette durée à côté du chiffre : Freqtrade sort
+ * « Drawdown start / end / duration », TradingView une « max drawdown duration ».
+ *
+ * ⚠️ `peakTime: null` ne veut **pas** dire « pas de sommet ». Depuis les types
+ * partagés 0.30.0, le sommet est planché au capital intact, et ce `null` désigne
+ * un sommet qui est le **début de la fenêtre** : aucune bougie ne l'a touché,
+ * parce que la courbe n'est jamais remontée au capital de départ. C'est le cas
+ * courant d'une position ouverte sur la première bougie, dont le frais d'entrée
+ * fait plonger la courbe sous 1 avant tout autre point. D'où `rangeStart` en
+ * second argument — rendre ce `null` à un `DatePipe` afficherait le 1er janvier
+ * 1970.
+ *
+ * Le discriminant est `troughTime` et non `depthPercent` : le rapport ne pose un
+ * creux que lorsqu'il a mesuré une baisse, donc un creux implique une profondeur
+ * non nulle, quand l'inverse se déduit moins sûrement d'un flottant.
+ */
+export interface DrawdownWindow {
+  /** Bougie du sommet, ou `rangeStart` quand le sommet est le début de la fenêtre. */
+  fromTime: number;
+  toTime: number;
+  /** `0` quand le sommet et le creux tombent au même instant. */
+  durationMs: number;
+  /** `true` quand `fromTime` est le début de la fenêtre et non une bougie observée. */
+  fromRangeStart: boolean;
+}
+
+export function drawdownWindow(
+  drawdown: BacktestDrawdown,
+  rangeStart: number,
+): DrawdownWindow | null {
+  if (drawdown.troughTime === null) return null;
+
+  const fromTime = drawdown.peakTime ?? rangeStart;
+  return {
+    fromTime,
+    toTime: drawdown.troughTime,
+    durationMs: drawdown.troughTime - fromTime,
+    fromRangeStart: drawdown.peakTime === null,
+  };
+}
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
+/**
+ * `2 d 12 h`, `4 h 30 min`, `45 min`.
+ *
+ * Deux unités au plus : la troisième n'a jamais changé une lecture, et la place
+ * manque sur un téléphone. Une durée négative ou non finie rend `?` plutôt qu'un
+ * chiffre inventé — elle ne peut venir que d'un rapport incohérent, et un
+ * rapport incohérent doit se voir (voir CLAUDE.md, « aucune défaillance muette »).
+ */
+export function formatDuration(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return '?';
+  // Aucune bougie ne dure moins d'une minute, donc ce cas vient d'un intervalle
+  // qu'Hyperliquid ne sert pas encore : afficher « 0 min » le nierait.
+  if (ms < MINUTE) return '< 1 min';
+
+  const days = Math.floor(ms / DAY);
+  const hours = Math.floor((ms % DAY) / HOUR);
+  const minutes = Math.floor((ms % HOUR) / MINUTE);
+
+  if (days > 0) return hours > 0 ? `${days} d ${hours} h` : `${days} d`;
+  if (hours > 0) return minutes > 0 ? `${hours} h ${minutes} min` : `${hours} h`;
+  return `${minutes} min`;
 }
 
 const PRICE_FORMAT = new Intl.NumberFormat('en-US', { maximumSignificantDigits: 6 });

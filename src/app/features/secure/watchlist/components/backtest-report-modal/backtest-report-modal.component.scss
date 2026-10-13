@@ -91,6 +91,30 @@ ion-note.down {
   font-variant-numeric: tabular-nums;
 }
 
+// Les bornes du drawdown : une ligne par colonne du tableau, en pleine largeur.
+// Pas de puces — ce n'est pas une énumération mais trois lectures du même
+// chiffre, et le libellé de gauche fait déjà le repère.
+.drawdowns {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ion-color-medium);
+
+  li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 1px 0;
+  }
+
+  &__label {
+    min-width: 44px;
+    color: var(--ion-text-color);
+  }
+}
+
 // Mêmes couleurs que la bande de positions (`POSITION_COLORS`), passées en style
 // depuis le composant : une seule source pour le vert du long et le rouge du short.
 .side {
