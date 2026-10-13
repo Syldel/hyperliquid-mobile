@@ -60,6 +60,25 @@ export class StrategiesPage {
     this.documents.set(documents);
   }
 
+  /**
+   * Redemande la liste **à la mise en page**, jamais à soi-même.
+   *
+   * `RefreshableLayoutComponent` garde sa propre copie des données, et c'est
+   * elle qui choisit entre « No strategy yet » et le contenu projeté
+   * (`@if (!isEmpty())`). Écrire dans `documents` sans la prévenir laissait donc
+   * la page vide après la création de la **première** stratégie : la liste était
+   * bien construite, mais sous un `@if` resté faux, et seul un tirer-pour-
+   * rafraîchir la faisait apparaître. Même défaut en miroir à la suppression de
+   * la dernière, où le message d'absence ne revenait pas.
+   *
+   * Remplacer `fetchFn` relance l'effet de la mise en page, qui recharge et
+   * réémet `dataLoaded` — une seule source de vérité, et l'idiome déjà employé
+   * par `open-orders` après une action.
+   */
+  private reload(): void {
+    this.fetchFn.set(() => this.library.load());
+  }
+
   /** Libellés des branches réellement renseignées — résumé tenant sur une ligne. */
   branchSummary(document: StrategyDocument): string {
     return summariseBranches(document.rules);
@@ -87,7 +106,7 @@ export class StrategiesPage {
     await modal.present();
     await modal.onDidDismiss();
 
-    this.onDataLoaded(await this.library.load());
+    this.reload();
   }
 
   async openActions(document: StrategyDocument, event: Event): Promise<void> {
@@ -115,7 +134,7 @@ export class StrategiesPage {
       await this.toast('Nothing changed — the library could not be written.');
     }
 
-    this.onDataLoaded(this.library.documents());
+    this.reload();
   }
 
   private async toast(message: string): Promise<void> {

@@ -311,6 +311,34 @@ export class IonFabStub {}
 export class IonFabButtonStub {}
 
 /**
+ * Ce que `RefreshableLayoutComponent` met autour d'une page, ajouté le
+ * 2026-10-14 pour le premier spec qui monte cette mise en page plutôt que la
+ * classe seule.
+ *
+ * `ionRefresh` est déclaré parce que le gabarit s'y lie ; il porte le même
+ * `CustomEvent` que le vrai, dont l'appelant lit `target` pour appeler
+ * `complete()`. Un spec qui déclenchera ce tirer-pour-rafraîchir devra donc
+ * fournir une cible qui sait le faire — exactement comme le vrai composant
+ * l'exige.
+ */
+@Component({ selector: 'ion-refresher', standalone: true, template: '<ng-content></ng-content>' })
+export class IonRefresherStub {
+  @Output() ionRefresh = new EventEmitter<CustomEvent>();
+}
+
+@Component({ selector: 'ion-refresher-content', standalone: true, template: '' })
+export class IonRefresherContentStub {}
+
+@Component({ selector: 'ion-menu-button', standalone: true, template: '' })
+export class IonMenuButtonStub {}
+
+/** `defaultHref` est lié par binding : non déclaré, le gabarit ne compile pas. */
+@Component({ selector: 'ion-back-button', standalone: true, template: '' })
+export class IonBackButtonStub {
+  @Input() defaultHref = '';
+}
+
+/**
  * Contrôles de saisie : leurs `@Input`/`@Output` sont déclarés parce qu'ils
  * sont liés par binding (`[value]`, `(ionChange)`) dans les templates du
  * builder — sous `strictTemplates`, un binding vers une propriété non déclarée
@@ -394,6 +422,7 @@ export class IonSearchbarStub {
  * ============================================================================
  */
 export {
+  IonBackButtonStub as IonBackButton,
   IonBadgeStub as IonBadge,
   IonButtonStub as IonButton,
   IonButtonsStub as IonButtons,
@@ -413,9 +442,12 @@ export {
   IonItemSlidingStub as IonItemSliding,
   IonLabelStub as IonLabel,
   IonListStub as IonList,
+  IonMenuButtonStub as IonMenuButton,
   IonNoteStub as IonNote,
   IonProgressBarStub as IonProgressBar,
   IonRangeStub as IonRange,
+  IonRefresherStub as IonRefresher,
+  IonRefresherContentStub as IonRefresherContent,
   IonSearchbarStub as IonSearchbar,
   IonSegmentStub as IonSegment,
   IonSegmentButtonStub as IonSegmentButton,
