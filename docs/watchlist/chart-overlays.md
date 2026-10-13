@@ -344,6 +344,31 @@ passe `isLocallyExecutable` pour la même raison, donc part aussi dans `strategi
 `assertStrategiesAreUnambiguous` la refusera. Dans les deux cas le client a eu raison de
 ne pas trancher, et le message dit ce qui s'est passé.
 
+## Trois intervalles que le backtest ne sait pas lire
+
+**8H, 12H et 3D sont de vraies bougies d'Hyperliquid** — mesuré le 2026-10-14 sur le
+gateway : 8 h exactement, grille alignée sur 00:00 / 08:00 / 16:00 UTC pour la première, 3
+jours exactement pour la dernière. Mais `ChartInterval`, le jeu de codes que `POST /analysis`
+accepte, n'en porte aucune : c'est une liste de fournisseur de chart, qui contient au
+passage cinq codes qu'Hyperliquid ne sert pas (`'2'`, `'10'`, `'45'`, `'180'`, `'3M'`).
+
+⚠️ `toChartInterval` rabattait ces trois-là sur `'60'` — **une heure** — avec un
+`console.warn` pour seule trace. Mesuré dans le navigateur : sélectionner 8H affichait 253
+bougies d'une heure **et le backtest d'une heure avec**, sous une étiquette 8H. Le pire des
+cas sur un écran qui sert à décider, et il dépendait de ce qui était attaché : sans
+stratégie ni indicateur, le même bouton affichait les vraies bougies 8h, puisque ce
+chemin-là (`fetchViaCandles`) ne passe pas par l'analyse.
+
+Depuis, `chartIntervalFor` rend `null` au lieu d'un intervalle inventé, et la page
+court-circuite l'analyse : vraies bougies, aucune surcouche, et le toast le dit — « Chart
+loaded without indicators — the bot cannot analyse 8H candles. » Le cache des résultats est
+vidé au passage, donc aucun bilan d'un autre intervalle ne survit sous ces bougies.
+
+Lever la limite demanderait d'étendre `ChartInterval` (`'480' | '720' | '3D'`) dans les types
+partagés, le mapper du bot et cette table. Ça ne donnerait que le **backtest** : le bot
+n'automatise que `'15' | '60' | '240' | '1D'` (`PASS_SCHEDULES`), et la configuration des
+paires ne propose que ces quatre-là, lus du catalogue serveur.
+
 ## Un refus est un état, pas un événement
 
 Il reste vrai tant que la configuration ne change pas, alors qu'un toast est fait pour un

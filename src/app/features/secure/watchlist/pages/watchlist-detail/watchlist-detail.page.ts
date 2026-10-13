@@ -47,7 +47,7 @@ import {
   IndicatorMetadata,
   PositionSide,
 } from '@syldel/trading-shared-types';
-import { toChartInterval } from '@utils/hl-interval.utils';
+import { chartIntervalFor } from '@utils/hl-interval.utils';
 import { addIcons } from 'ionicons';
 import {
   addOutline,
@@ -535,9 +535,30 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     // celui qu'un changement pendant l'appel aurait mis à la place.
     const interval = this.selectedInterval();
 
+    /**
+     * Trois intervalles d'Hyperliquid n'ont aucun code `/analysis` : 8h, 12h et
+     * 3d. On ne demande donc rien, plutôt que de demander **une heure** sous leur
+     * nom — ce que faisait le repli de `toChartInterval` jusqu'au 2026-10-14,
+     * avec un `console.warn` pour seule trace et 253 bougies d'une heure à
+     * l'écran sous une étiquette 8H.
+     *
+     * Le chart reste utile : `fetchViaCandles` demande les vraies bougies de
+     * l'intervalle, qu'Hyperliquid sert bien. Ce sont les surcouches qui
+     * manquent, et le toast le dit — la même annonce que pour une panne du bot,
+     * parce que du point de vue de l'écran c'est le même état.
+     */
+    const chartInterval = chartIntervalFor(interval);
+    if (chartInterval === null) {
+      await this.fetchViaCandles(item, displayStartTime, endTime);
+      await this.notifyOverlaysUnavailable(
+        `the bot cannot analyse ${INTERVAL_LABELS[interval]} candles.`,
+      );
+      return;
+    }
+
     const request: AnalysisRequest = {
       symbol: item.coin,
-      interval: toChartInterval(interval),
+      interval: chartInterval,
       // Début de la fenêtre à AFFICHER, jamais une valeur pré-paddée : le
       // serveur recule lui-même `startTime` du warm-up nécessaire
       // (`AnalysisService.padStartTimeForWarmup`), en s'appuyant sur un registre
@@ -598,7 +619,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       // panne du service d'analyse se lisait comme « cet indicateur ne donne
       // rien », ce qui est le pire diagnostic possible sur un outil de trading.
       await this.fetchViaCandles(item, displayStartTime, endTime);
-      await this.notifyOverlaysUnavailable(error);
+      await this.notifyOverlaysUnavailable(overlayFailureReason(error));
     }
   }
 
@@ -609,10 +630,13 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
    * « the analysis service did not respond » sur un `400` envoyait chercher du
    * côté du réseau un problème qui était dans la requête — exactement le genre
    * de diagnostic faux qu'on ne veut pas sur un outil de trading.
+   *
+   * Prend un **motif** et non une erreur depuis le 2026-10-14 : tous les chemins
+   * qui laissent le chart nu ne passent pas par un rejet du bot. L'intervalle
+   * que `/analysis` ne sait pas demander n'en est pas un — il n'y a aucune
+   * requête, donc aucune erreur à traduire.
    */
-  private async notifyOverlaysUnavailable(error: unknown): Promise<void> {
-    const reason = overlayFailureReason(error);
-
+  private async notifyOverlaysUnavailable(reason: string): Promise<void> {
     // Le même motif ne se réannonce pas. Un refus du bot est un **état** — il
     // reste vrai tant que la configuration ne change pas — alors qu'un toast
     // est fait pour un événement. Sans ce garde-fou, chaque rechargement (un
