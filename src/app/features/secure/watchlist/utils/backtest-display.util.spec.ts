@@ -26,6 +26,7 @@ function stats(overrides: Partial<BacktestStats> = {}): BacktestStats {
     losses: 0,
     breakeven: 0,
     winRatePercent: null,
+    payoffRatio: null,
     realizedGrossPercent: 0,
     realizedNetPercent: 0,
     unrealizedGrossPercent: 0,
@@ -47,12 +48,21 @@ function report(overrides: Partial<BacktestReport> = {}): BacktestReport {
     long: stats(),
     short: stats(),
     total: stats(),
+    // L'achat-conservation : la référence à battre, plate par défaut pour que
+    // les tests qui ne la regardent pas ne la lisent pas non plus.
+    hold: {
+      returnPercent: 0,
+      maxDrawdown: { depthPercent: 0, peakTime: null, troughTime: null },
+      maxDrawdownIntrabar: { depthPercent: 0, peakTime: null, troughTime: null },
+      currentDrawdown: { depthPercent: 0, peakTime: null },
+    },
+    exposurePercent: 0,
     trades: [],
     openPositions: [],
     carriedIn: [],
     equity: [
-      { time: H, long: 1, short: 2, total: 3 },
-      { time: 2 * H, long: 4, short: 5, total: 9 },
+      { time: H, long: 1, short: 2, total: 3, hold: 0 },
+      { time: 2 * H, long: 4, short: 5, total: 9, hold: 0 },
     ],
     overlap: { candles: 0, firstTime: null },
     anomalies: [],
@@ -143,10 +153,24 @@ describe('backtestLimits', () => {
   });
 
   it('keeps the three limits that do not depend on the tier', () => {
-    expect(backtestLimits([TAKER])).toHaveLength(5);
+    expect(backtestLimits([TAKER])).toHaveLength(6);
     expect(joined([TAKER])).toContain('simplified simulation');
     expect(joined([TAKER])).toContain('take-profit / stop-loss');
     expect(joined([TAKER])).toContain('added, not compounded');
+  });
+
+  it('says the benchmark pays no fee, and what that is worth to it', () => {
+    /**
+     * Le hold est brut comme chez TradingView et Freqtrade, et l'écart avantage
+     * la référence — donc désavantage la stratégie. Le taire ferait lire deux
+     * colonnes comptées pareil ; le dire sans le chiffrer ne permettrait pas de
+     * corriger de tête. Au palier de base, l'aller-retour épargné vaut 0,09 %.
+     */
+    expect(joined([TAKER])).toContain('buy and hold pays no fee');
+    expect(joined([TAKER])).toContain('0.09%');
+    // Deux paliers à l'écran : on ne peut plus nommer un aller-retour unique.
+    expect(joined([TAKER, MAKER])).toContain('pays no fee');
+    expect(joined([TAKER, MAKER])).not.toContain('0.09%');
   });
 
   it('says the deeper drawdown is itself a floor, not the truth', () => {
@@ -324,10 +348,33 @@ describe('definedSides', () => {
 });
 
 describe('equityLines', () => {
+  it('always draws the benchmark, whatever the strategy did', () => {
+    /**
+     * « Ne rien faire » est la référence à battre. Une courbe qui monte seule à
+     * l'écran se lit comme un succès, même quand le cours qu'elle suit a fait
+     * mieux — c'est pour ça que celle-ci n'est jamais optionnelle.
+     *
+     * Elle vient du rapport (`equity[].hold`, types partagés 0.33.0) : l'app ne
+     * la calcule pas, elle la lit, comme tout le reste de cet écran.
+     */
+    const lines = equityLines(
+      report({
+        equity: [
+          { time: H, long: 1, short: 2, total: 3, hold: 5 },
+          { time: 2 * H, long: 4, short: 5, total: 9, hold: 12 },
+        ],
+      }),
+      ['LONG'],
+    );
+
+    expect(lines.at(-1)?.id).toBe('hold');
+    expect(lines.at(-1)?.points.map((p) => p.value)).toEqual([5, 12]);
+  });
+
   it('draws the total alone when only one side traded', () => {
     const lines = equityLines(report({ long: stats({ trades: 2 }) }), ['LONG', 'SHORT']);
 
-    expect(lines.map((l) => l.id)).toEqual(['total']);
+    expect(lines.map((l) => l.id)).toEqual(['total', 'hold']);
     expect(lines[0]?.points.map((p) => p.value)).toEqual([3, 9]);
   });
 
@@ -337,7 +384,7 @@ describe('equityLines', () => {
       'SHORT',
     ]);
 
-    expect(lines.map((l) => l.id)).toEqual(['total', 'LONG', 'SHORT']);
+    expect(lines.map((l) => l.id)).toEqual(['total', 'LONG', 'SHORT', 'hold']);
   });
 
   // Le bot ne tient qu'une position par paire : une somme de deux côtés ouverts
@@ -348,12 +395,12 @@ describe('equityLines', () => {
         total: null,
         long: stats({ trades: 1 }),
         short: stats({ trades: 1 }),
-        equity: [{ time: H, long: 1, short: 2, total: null }],
+        equity: [{ time: H, long: 1, short: 2, total: null, hold: 0 }],
       }),
       ['LONG', 'SHORT'],
     );
 
-    expect(lines.map((l) => l.id)).toEqual(['LONG', 'SHORT']);
+    expect(lines.map((l) => l.id)).toEqual(['LONG', 'SHORT', 'hold']);
   });
 
   it('counts a side holding only an open position as active', () => {
@@ -375,7 +422,7 @@ describe('equityLines', () => {
       ['LONG', 'SHORT'],
     );
 
-    expect(lines.map((l) => l.id)).toEqual(['total', 'LONG', 'SHORT']);
+    expect(lines.map((l) => l.id)).toEqual(['total', 'LONG', 'SHORT', 'hold']);
   });
 });
 

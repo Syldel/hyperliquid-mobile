@@ -78,6 +78,22 @@ interface UnderwaterRow {
 const SIDE_LABELS: Record<PositionSide, string> = { LONG: 'Long', SHORT: 'Short' };
 
 /**
+ * Le gris de la référence, posé en clair plutôt que lu d'une variable CSS : la
+ * courbe vit dans un canvas que `lightweight-charts` peint lui-même, hors de la
+ * cascade.
+ *
+ * Choisi pour tenir sur les deux fonds de la modale — calculé le 2026-10-14 :
+ * **4,88:1** sur le sombre (#1d1d1d) et **3,45:1** sur le clair (#feffff), au
+ * -dessus des 3:1 que la WCAG demande à un objet graphique. Les gris plus clairs
+ * passent mieux en sombre et moins bien en clair (`#909090` : 5,28 et 3,19) :
+ * c'est le thème clair qui contraint ici.
+ */
+const HOLD_COLOR = '#8a8a8a';
+
+/** Le même nom dans la légende, le tableau et les deux blocs de drawdown. */
+const HOLD_LABEL = 'Buy and hold';
+
+/**
  * Le rapport de backtest d'une stratégie, en détail : chiffres par côté,
  * courbe, positions et liste des trades.
  *
@@ -155,21 +171,40 @@ export class BacktestReportModalComponent implements OnInit {
 
     // Le sommet peut être le début de la fenêtre et non une bougie : c'est
     // `report.from` qui le datera alors — voir `drawdownWindow`.
-    this.drawdownRows.set(
-      columns.map((column) => ({
+    // La référence a droit aux mêmes lignes que les côtés : comparer deux
+    // rendements sans comparer deux risques flatte celui qui en a pris le plus.
+    const hold = report.hold;
+
+    this.drawdownRows.set([
+      ...columns.map((column) => ({
         label: column.label,
         depthPercent: column.stats.maxDrawdown.depthPercent,
         window: drawdownWindow(column.stats.maxDrawdown, report.from),
       })),
-    );
+      ...(hold
+        ? [
+            {
+              label: HOLD_LABEL,
+              depthPercent: hold.maxDrawdown.depthPercent,
+              window: drawdownWindow(hold.maxDrawdown, report.from),
+            },
+          ]
+        : []),
+    ]);
 
     // Seules les colonnes encore sous leur sommet : lister « at its peak » pour
     // les autres ferait trois lignes là où l'absence suffit, et le bloc dit déjà
     // en une phrase quand il n'y a plus personne sous l'eau.
     this.underwaterRows.set(
-      columns.flatMap((column) => {
-        const window = underwaterWindow(column.stats.currentDrawdown, report.from, report.to);
-        return window === null ? [] : [{ label: column.label, window }];
+      [
+        ...columns.map((column) => ({
+          label: column.label,
+          current: column.stats.currentDrawdown,
+        })),
+        ...(hold ? [{ label: HOLD_LABEL, current: hold.currentDrawdown }] : []),
+      ].flatMap(({ label, current }) => {
+        const window = underwaterWindow(current, report.from, report.to);
+        return window === null ? [] : [{ label, window }];
       }),
     );
 
@@ -177,13 +212,17 @@ export class BacktestReportModalComponent implements OnInit {
       equityLines(report, sides).map((line) => ({
         id: line.id,
         points: line.points,
-        emphasis: line.id === 'total' || report.total === null,
+        // `emphasis` décide du trait plein : la référence reste en pointillés,
+        // même quand il n'y a pas de total pour lui voler la vedette.
+        emphasis: line.id === 'total' || (report.total === null && line.id !== 'hold'),
         color:
           line.id === 'total'
             ? this.color()
-            : line.id === 'LONG'
-              ? POSITION_COLORS.long
-              : POSITION_COLORS.short,
+            : line.id === 'hold'
+              ? HOLD_COLOR
+              : line.id === 'LONG'
+                ? POSITION_COLORS.long
+                : POSITION_COLORS.short,
       })),
     );
 
@@ -194,7 +233,9 @@ export class BacktestReportModalComponent implements OnInit {
   }
 
   lineLabel(id: string): string {
-    return id === 'total' ? 'Total' : SIDE_LABELS[id as PositionSide];
+    if (id === 'total') return 'Total';
+    if (id === 'hold') return HOLD_LABEL;
+    return SIDE_LABELS[id as PositionSide];
   }
 
   close(): void {

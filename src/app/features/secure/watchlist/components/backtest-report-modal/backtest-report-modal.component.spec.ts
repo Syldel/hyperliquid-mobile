@@ -28,6 +28,7 @@ function stats(overrides: Partial<BacktestStats> = {}): BacktestStats {
     losses: 0,
     breakeven: 0,
     winRatePercent: null,
+    payoffRatio: null,
     realizedGrossPercent: 0,
     realizedNetPercent: 0,
     unrealizedGrossPercent: 0,
@@ -36,6 +37,19 @@ function stats(overrides: Partial<BacktestStats> = {}): BacktestStats {
     maxDrawdownIntrabar: { depthPercent: 0, peakTime: null, troughTime: null },
     currentDrawdown: { depthPercent: 0, peakTime: null },
     ...overrides,
+  };
+}
+
+/**
+ * L'achat-conservation, plat par défaut : les tests qui ne le regardent pas ne
+ * doivent pas le lire non plus.
+ */
+function holdFixture(): NonNullable<BacktestReport['hold']> {
+  return {
+    returnPercent: 0,
+    maxDrawdown: { depthPercent: 0, peakTime: null, troughTime: null },
+    maxDrawdownIntrabar: { depthPercent: 0, peakTime: null, troughTime: null },
+    currentDrawdown: { depthPercent: 0, peakTime: null },
   };
 }
 
@@ -49,6 +63,8 @@ function report(overrides: Partial<BacktestReport> = {}): BacktestReport {
     long: stats({ trades: 2 }),
     short: stats(),
     total: stats({ trades: 2 }),
+    hold: holdFixture(),
+    exposurePercent: 0,
     trades: [
       {
         side: 'LONG',
@@ -71,7 +87,7 @@ function report(overrides: Partial<BacktestReport> = {}): BacktestReport {
     ],
     openPositions: [],
     carriedIn: [],
-    equity: [{ time: H, long: 0, short: 0, total: 0 }],
+    equity: [{ time: H, long: 0, short: 0, total: 0, hold: 0 }],
     overlap: { candles: 0, firstTime: null },
     anomalies: [],
     ...overrides,
@@ -210,6 +226,84 @@ describe('BacktestReportModalComponent', () => {
     // La borne gauche est mesurée **avant** la flèche : une date rendue là y
     // apparaîtrait, et les dates de ce fixture tombent justement en 1970.
     expect(line).toMatch(/-8\.00% Range start → /);
+  });
+
+  /**
+   * La référence à battre, à côté du rendement qu'elle juge. « Ne rien faire »
+   * est ce qu'une stratégie doit dépasser pour exister, et un rendement positif
+   * affiché seul se lit comme un succès.
+   */
+  it('puts the benchmark one line under the return it judges', () => {
+    const host = mount(
+      report({
+        total: stats({ realizedNetPercent: -3.28 }),
+        hold: {
+          returnPercent: 12.5,
+          maxDrawdown: { depthPercent: 18.4, peakTime: 2 * H, troughTime: 6 * H },
+          maxDrawdownIntrabar: { depthPercent: 20.1, peakTime: 2 * H, troughTime: 6 * H },
+          currentDrawdown: { depthPercent: 0, peakTime: 10 * H },
+        },
+        exposurePercent: 23.4,
+      }),
+    );
+
+    const rows = [...host.querySelectorAll('tbody tr')].map((tr) => [
+      tr.querySelector('th')?.textContent?.trim(),
+      tr.querySelector('td')?.textContent?.trim(),
+    ]);
+    const labels = rows.map((row) => row[0]);
+
+    expect(labels.indexOf('Buy and hold')).toBe(labels.indexOf('Realized, net of fees') + 1);
+    expect(rows.find((row) => row[0] === 'Buy and hold')?.[1]).toBe('+12.50%');
+    expect(rows.find((row) => row[0] === 'Time in position')?.[1]).toBe('23%');
+  });
+
+  it('spreads the benchmark across the sides, having none of its own', () => {
+    // Une valeur par colonne ferait croire à un hold par côté ; et une colonne
+    // de plus ne tiendrait pas à 360 px.
+    const host = mount(report({ hold: { ...holdFixture(), returnPercent: 1 } }));
+
+    const cell = [...host.querySelectorAll('tbody tr')]
+      .find((tr) => tr.querySelector('th')?.textContent?.includes('Buy and hold'))
+      ?.querySelector('td');
+
+    expect(cell?.getAttribute('colspan')).toBe('3');
+  });
+
+  it('gives the benchmark the same drawdown lines as the sides', () => {
+    const host = mount(
+      report({
+        hold: {
+          ...holdFixture(),
+          maxDrawdown: { depthPercent: 18.4, peakTime: 2 * H, troughTime: 6 * H },
+          currentDrawdown: { depthPercent: 5.2, peakTime: 8 * H },
+        },
+      }),
+    );
+
+    const blocks = [...host.querySelectorAll('.drawdowns')].map((ul) =>
+      ul.textContent?.replace(/\s+/g, ' ').trim(),
+    );
+
+    expect(blocks[0]).toContain('Buy and hold');
+    expect(blocks[0]).toContain('-18.40%');
+    expect(blocks[1]).toContain('Buy and hold');
+  });
+
+  it('reads the payoff ratio, and refuses one it cannot compute', () => {
+    const host = mount(
+      report({
+        long: stats({ payoffRatio: 2.37 }),
+        short: stats({ payoffRatio: null }),
+        total: null,
+      }),
+    );
+
+    const cells = [...host.querySelectorAll('tbody tr')]
+      .find((tr) => tr.querySelector('th')?.textContent?.includes('Payoff ratio'))
+      ?.querySelectorAll('td');
+
+    expect([...(cells ?? [])].map((td) => td.textContent?.trim())).toEqual(['2.37', '—']);
   });
 
   /**

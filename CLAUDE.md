@@ -54,19 +54,22 @@ Ce qui en découle **ici**, où le chiffre est lu plutôt que produit :
 - **l'achat-conservation est la référence à battre.** Si l'écran ne la montre pas, il laisse
   croire qu'un rendement positif est un succès.
 
-⚠️ État au 2026-10-13, point par point — ce paragraphe a affirmé le contraire pendant
+⚠️ État au 2026-10-14, point par point — ce paragraphe a affirmé le contraire pendant
 plusieurs jours, et une dette qu'on croit ouverte fait « corriger » un affichage juste :
 
-|                                       |                                                                                                                                         |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| de quoi un rendement est net          | **tenu** — la modale écrit `Realized, net of fees` et nomme le palier (« net of 0.045 % per side »), lu sur `BacktestReport.feePerSide` |
-| une métrique porte son vrai nom       | **tenu** depuis les types partagés 0.26.0                                                                                               |
+|                                       |                                                                                                                                                                                     |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| de quoi un rendement est net          | **tenu** — la modale écrit `Realized, net of fees` et nomme le palier (« net of 0.045 % per side »), lu sur `BacktestReport.feePerSide`                                             |
+| une métrique porte son vrai nom       | **tenu** depuis les types partagés 0.26.0                                                                                                                                           |
 | drawdown et taux de réussite affichés | **tenus** — `Max drawdown, net`, `Max drawdown, intrabar`, `Below its peak now` et `Win rate` dans la modale, `DD` et `% win` dans le bandeau ; le quand et la durée sous la courbe |
-| **exposition et régularité**          | **non** — ni l'une ni l'autre n'apparaît à l'écran                                                                                      |
-| **l'achat-conservation**              | **non** — le harnais la calcule, l'app ne la demande pas                                                                                |
+| **l'achat-conservation**              | **tenue** depuis les types partagés 0.33.0 — courbe grise sur le chart d'équité, ligne `Buy and hold` dans le tableau et dans les deux blocs de drawdown, `vs hold` dans le bandeau |
+| **l'exposition**                      | **tenue** — `Time in position` dans la modale                                                                                                                                       |
+| le rapport gain/perte                 | **tenu** — `Payoff ratio` dans la modale                                                                                                                                            |
+| **la régularité**                     | **hors de cet écran, par décision** — elle se mesure sur des tranches de 30 jours, et la fenêtre d'un chart en fait souvent sept. Elle vit dans les campagnes du harnais            |
 
-Les deux derniers restent de la dette connue : voir [docs/roadmap.md](docs/roadmap.md) et
-`nest-trading-bot/docs/known-gaps.md`.
+⚠️ L'achat-conservation est **brute de frais**, comme chez TradingView et Freqtrade :
+l'écart avantage la référence, donc désavantage la stratégie, et la note des limites le
+chiffre. Voir [docs/roadmap.md](docs/roadmap.md) et `nest-trading-bot/docs/known-gaps.md`.
 
 ## Stade du projet : casser est permis, et souvent souhaitable
 

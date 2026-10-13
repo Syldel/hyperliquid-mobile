@@ -122,26 +122,23 @@ C'est dit à l'écran. Les simuler est une évolution à étudier — elle exige
 se passe à l'intérieur d'une bougie (un stop touché avant ou après le take-profit ?), ce
 qu'aucune bougie seule ne dit.
 
-## Plus tard : l'exposition, la régularité, et la référence à battre
+## La régularité : hors de cet écran, et c'est une décision
 
-Le rapport de backtest montre le rendement, le drawdown, le taux de réussite et, depuis les
-types partagés 0.27.0, de quoi ces chiffres sont nets. **Trois lectures manquent encore**,
-et le `CLAUDE.md` de ce dépôt les réclame :
+L'exposition et l'achat-conservation sont à l'écran depuis les types partagés 0.33.0
+(2026-10-14), avec le rapport gain/perte : voir [watchlist/chart-overlays.md](watchlist/chart-overlays.md).
+Reste la troisième lecture que le `CLAUDE.md` du bot réclame, et elle **n'ira pas ici**.
 
-- **l'exposition** — quelle part du temps la stratégie est en position. Deux stratégies au
-  même rendement ne disent pas la même chose si l'une l'obtient en étant investie 20 % du
-  temps ;
-- **la régularité** — sur combien de tranches de 30 jours la stratégie bat la référence. Un
-  gain qui vient de 2 tranches sur 74 est du sur-ajustement, pas une stratégie. C'est le
-  révélateur de sur-ajustement le moins cher à produire ;
-- **l'achat-conservation**, la référence à battre. Sans elle, un rendement positif se lit
-  comme un succès, alors que sur six ans de BTC le hold fait +307 % — avec un drawdown
-  trois fois pire, et c'est précisément ce que la comparaison apprend.
+**La régularité** — sur combien de tranches de 30 jours la stratégie bat la référence —
+reste le révélateur de sur-ajustement le moins cher à produire : un gain qui vient de 2
+tranches sur 74 n'est pas une stratégie. Mais elle se mesure sur des **tranches de 30
+jours**, quand la fenêtre d'un chart en fait souvent sept : l'y porter afficherait
+« 0 tranche sur 0 ». Elle vit donc dans les campagnes du harnais (`blocksBeatingHold`),
+où les périodes sont longues et choisies pour ça.
 
-⚠️ Les trois sont **déjà calculées**, par le harnais du bot (`scripts/backtest/stats.ts` :
-`exposure`, `blocksBeatingHold`, `holdEquityPoints`). Ce qui manque n'est pas le calcul,
-c'est de les faire traverser : `BacktestReport` ne les porte pas, donc l'app ne peut pas
-les demander. C'est une tournée de types partagés, pas un travail d'affichage.
+⚠️ L'achat-conservation affichée est **brute de frais**, comme chez TradingView
+(« Buy & hold return ») et Freqtrade (`market_change`). L'écart avantage la référence, donc
+désavantage la stratégie — une asymétrie conservatrice, chiffrée dans la note des limites
+plutôt que tue.
 
 ## Traité récemment
 

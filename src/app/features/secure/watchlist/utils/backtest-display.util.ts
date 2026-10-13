@@ -59,6 +59,7 @@ export function backtestLimits(fees: readonly number[]): readonly string[] {
     fillLine(fees),
     "Drawdowns are given twice: on candle closes, and at each candle's worst point — " +
       'the second is the deeper, and even it is a lower bound.',
+    holdLine(fees),
     "Take-profit / stop-loss, latent orders and the pair's exit behaviour are not simulated yet.",
     'Each trade counts at the same size; returns are added, not compounded.',
   ];
@@ -104,6 +105,29 @@ function fillLine(fees: readonly number[]): string {
 
 function isUsableFee(fee: number): boolean {
   return Number.isFinite(fee) && fee >= 0;
+}
+
+/**
+ * Ce que la référence ne paie pas, chiffré.
+ *
+ * Le hold est **brut**, comme chez TradingView (« Buy & hold return ») et
+ * Freqtrade (`market_change`) — et l'écart va dans le sens prudent : il avantage
+ * la référence, donc désavantage la stratégie. Le taire laisserait croire que
+ * les deux colonnes sont comptées pareil ; le dire sans le chiffrer ne
+ * permettrait pas de corriger de tête. D'où l'aller-retour, calculé au palier du
+ * rapport.
+ */
+function holdLine(fees: readonly number[]): string {
+  const distinct = [...new Set(fees.filter(isUsableFee))].sort((a, b) => a - b);
+  const roundTrip = distinct.length === 1 ? distinct[0]! * 2 : null;
+
+  if (roundTrip === null || roundTrip === 0) {
+    return 'Buy and hold pays no fee here, where the strategy pays one per side.';
+  }
+  return (
+    `Buy and hold pays no fee here — the round trip it is spared would cost it ` +
+    `${formatRatePercent(roundTrip)}.`
+  );
 }
 
 /**
@@ -273,7 +297,7 @@ export function statsOf(report: BacktestReport, side: PositionSide): BacktestSta
 }
 
 export interface EquityLine {
-  id: 'total' | PositionSide;
+  id: 'total' | 'hold' | PositionSide;
   points: { time: number; value: number }[];
 }
 
@@ -284,6 +308,11 @@ export interface EquityLine {
  * travaillé, pour voir d'où vient le total sans doubler une courbe identique.
  * Sans total (long et short se chevauchent), chaque côté a sa courbe — et aucune
  * somme n'est dessinée, puisque le bot ne pourrait pas la réaliser.
+ *
+ * **L'achat-conservation est toujours tracé**, en dernier. « Ne rien faire » est
+ * la référence à battre, et une courbe qui monte seule à l'écran se lit comme un
+ * succès même quand le cours qu'elle suit a fait mieux. Le rapport la porte
+ * depuis les types partagés 0.33.0 : rien n'est calculé ici, pas même elle.
  */
 export function equityLines(report: BacktestReport, sides: readonly PositionSide[]): EquityLine[] {
   const active = sides.filter((side) => isActive(report, side));
@@ -292,15 +321,20 @@ export function equityLines(report: BacktestReport, sides: readonly PositionSide
     points: report.equity.map((p) => ({ time: p.time, value: side === 'LONG' ? p.long : p.short })),
   });
 
+  const hold: EquityLine = {
+    id: 'hold',
+    points: report.equity.map((p) => ({ time: p.time, value: p.hold })),
+  };
+
   if (report.total === null) {
-    return (active.length > 0 ? active : sides).map(sideLine);
+    return [...(active.length > 0 ? active : sides).map(sideLine), hold];
   }
 
   const total: EquityLine = {
     id: 'total',
     points: report.equity.map((p) => ({ time: p.time, value: p.total ?? 0 })),
   };
-  return active.length > 1 ? [total, ...active.map(sideLine)] : [total];
+  return active.length > 1 ? [total, ...active.map(sideLine), hold] : [total, hold];
 }
 
 function isActive(report: BacktestReport, side: PositionSide): boolean {

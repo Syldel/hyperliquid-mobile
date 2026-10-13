@@ -203,6 +203,28 @@ La courbe vit dans un petit chart à part (`EquityCurveComponent`), pas dans un 
 principal, dont la hauteur est déjà rationnée. Son dernier point est signalé provisoire
 quand il tombe sur la bougie en cours.
 
+**La référence à battre est tracée avec la stratégie** (types partagés 0.33.0) : une
+quatrième courbe, grise et pointillée, l'achat-conservation sur la même fenêtre. « Ne rien
+faire » est ce qu'une stratégie doit dépasser pour exister, et une courbe qui monte seule à
+l'écran se lit comme un succès même quand le cours qu'elle suit a fait mieux. Elle vient de
+`equity[].hold` : l'app ne la calcule pas, comme le reste.
+
+Le tableau porte `Buy and hold` juste sous `Realized, net of fees` — **une seule valeur
+étalée sur les colonnes**, parce que la référence n'a pas de côté. ⚠️ Et non une colonne de
+plus : mesuré à 360 px, le tableau occupe 328 px avec trois colonnes de valeurs déjà à leur
+largeur minimale ; une quatrième déborderait ou écraserait les libellés. Vérifié à 360 et
+411 px, les onze lignes tiennent chacune sur une seule.
+
+Deux lignes l'accompagnent : `Time in position` (l'union des deux côtés, héritées comprises)
+et `Payoff ratio` (par côté, `—` quand un des deux manque). Le bandeau, lui, porte l'écart :
+`-0.88% vs hold`, en **points** parce que les deux chiffres comparés sont déjà des
+pourcentages.
+
+⚠️ **Le hold est brut de frais**, comme chez TradingView (« Buy & hold return ») et
+Freqtrade (`market_change`). L'écart avantage la référence, donc désavantage la stratégie :
+une asymétrie conservatrice, que la note des limites chiffre (`0.09%` d'aller-retour épargné
+au palier de base) plutôt que de la taire.
+
 **Trois lectures d'un même creux**, dans le tableau, parce qu'un seul chiffre ne répond pas
 à trois questions (types partagés 0.31.0) :
 

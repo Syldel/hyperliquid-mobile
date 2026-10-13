@@ -192,6 +192,19 @@
         >
           {{ formatPercent(total.realizedNetPercent) }}
         </span>
+        <!--
+          L'écart à la référence, en **points**, juste après le rendement : une
+          stratégie qui rend moins que le cours qu'elle suit n'a pas de raison
+          d'exister, et ce bandeau est le seul écran qu'on regarde d'un coup
+          d'œil. En points et non en pourcentage parce que les deux chiffres
+          sont déjà des pourcentages — « +2 % de mieux que le hold » se lirait
+          comme un rapport.
+        -->
+        @if (report.hold; as hold) { @let gap = total.realizedNetPercent - hold.returnPercent;
+        <span [class.up]="percentTone(gap) === 'up'" [class.down]="percentTone(gap) === 'down'">
+          {{ formatPercent(gap) }} vs hold
+        </span>
+        }
         <span>{{ total.trades }} {{ total.trades === 1 ? 'trade' : 'trades' }}</span>
         @if (total.winRatePercent !== null) {
         <span>{{ total.winRatePercent.toFixed(0) }}% win</span>

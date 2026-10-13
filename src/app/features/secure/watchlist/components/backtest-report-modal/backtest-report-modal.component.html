@@ -108,6 +108,30 @@
           </td>
         }
       </tr>
+      <!--
+        La référence à battre, collée au rendement qu'elle juge : « ne rien
+        faire » est ce qu'une stratégie doit dépasser pour exister, et deux
+        lignes voisines se comparent d'un coup d'œil.
+
+        Une seule valeur étalée sur les colonnes, parce que l'achat-conservation
+        n'a pas de côté. ⚠️ Et **pas** une colonne de plus : mesuré à 360 px, le
+        tableau occupe déjà 328 px avec trois colonnes de valeurs à leur largeur
+        minimale ; une quatrième déborderait ou écraserait les libellés.
+      -->
+      <tr>
+        <th>Buy and hold</th>
+        @if (report().hold; as hold) {
+          <td
+            [attr.colspan]="columns().length"
+            [class.up]="percentTone(hold.returnPercent) === 'up'"
+            [class.down]="percentTone(hold.returnPercent) === 'down'"
+          >
+            {{ formatPercent(hold.returnPercent) }}
+          </td>
+        } @else {
+          <td [attr.colspan]="columns().length">—</td>
+        }
+      </tr>
       <tr>
         <th>Open, net of fees</th>
         @for (column of columns(); track column.label) {
@@ -155,6 +179,30 @@
             {{ formatPercent(-column.stats.currentDrawdown.depthPercent) }}
           </td>
         }
+      </tr>
+      <!--
+        Le taux de réussite seul ne décide pas : un suiveur de tendance gagne 35
+        à 40 % du temps avec un gros rapport, et une configuration qui gagne
+        60 % avec un petit rapport est probablement autre chose, et de plus
+        fragile. `—` quand un des deux côtés est vide : sans trade perdant le
+        rapport serait infini.
+      -->
+      <tr>
+        <th>Payoff ratio</th>
+        @for (column of columns(); track column.label) {
+          <td>
+            {{ column.stats.payoffRatio === null ? '—' : column.stats.payoffRatio.toFixed(2) }}
+          </td>
+        }
+      </tr>
+      <!--
+        Une stratégie à plat 70 % du temps qui égale l'achat-conservation ne lui
+        est pas équivalente : elle est bien meilleure en risque, et c'est
+        invisible sans ce chiffre. L'union des deux côtés, donc une seule valeur.
+      -->
+      <tr>
+        <th>Time in position</th>
+        <td [attr.colspan]="columns().length">{{ report().exposurePercent.toFixed(0) }}%</td>
       </tr>
     </tbody>
   </table>
