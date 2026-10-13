@@ -203,13 +203,39 @@ La courbe vit dans un petit chart à part (`EquityCurveComponent`), pas dans un 
 principal, dont la hauteur est déjà rationnée. Son dernier point est signalé provisoire
 quand il tombe sur la bougie en cours.
 
-**Sous la courbe, les bornes de la pire baisse** : « Deepest drawdown » date le sommet et le
+**Trois lectures d'un même creux**, dans le tableau, parce qu'un seul chiffre ne répond pas
+à trois questions (types partagés 0.31.0) :
+
+| ligne                    | ce qu'elle répond                                                |
+| ------------------------ | ---------------------------------------------------------------- |
+| `Max drawdown, net`      | le pire creux traversé, sur les clôtures                         |
+| `Max drawdown, intrabar` | le même, au pire instant de chaque bougie — jamais moins profond |
+| `Below its peak now`     | le recul où le compte est **encore**, à la dernière clôture      |
+
+TradingView publie les deux premières côte à côte, Freqtrade la troisième (« Current
+drawdown »). ⚠️ L'intra-bougie est une **borne inférieure** et la note des limites le dit :
+son sommet est lu sur les clôtures, parce qu'apparier un plus haut et un plus bas dans une
+même bougie supposerait un ordre que l'OHLC ne donne pas.
+
+⚠️ Le « jamais moins profond » de la deuxième ligne a été **faux à l'écran** : les types
+partagés 0.31.0 lisaient le sommet sur la courbe adverse, et une mèche sous la bougie du
+sommet l'abaissait autant que le creux. Mesuré sur BTC le 2026-10-14, cette page affichait
+`-2.41%` d'intra-bougie sous un `-2.86%` de close-to-close. Corrigé en 0.31.1 ; la leçon
+tient en une ligne : une courbe partout plus basse ne donne pas un drawdown plus profond.
+
+**Sous la courbe, le « quand »** : « When the max drawdown happened » date le sommet et le
 creux de chaque colonne et donne la durée entre les deux (`drawdownWindow`,
 `formatDuration`). La profondeur seule ne permet pas de décider — 12 % perdus en trois
 heures et les mêmes 12 % perdus en trois mois ne disent pas la même chose d'une stratégie —
 et c'est bien cette durée que Freqtrade (« Drawdown start / end / duration ») comme
 TradingView (« max drawdown duration ») publient à côté du chiffre. Le bandeau compact, lui,
 n'a la place que pour la durée : `DD -12.34% over 2 d 12 h`.
+
+**Puis « Still under water »** (`underwaterWindow`) : depuis quel sommet, et depuis combien
+de temps, pour les seules colonnes encore en dessous. Sans pourcentage — le tableau le porte
+déjà, et le même chiffre à deux endroits fait chercher une différence qui n'existe pas.
+Quand plus personne n'est sous l'eau, la section l'**écrit** au lieu de disparaître : une
+section absente se lit comme une donnée manquante, alors que c'est une bonne nouvelle.
 
 Deux formulations valent une explication :
 

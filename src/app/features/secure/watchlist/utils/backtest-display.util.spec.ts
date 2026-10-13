@@ -9,6 +9,7 @@ import {
   formatPriceForDisplay,
   percentTone,
   tradeFocusRange,
+  underwaterWindow,
 } from './backtest-display.util';
 
 /**
@@ -30,6 +31,8 @@ function stats(overrides: Partial<BacktestStats> = {}): BacktestStats {
     unrealizedGrossPercent: 0,
     unrealizedNetPercent: 0,
     maxDrawdown: { depthPercent: 0, peakTime: null, troughTime: null },
+    maxDrawdownIntrabar: { depthPercent: 0, peakTime: null, troughTime: null },
+    currentDrawdown: { depthPercent: 0, peakTime: null },
     ...overrides,
   };
 }
@@ -144,8 +147,21 @@ describe('backtestLimits', () => {
     expect(joined([TAKER])).toContain('simplified simulation');
     expect(joined([TAKER])).toContain('take-profit / stop-loss');
     expect(joined([TAKER])).toContain('added, not compounded');
-    // Le drawdown se lit sur des clotures : TradingView nomme la meme distinction.
-    expect(joined([TAKER])).toContain('measured on candle closes');
+  });
+
+  it('says the deeper drawdown is itself a floor, not the truth', () => {
+    /**
+     * La note annonçait un manque (« the real one is deeper ») tant que l'écran
+     * n'avait que la mesure sur clôtures. Les deux sont là depuis les types
+     * partagés 0.31.0, et la note doit donc apprendre à les lire — sans laisser
+     * croire que la seconde est exacte : son sommet est lu sur la courbe
+     * adverse, faute d'ordre connu à l'intérieur d'une bougie.
+     */
+    const text = joined([TAKER]);
+
+    expect(text).toContain('on candle closes');
+    expect(text).toContain("at each candle's worst point");
+    expect(text).toContain('lower bound');
   });
 });
 
@@ -191,6 +207,48 @@ describe('drawdownWindow', () => {
         fromRangeStart: true,
       },
     );
+  });
+});
+
+describe('underwaterWindow', () => {
+  it('dates the peak the curve is still under, and the time since', () => {
+    // Le creux courant n'a pas de borne droite dans le rapport : son point de
+    // mesure est la dernière bougie, et c'est elle qu'on lui donne.
+    expect(underwaterWindow({ depthPercent: 6.88, peakTime: 2 * H }, H, 5 * H)).toEqual({
+      fromTime: 2 * H,
+      toTime: 5 * H,
+      durationMs: 3 * H,
+      fromRangeStart: false,
+    });
+  });
+
+  it('says nothing when the curve is back at its peak', () => {
+    expect(underwaterWindow({ depthPercent: 0, peakTime: 2 * H }, H, 5 * H)).toBeNull();
+  });
+
+  it('stays quiet on a fall too small to show, like its tone does', () => {
+    /**
+     * `percentTone` tient déjà cette règle : un recul de 0,004 % s'affiche
+     * `0.00%`. Annoncer un compte « encore sous son sommet » à côté d'un zéro
+     * ferait lire une alerte que le chiffre dément.
+     */
+    expect(underwaterWindow({ depthPercent: 0.004, peakTime: 2 * H }, H, 5 * H)).toBeNull();
+  });
+
+  it('falls back on the range start when no candle reached that peak', () => {
+    // Même règle que pour le maximum : `peakTime` à `null` désigne le début de
+    // la fenêtre, jamais une absence de sommet.
+    expect(underwaterWindow({ depthPercent: 3, peakTime: null }, H, 4 * H)).toMatchObject({
+      fromTime: H,
+      fromRangeStart: true,
+      durationMs: 3 * H,
+    });
+  });
+
+  it('refuses to date anything on a window without a last candle', () => {
+    // `BacktestReport.to` est nul quand la fenêtre n'a aucune bougie : il n'y a
+    // alors pas d'instant présent à opposer au sommet.
+    expect(underwaterWindow({ depthPercent: 3, peakTime: H }, H, null)).toBeNull();
   });
 });
 

@@ -61,7 +61,7 @@ plusieurs jours, et une dette qu'on croit ouverte fait « corriger » un afficha
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | de quoi un rendement est net          | **tenu** — la modale écrit `Realized, net of fees` et nomme le palier (« net of 0.045 % per side »), lu sur `BacktestReport.feePerSide` |
 | une métrique porte son vrai nom       | **tenu** depuis les types partagés 0.26.0                                                                                               |
-| drawdown et taux de réussite affichés | **tenus** — `Max drawdown, net` et `Win rate` dans la modale, `DD` et `% win` dans le bandeau                                           |
+| drawdown et taux de réussite affichés | **tenus** — `Max drawdown, net`, `Max drawdown, intrabar`, `Below its peak now` et `Win rate` dans la modale, `DD` et `% win` dans le bandeau ; le quand et la durée sous la courbe |
 | **exposition et régularité**          | **non** — ni l'une ni l'autre n'apparaît à l'écran                                                                                      |
 | **l'achat-conservation**              | **non** — le harnais la calcule, l'app ne la demande pas                                                                                |
 

@@ -1,4 +1,5 @@
 import type {
+  BacktestCurrentDrawdown,
   BacktestDrawdown,
   BacktestReport,
   BacktestStats,
@@ -32,13 +33,20 @@ import { formatRatePercent } from '@utils/fee-rate.utils';
  * à deux lignes d'une note qui disait encore « with no fees », les deux dans le
  * même bloc. Aucun test ne l'avait vu — il y en a un maintenant.
  *
- * La ligne sur les drawdowns dit un écart que TradingView prend soin de nommer
- * — il publie un « max drawdown (close-to-close) » **et** un « (intrabar) »,
- * le second mesurant le creux sur le plus bas de la bougie. Mesuré le
- * 2026-10-13 sur nos cinq jeux, en achat-conservation, l'intrabar est plus
- * profond de **0,76 à 2,79 points** (l'écart grandit sur les séries courtes :
- * `xyz:BRENTOIL` en 1 j est le pire). Toujours dans le même sens, donc une
- * sous-estimation systématique.
+ * La ligne sur les drawdowns annonçait un écart que l'écran ne pouvait pas
+ * montrer : TradingView publie un « max drawdown (close-to-close) » **et** un
+ * « (intrabar) », nous n'avions que le premier. Depuis les types partagés
+ * 0.31.0 le rapport porte les deux, et la note ne prévient plus d'un manque —
+ * elle dit comment lire deux chiffres présents. Mesuré le 2026-10-13 sur nos
+ * cinq jeux, en achat-conservation, l'intrabar était plus profond de **0,76 à
+ * 2,79 points** (l'écart grandit sur les séries courtes : `xyz:BRENTOIL` en 1 j
+ * est le pire), toujours dans le même sens.
+ *
+ * ⚠️ « even it is a lower bound » n'est pas une précaution de style : le sommet
+ * de la mesure intra-bougie est lu sur les **clôtures**, jamais sur l'extrême
+ * favorable d'une bougie, parce qu'apparier un plus haut et un plus bas à
+ * l'intérieur d'une bougie supposerait un ordre que l'OHLC ne donne pas. Un vrai
+ * sommet intra-bougie creuserait donc davantage.
  *
  * C'est aussi pourquoi ce n'est plus une constante : depuis la version 0.28.0
  * le rapport porte le palier qu'il a appliqué, et la liste le **lit** au lieu
@@ -49,8 +57,8 @@ export function backtestLimits(fees: readonly number[]): readonly string[] {
   return [
     'Simplified simulation — not what the bot would have earned.',
     fillLine(fees),
-    'Drawdowns are measured on candle closes: a dip inside a candle that recovered before ' +
-      'its close is invisible, so the real one is deeper.',
+    "Drawdowns are given twice: on candle closes, and at each candle's worst point — " +
+      'the second is the deeper, and even it is a lower bound.',
     "Take-profit / stop-loss, latent orders and the pair's exit behaviour are not simulated yet.",
     'Each trade counts at the same size; returns are added, not compounded.',
   ];
@@ -174,6 +182,33 @@ export function drawdownWindow(
     durationMs: drawdown.troughTime - fromTime,
     fromRangeStart: drawdown.peakTime === null,
   };
+}
+
+/**
+ * Depuis quand la courbe est sous son sommet, quand elle y est **encore**.
+ *
+ * `currentDrawdown` (types partagés 0.31.0) ne porte pas de creux : son point de
+ * mesure est la dernière bougie. On la lui donne donc, et la fenêtre qui en sort
+ * se lit « depuis ce sommet, et depuis ce temps-là » — la question qu'un
+ * maximum, refermé ou non, ne distingue pas.
+ *
+ * Passe par `drawdownWindow` plutôt que de refaire la substitution du sommet
+ * nul : c'est la même règle, et deux copies finiraient par en appliquer deux.
+ */
+export function underwaterWindow(
+  current: BacktestCurrentDrawdown,
+  rangeStart: number,
+  lastCandleTime: number | null,
+): DrawdownWindow | null {
+  // Jugé sur la valeur **affichée**, comme `percentTone` : un recul de 0,004 %
+  // s'écrit `0.00%`, et annoncer un compte sous son sommet pour ça alarmerait là
+  // où le chiffre montre zéro.
+  if (lastCandleTime === null || percentTone(-current.depthPercent) !== 'down') return null;
+
+  return drawdownWindow(
+    { depthPercent: current.depthPercent, peakTime: current.peakTime, troughTime: lastCandleTime },
+    rangeStart,
+  );
 }
 
 const MINUTE = 60_000;

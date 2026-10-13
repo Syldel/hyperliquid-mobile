@@ -129,6 +129,33 @@
           </td>
         }
       </tr>
+      <!--
+        Les deux lectures du même creux, l'une sous l'autre, comme TradingView
+        les publie. Celle du dessus se lit sur les clôtures ; celle-ci au pire
+        instant de chaque bougie, et elle ne peut donc jamais être moins
+        profonde — si elles sont égales, c'est qu'aucune mèche n'a creusé plus
+        bas qu'une clôture.
+      -->
+      <tr>
+        <th>Max drawdown, intrabar</th>
+        @for (column of columns(); track column.label) {
+          <td [class.down]="percentTone(-column.stats.maxDrawdownIntrabar.depthPercent) === 'down'">
+            {{ formatPercent(-column.stats.maxDrawdownIntrabar.depthPercent) }}
+          </td>
+        }
+      </tr>
+      <!--
+        Le recul **actuel**, celui qu'un maximum ne distingue pas : 25 % refermés
+        il y a six mois et 25 % toujours ouverts s'affichaient pareil.
+      -->
+      <tr>
+        <th>Below its peak now</th>
+        @for (column of columns(); track column.label) {
+          <td [class.down]="percentTone(-column.stats.currentDrawdown.depthPercent) === 'down'">
+            {{ formatPercent(-column.stats.currentDrawdown.depthPercent) }}
+          </td>
+        }
+      </tr>
     </tbody>
   </table>
 
@@ -195,6 +222,39 @@
         </li>
       }
     </ul>
+
+    <!--
+      Depuis quand le compte est sous son sommet, quand il y est encore. Pas de
+      pourcentage ici : le tableau porte « Below its peak now », et le même
+      chiffre à deux endroits ferait chercher une différence qui n'existe pas.
+
+      La phrase de repli est rendue plutôt qu'un bloc absent : une section qui
+      disparaît se lit comme une donnée manquante, alors que c'est une bonne
+      nouvelle.
+    -->
+    <h2>Still under water</h2>
+    @if (underwaterRows().length === 0) {
+      <p class="note">Every side closed its drawdown — each is back at its peak.</p>
+    } @else {
+      <ul class="drawdowns">
+        @for (row of underwaterRows(); track row.label) {
+          <li>
+            <span class="drawdowns__label">{{ row.label }}</span>
+            <span>
+              since
+              @if (row.window.fromRangeStart) {
+                the range start
+              } @else {
+                {{ row.window.fromTime | date: 'MMM d, HH:mm' }}
+              }
+              @if (row.window.durationMs > 0) {
+                · {{ formatDuration(row.window.durationMs) }}
+              }
+            </span>
+          </li>
+        }
+      </ul>
+    }
   }
 
   @if (report().openPositions.length > 0) {

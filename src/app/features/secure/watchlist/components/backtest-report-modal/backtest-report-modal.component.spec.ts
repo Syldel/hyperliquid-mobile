@@ -33,6 +33,8 @@ function stats(overrides: Partial<BacktestStats> = {}): BacktestStats {
     unrealizedGrossPercent: 0,
     unrealizedNetPercent: 0,
     maxDrawdown: { depthPercent: 0, peakTime: null, troughTime: null },
+    maxDrawdownIntrabar: { depthPercent: 0, peakTime: null, troughTime: null },
+    currentDrawdown: { depthPercent: 0, peakTime: null },
     ...overrides,
   };
 }
@@ -208,6 +210,70 @@ describe('BacktestReportModalComponent', () => {
     // La borne gauche est mesurée **avant** la flèche : une date rendue là y
     // apparaîtrait, et les dates de ce fixture tombent justement en 1970.
     expect(line).toMatch(/-8\.00% Range start → /);
+  });
+
+  /**
+   * Les trois lectures d'un même creux, que le rapport porte depuis les types
+   * partagés 0.31.0. Les afficher ensemble est tout l'intérêt : l'intra-bougie
+   * ne peut pas être moins profond que les clôtures, et le courant distingue un
+   * creux refermé d'un creux ouvert.
+   */
+  it('puts the three drawdown readings side by side', () => {
+    const host = mount(
+      report({
+        long: stats({
+          maxDrawdown: { depthPercent: 6.88, peakTime: 2 * H, troughTime: 5 * H },
+          maxDrawdownIntrabar: { depthPercent: 8.1, peakTime: 2 * H, troughTime: 5 * H },
+          currentDrawdown: { depthPercent: 3.2, peakTime: 7 * H },
+        }),
+        short: stats(),
+        total: null,
+      }),
+    );
+
+    const rowFor = (label: string) =>
+      [...host.querySelectorAll('tbody tr')]
+        .find((tr) => tr.querySelector('th')?.textContent?.includes(label))
+        ?.querySelector('td')
+        ?.textContent?.trim();
+
+    expect(rowFor('Max drawdown, net')).toBe('-6.88%');
+    expect(rowFor('Max drawdown, intrabar')).toBe('-8.10%');
+    expect(rowFor('Below its peak now')).toBe('-3.20%');
+  });
+
+  it('says since when a side is still under water, and for how long', () => {
+    const host = mount(
+      report({
+        long: stats({ currentDrawdown: { depthPercent: 3.2, peakTime: 6 * H } }),
+        short: stats(),
+        total: null,
+      }),
+    );
+
+    const lines = [...host.querySelectorAll('h2')]
+      .find((h) => h.textContent?.includes('Still under water'))
+      ?.nextElementSibling?.textContent?.replace(/\s+/g, ' ')
+      .trim();
+
+    // La fenêtre court jusqu'à la dernière bougie du rapport (10 h), soit 4 h.
+    expect(lines).toContain('Long');
+    expect(lines).toContain('since');
+    expect(lines).toContain('4 h');
+    // La profondeur reste au tableau : la répéter ferait chercher une différence.
+    expect(lines).not.toContain('3.20%');
+  });
+
+  it('says the drawdowns are closed rather than leaving the section empty', () => {
+    // Une section absente se lit comme une donnée manquante ; ici c'est une
+    // bonne nouvelle, et elle doit s'écrire.
+    const host = mount(report({ long: stats(), short: stats(), total: stats() }));
+
+    const note = [...host.querySelectorAll('h2')]
+      .find((h) => h.textContent?.includes('Still under water'))
+      ?.nextElementSibling?.textContent?.trim();
+
+    expect(note).toContain('back at its peak');
   });
 
   it('names the candle instead of a duration when the fall fits inside one', () => {

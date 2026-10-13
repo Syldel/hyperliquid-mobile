@@ -37,6 +37,7 @@ import {
   formatPriceForDisplay,
   percentTone,
   statsOf,
+  underwaterWindow,
 } from '../../utils/backtest-display.util';
 import { EquityCurveComponent, type EquityCurveLine } from '../equity-curve/equity-curve.component';
 
@@ -61,6 +62,17 @@ interface DrawdownRow {
   label: string;
   depthPercent: number;
   window: DrawdownWindow | null;
+}
+
+/**
+ * Une ligne de « Still under water » : depuis quel sommet, et depuis combien de
+ * temps. La profondeur n'y est pas — le tableau la donne déjà, colonne par
+ * colonne, et deux chiffres identiques à deux endroits invitent à chercher une
+ * différence qui n'existe pas.
+ */
+interface UnderwaterRow {
+  label: string;
+  window: DrawdownWindow;
 }
 
 const SIDE_LABELS: Record<PositionSide, string> = { LONG: 'Long', SHORT: 'Short' };
@@ -125,6 +137,7 @@ export class BacktestReportModalComponent implements OnInit {
   readonly tradesNewestFirst = signal<BacktestReport['trades']>([]);
   readonly lastPointProvisional = signal(false);
   readonly drawdownRows = signal<DrawdownRow[]>([]);
+  readonly underwaterRows = signal<UnderwaterRow[]>([]);
 
   constructor() {
     addIcons({ locateOutline });
@@ -148,6 +161,16 @@ export class BacktestReportModalComponent implements OnInit {
         depthPercent: column.stats.maxDrawdown.depthPercent,
         window: drawdownWindow(column.stats.maxDrawdown, report.from),
       })),
+    );
+
+    // Seules les colonnes encore sous leur sommet : lister « at its peak » pour
+    // les autres ferait trois lignes là où l'absence suffit, et le bloc dit déjà
+    // en une phrase quand il n'y a plus personne sous l'eau.
+    this.underwaterRows.set(
+      columns.flatMap((column) => {
+        const window = underwaterWindow(column.stats.currentDrawdown, report.from, report.to);
+        return window === null ? [] : [{ label: column.label, window }];
+      }),
     );
 
     this.curve.set(
