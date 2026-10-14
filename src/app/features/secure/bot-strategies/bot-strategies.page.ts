@@ -1,5 +1,7 @@
 import { TitleCasePipe, UpperCasePipe } from '@angular/common';
 import { Component, computed, inject, resource, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import type { HttpErrorResponse } from '@angular/common/http';
 import {
   IonBadge,
   IonFab,
@@ -15,12 +17,14 @@ import {
   IonList,
   IonToggle,
   ModalController,
+  ToastController,
 } from '@ionic/angular/standalone';
 import { TradingPair } from '@models/user.interface';
 import { BotService } from '@services/bot.service';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { UserService } from '@services/user.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
+import { extractErrorMessage } from '@utils/hl-error.utils';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import { hlPerpDexOf } from '@syldel/hl-shared-types';
 import { ExternalUser, IExchange, ProtectiveOrderEntry } from '@syldel/trading-shared-types';
@@ -34,7 +38,7 @@ import {
   trendingDownOutline,
   trendingUpOutline,
 } from 'ionicons/icons';
-import { debounceTime, firstValueFrom, Subject, switchMap } from 'rxjs';
+import { EMPTY, catchError, debounceTime, firstValueFrom, Subject, switchMap } from 'rxjs';
 import {
   ProtectiveModalComponent,
   ProtectiveModalResult,
@@ -87,6 +91,7 @@ export class BotStrategiesPage extends MenuBasePage {
   private readonly modalCtrl = inject(ModalController);
   private readonly botService = inject(BotService);
   private readonly hlMarket = inject(HyperliquidMarketService);
+  private readonly toastCtrl = inject(ToastController);
 
   user = signal<ExternalUser | null>(null);
   fetchFn = () => this.userService.getMe();
@@ -114,10 +119,31 @@ export class BotStrategiesPage extends MenuBasePage {
 
     this.botService.getExchangeFormMetadata().subscribe();
 
+    /**
+     * ⚠️ Le `catchError` est **à l'intérieur** du `switchMap`, et ce n'est pas
+     * une préférence de style : posé sur le flux extérieur, il verrait passer
+     * la première erreur puis laisserait l'abonnement se terminer, ce qui est
+     * exactement le défaut corrigé ici.
+     *
+     * Il n'y en avait aucun. Une erreur du `PATCH` remontait donc à l'abonné,
+     * terminait la souscription, et **toutes les sauvegardes suivantes étaient
+     * ignorées en silence** : l'interrupteur restait allumé à l'écran, le
+     * compte n'avait rien reçu, et `ion-router-outlet` gardant la page vivante,
+     * quitter l'écran puis revenir ne la ressuscitait pas. Sur l'écran qui arme
+     * les paires du bot.
+     */
     this.save$
       .pipe(
         debounceTime(1000),
-        switchMap((data) => this.userService.updateStrategy(data)),
+        switchMap((tradingSettings) =>
+          this.userService.updateStrategy(tradingSettings).pipe(
+            catchError((error: unknown) => {
+              void this.announceSaveFailure(extractErrorMessage(error as HttpErrorResponse));
+              return EMPTY;
+            }),
+          ),
+        ),
+        takeUntilDestroyed(),
       )
       .subscribe();
   }
@@ -390,6 +416,30 @@ export class BotStrategiesPage extends MenuBasePage {
         [exchangeKey]: { ...user.tradingSettings![exchangeKey], ...patch },
       },
     };
+  }
+
+  /**
+   * Ce qu'un enregistrement refusé laisse à l'écran, dit une fois.
+   *
+   * ⚠️ Le toast annonce l'échec ; il ne le répare pas. L'interrupteur continue
+   * d'afficher ce que l'utilisateur a demandé, alors que le compte tient encore
+   * l'état précédent — et plus rien ne le rappelle une fois les quatre secondes
+   * passées. Remettre l'écran d'accord avec le compte demanderait de relire le
+   * compte, ce que la page ne peut pas faire seule : `RefreshableLayoutComponent`
+   * garde sa propre copie des données et n'expose aucun rechargement (le piège
+   * déjà rencontré dans `strategies.page.spec.ts`). C'est une décision à part.
+   *
+   * ⚠️ Sa portée est plus étroite qu'il n'y paraît : un **401** ne l'atteint
+   * pas, l'intercepteur déconnectant et redirigeant avant
+   * (`auth.interceptor.ts`). Restent les `400`, les `5xx` et le réseau coupé.
+   */
+  private async announceSaveFailure(reason: string): Promise<void> {
+    const toast = await this.toastCtrl.create({
+      message: `Not saved — ${reason} The account still holds the previous settings.`,
+      color: 'danger',
+      duration: 4000,
+    });
+    await toast.present();
   }
 
   private triggerSave(): void {

@@ -243,6 +243,26 @@ export class ModalControllerStub {
 @Injectable({ providedIn: 'root' })
 export class ActionSheetControllerStub extends ModalControllerStub {}
 
+/**
+ * `MenuController` : injecté par `MenuBasePage`, dont **toutes les pages de
+ * menu héritent**. Un spec de page ne peut donc pas s'en passer, même quand il
+ * ne touche jamais au menu. `enable()` est le seul appel du dépôt.
+ */
+@Injectable({ providedIn: 'root' })
+export class MenuControllerStub {
+  readonly enabled: boolean[] = [];
+
+  /**
+   * Le vrai rend le menu concerné ; le type n'est pas repris, parce qu'il
+   * faudrait importer Ionic — ce que ce fichier existe précisément pour éviter.
+   * Aucun appelant du dépôt n'attend la réponse.
+   */
+  async enable(shouldEnable: boolean): Promise<undefined> {
+    this.enabled.push(shouldEnable);
+    return undefined;
+  }
+}
+
 /** `ToastController` : seul `create().present()` est appelé par les composants du repo. */
 @Injectable({ providedIn: 'root' })
 export class ToastControllerStub {
@@ -459,6 +479,7 @@ export {
   IonToggleStub as IonToggle,
   IonToolbarStub as IonToolbar,
   ActionSheetControllerStub as ActionSheetController,
+  MenuControllerStub as MenuController,
   ModalControllerStub as ModalController,
   ToastControllerStub as ToastController,
   PlatformStub as Platform,
