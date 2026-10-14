@@ -51,6 +51,7 @@ import {
   type PairMarketStatus,
   type PerpMarketCatalogue,
 } from './domain/pair-market-status.util';
+import { protectiveDistanceLabel } from './domain/protective-distance.util';
 import {
   isKnownUnexecutable,
   pairStrategyStatus,
@@ -97,6 +98,7 @@ export class BotStrategiesPage extends MenuBasePage {
   private readonly save$ = new Subject<Record<string, IExchange>>();
 
   readonly exitBehaviorLabels = this.botService.exitBehaviorLabels;
+  readonly protectiveDistanceLabel = protectiveDistanceLabel;
 
   constructor() {
     super();

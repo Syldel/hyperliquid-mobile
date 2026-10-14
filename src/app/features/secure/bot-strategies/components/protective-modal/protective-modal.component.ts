@@ -74,6 +74,7 @@ import {
   toProtectiveEntryForm,
   toProtectiveStrategy,
 } from '../../domain/protective-entry-form.util';
+import { distanceUnitSuffix } from '../../domain/protective-distance.util';
 
 // ─── Result type ──────────────────────────────────────────────────────────────
 
@@ -400,9 +401,15 @@ export class ProtectiveModalComponent implements OnInit {
     return this.isTp(i);
   }
 
-  /** Ce que la distance multiplie, tel qu'il s'affiche à côté du nombre. */
+  /**
+   * Ce que la distance multiplie, tel qu'il s'affiche à côté du nombre.
+   *
+   * Le sélecteur propose les unités **servies par le catalogue** : il peut donc
+   * en porter une que ce paquet ignore, et le ternaire qui vivait ici la
+   * nommait `× ATR`. Voir `protective-distance.util.ts`.
+   */
   distanceUnitLabel(i: number): string {
-    return this.entryGroup(i).controls.distanceUnit.value === 'PERCENT' ? '%' : '× ATR';
+    return distanceUnitSuffix(this.entryGroup(i).controls.distanceUnit.value);
   }
 
   hasExistingStrategy(): boolean {

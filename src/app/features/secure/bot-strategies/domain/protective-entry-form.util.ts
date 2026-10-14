@@ -122,6 +122,22 @@ export function toProtectiveEntryForm(
 ): ProtectiveEntryFormValue {
   const { tpsl, distance, sizePercent, anchor, followMode, boundedByEntry, ...rest } = entry ?? {};
 
+  /**
+   * ⚠️ **Mesuré le 2026-10-14, et volontairement pas corrigé ici.** Les quatre
+   * protections du compte de développement portent `atrMultiplier`
+   * (1.5 · 2 · 1.5 · 1) et aucun `distance` : le champ a été renommé, et les
+   * types partagés refusent l'ancien nommément (`RETIRED_ATR_MULTIPLIER`). Les
+   * deux `??` ci-dessous remplissent donc le formulaire avec `1.5` sur les
+   * **quatre** lignes — relevé dans le navigateur, quatre `distanceValue` à 1.5
+   * contre 1.5 · 2 · 1.5 · 1 en base. Ouvrir la modale puis enregistrer écrase
+   * le stop à 2×ATR et le gain à 1×ATR, sans que rien ne le dise.
+   *
+   * Lire `atrMultiplier` ici serait une migration implicite, que ce dépôt
+   * refuse (« un champ abandonné se refuse bruyamment, il ne se lit pas au cas
+   * où »). Il reste à trancher entre migrer explicitement et refuser d'ouvrir.
+   * La liste, elle, ne ment plus : le badge écrit `no distance` au lieu d'un
+   * `×ATR` inventé (`protective-distance.util.ts`).
+   */
   return {
     tpsl: tpsl ?? DEFAULT_TPSL,
     distanceUnit: distance?.unit ?? DEFAULT_DISTANCE_UNIT,

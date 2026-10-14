@@ -87,8 +87,8 @@
                   <ion-icon
                     [name]="e.tpsl === 'tp' ? 'trending-up-outline' : 'trending-down-outline'"
                   />
-                  {{ e.tpsl | uppercase }} {{ e.sizePercent }}% · {{ e.distance?.value }}{{
-                  e.distance?.unit === 'PERCENT' ? '%' : '×ATR' }}
+                  {{ e.tpsl | uppercase }} {{ e.sizePercent }}% · {{
+                  protectiveDistanceLabel(e.distance) }}
                 </ion-badge>
                 }
               </div>
