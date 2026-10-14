@@ -99,8 +99,13 @@ questions s'il en reste, une recommandation — puis on attend le feu vert. Pas 
 enchaînement d'étapes décidées seul.
 
 **Vérifier plutôt que supposer.** Le navigateur interne, les vraies routes du bot, le DOM
-plutôt qu'une capture d'écran. Annoncer qu'une chose fonctionne engage : ça doit avoir été
-mesuré, et le rapport doit dire comment.
+plutôt qu'une capture d'écran — **sauf sur un canvas**, où c'est l'inverse. Un marqueur du
+chart peut exister, au bon temps, sur la bonne série, à une coordonnée dans la fenêtre, et
+n'être **jamais dessiné** : mesuré le 2026-10-14, quatre tours de correctifs perdus sur des
+chiffres tous justes, faute d'une seule capture. Voir
+[docs/watchlist/chart-overlays.md](docs/watchlist/chart-overlays.md#ce-qui-est-peint-nest-pas-ce-qui-est-posé).
+Annoncer qu'une chose fonctionne engage : ça doit avoir été mesuré, et le rapport doit dire
+comment.
 
 **Dire ce qui n'a pas été vérifié.** Une incertitude s'écrit là où quelqu'un la lira au bon
 moment — un `⚠️` dans `docs/`, un commentaire à l'endroit concerné. Le dernier risque écrit

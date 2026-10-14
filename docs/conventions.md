@@ -518,6 +518,14 @@ Deux pièges :
 - une modale Ionic **fermée traîne un instant dans le DOM** : `querySelectorAll('ion-modal')`
   peut renvoyer celle qui vient de se fermer. Cibler par titre ou par composant.
 
-Et un rappel de méthode : quand une capture d'écran contredit le DOM, c'est la capture
-qui ment. Interroger l'état réel (`read_page`, une requête DOM, l'API du chart) plutôt que
-de conclure d'une image.
+Et un rappel de méthode, que le 2026-10-14 a **borné** :
+
+- pour ce que le DOM porte — un libellé, une puce, un bloc présent ou absent — quand une
+  capture contredit le DOM, c'est la capture qui ment. Interroger l'état réel
+  (`read_page`, une requête DOM) plutôt que conclure d'une image ;
+- pour ce qu'un **canvas peint** — le chart de la watchlist et sa surcouche d'ordres — ni
+  le DOM ni l'API du chart ne disent ce qui est à l'écran, et la capture devient la seule
+  preuve. Un marqueur au bon temps, sur la bonne série, à une coordonnée dans la fenêtre
+  peut n'être jamais dessiné ; ce défaut-là a survécu à quatre tours de correctifs tous
+  vérifiés sur des coordonnées calculées. Les sondes qui mentent et ce qui compte comme
+  preuve : [chart-overlays.md](watchlist/chart-overlays.md#ce-qui-est-peint-nest-pas-ce-qui-est-posé).

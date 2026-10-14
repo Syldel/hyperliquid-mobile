@@ -28,6 +28,61 @@ Le volume vit sur le pane des bougies mais avec sa propre échelle (`priceScaleI
 
 ---
 
+# Ce qui est peint n'est pas ce qui est posé
+
+Les sept couches ci-dessus vivent dans un `<canvas>`. **Rien dans le DOM ne décrit ce qui
+est à l'écran** : un marqueur, une courbe ou une bande existent dans l'API du greffon bien
+avant d'être dessinés — et parfois sans jamais l'être. C'est la seule partie de cette app
+où une capture d'écran est une preuve plus forte qu'une requête DOM.
+
+⚠️ Ce n'est pas une précaution de principe : elle a coûté **quatre tours de correctifs
+inutiles** le 2026-10-14. Symptôme rapporté — aucune flèche d'entrée/sortie après un
+passage 1H → 4H, alors que le chargement initial les montrait. Relevé dans le navigateur au
+moment du défaut :
+
+| ce qui a été vérifié             | résultat                                      |
+| -------------------------------- | --------------------------------------------- |
+| signaux rendus par la page       | 11, le bon compte                             |
+| `markersPlugin.markers()`        | 11, aux bonnes dates                          |
+| série porteuse                   | celle du chart affiché                        |
+| pagination des bougies           | une seule page, pas de fenêtre tronquée       |
+| coordonnées (`timeToCoordinate`) | 704, 1559, 1687 px sur 1838 de large — dedans |
+| **flèches dessinées**            | **aucune**                                    |
+
+Tout était juste sauf le dessin. Trois correctifs de plage se sont succédé — `fitContent`
+écrasant la plage demandée, la plage perdue au redimensionnement, la réponse d'un intervalle
+quitté qui repeignait — **tous réels, aucun n'étant la cause**. Chacun a été annoncé corrigé
+sur la foi de coordonnées calculées, et chacun a été démenti à l'écran.
+
+Ce qui a tranché : reposer **les mêmes marqueurs**, sans rien changer d'autre
+(`setMarkers([...markers()])`), les fait apparaître. Donc ni leur contenu, ni leur position,
+ni la fenêtre — **l'instant de la pose**. Posés dans le même tour synchrone que `setData`,
+le greffon les retient et n'en dessine aucun ; reposés au cycle d'animation suivant, une
+fois les bougies engagées, ils sortent. C'est ce que fait `renderCandles`, et c'est aussi
+pourquoi la correction tient en un appel déplacé.
+
+## Ce qui compte comme preuve
+
+Pour une couche de canvas, une seule chose éprouvée : une **capture d'écran** du volet,
+prise après le cycle d'animation. Les trois états qui distinguent ce défaut-là se vérifient
+l'un après l'autre — chargement depuis la watchlist, aller-retour 1H → 4H, aller-retour
+2H → 4H — parce que seul le second le faisait apparaître. ⚠️ Un relevé de pixels
+(`getImageData` sur la bande attendue) serait l'équivalent automatisable ; jamais éprouvé
+ici.
+
+Et deux sondes qui rendent un faux chiffre :
+
+- `timeToCoordinate(t) !== null` **ne teste pas la visibilité** — une coordonnée hors
+  fenêtre est rendue comme une autre. Il faut `0 ≤ x ≤ largeur`, et cette sonde-là a
+  produit un « 11 marqueurs à l'écran » qui ne voulait rien dire ;
+- une coordonnée valide, elle, ne dit rien du **dessin** : c'est tout le défaut ci-dessus.
+
+Pour le reste de l'app — un libellé, une puce, un bloc présent ou absent — la règle inverse
+tient toujours : interroger le DOM plutôt que conclure d'une image (voir
+[conventions.md](../conventions.md#vérifier-dans-un-navigateur)).
+
+---
+
 # Les règles de pane de lightweight-charts
 
 Quatre comportements de la librairie, tous contre-intuitifs, tous rencontrés en
