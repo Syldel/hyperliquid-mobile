@@ -160,6 +160,14 @@ appliqué** pendant des mois sans que rien ne le signale, et une correction qui 
 thème peut dégrader l'autre — mesuré. Seuils, pièges de mesure et chiffres de référence :
 [docs/theming.md](docs/theming.md).
 
+**Et à la largeur d'un téléphone.** Cette app est un outil de téléphone : un élément
+ajouté, élargi ou écarté se contrôle à **360 px** avant d'être proposé, le volet du
+navigateur en faisant 1215 et ne refusant donc jamais rien. À cette largeur la marge est
+mince — mesuré le 2026-10-14, le tableau du rapport de backtest occupe 328 px sur 360 avec
+ses colonnes déjà au minimum, et 12 px de marge ailleurs ont coûté une ligne de plus. Ce
+qui se mesure, les largeurs de référence et ce qu'elles valent vraiment :
+[docs/conventions.md](docs/conventions.md#la-largeur-se-vérifie-et-sur-des-largeurs-réelles).
+
 **Vérifier l'état réel avant de ré-implémenter.** Lire le fichier et l'historique git
 avant de refaire une étape supposée manquante.
 

@@ -265,6 +265,65 @@ sombre a failli dégrader le sombre de 6,80 à 3,66 sans qu'on le voie.
 
 La sonde, la méthode et les chiffres de référence : [theming.md](theming.md#mesurer-soi-même).
 
+## La largeur se vérifie, et sur des largeurs réelles
+
+Cette app est **un outil de téléphone**. Un élément ajouté, élargi ou écarté se
+contrôle donc à **360 px de large** avant d'être proposé — et non à la largeur du
+volet du navigateur, qui en fait 1215 et ne refuse jamais rien.
+
+| largeur CSS | ce qu'elle représente                                                                  |
+| ----------- | -------------------------------------------------------------------------------------- |
+| **360 px**  | le plancher de vérification — largeur dominante sur Android, milieu et entrée de gamme |
+| 375 px      | iPhone SE et mini                                                                      |
+| 390 px      | les iPhone récents                                                                     |
+| **411 px**  | l'appareil de l'utilisateur, un Xperia 1 III                                           |
+| 430 px      | les grands formats, iPhone Pro Max                                                     |
+
+⚠️ **Ces largeurs ne viennent pas d'un relevé.** Les pages qui annoncent une
+répartition 2026 (TestMu, Altamira, Kobiton, BrowserStack) ne publient aucune
+méthodologie, et le dernier classement de viewports avec des nombres réels date
+de **2017** (DeviceAtlas, `360×640` en tête devant `375×667`). Ce qui tient : la
+bande 360–430 px couvre l'essentiel du trafic mobile, 360 est la largeur Android
+dominante, 375 la largeur iPhone historique. En dessous de 360, **rien n'est
+vérifié ici** — le 320 px du premier SE est supposé disparu, ce qui est une
+hypothèse et non une mesure.
+
+⚠️ Le 411 px de l'Xperia 1 III est lui aussi une **déduction** : le panneau fait
+1644×3840, mais le téléphone rend l'interface en 1096×2560 au quotidien, et les
+deux divisés par leur densité donnent 411×960. À confirmer sur l'appareil avec
+`window.innerWidth` plutôt qu'à me croire.
+
+La densité de pixels, elle, ne change rien à la mise en page : tout se raisonne
+en pixels CSS. La hauteur compte moins — on fait défiler — sauf dans une modale,
+dont l'en-tête et le pied sont fixes.
+
+**Ce qui se mesure**, parce que « ça a l'air de tenir » n'est pas une
+vérification :
+
+- `document.documentElement.scrollWidth` contre `innerWidth` — une seule ligne
+  trop large fait défiler **toute la page** de côté ;
+- `scrollWidth > clientWidth` sur l'élément lui-même, qui attrape un texte rogné
+  là où la page, elle, ne bouge pas ;
+- sa largeur rendue, à comparer à ce qui reste autour.
+
+Trois relevés du 2026-10-14 qui disent pourquoi la marge est mince à 360 px :
+
+- le tableau du rapport de backtest occupe **328 px sur 360**, avec trois
+  colonnes déjà à leur largeur minimale. La quatrième colonne envisagée pour
+  l'achat-conservation aurait débordé ; la valeur a été étalée sur toute la
+  largeur à la place ;
+- les badges de protection font **132 px**, donc deux par ligne. `no distance`
+  tenait, une mention plus longue n'aurait pas tenu ;
+- une marge de **12 px** entre un contenu et son interrupteur a coûté **une ligne
+  de plus** au plus long des deux encadrés (101 → 117 px de haut). Un écart n'est
+  jamais gratuit à cette largeur.
+
+Le navigateur émule la largeur, donc la vérification ne se délègue pas plus que
+celle du contraste. ⚠️ Le préréglage `mobile` émule **aussi un appareil tactile**
+(agent utilisateur Android, cinq points de contact) : un code qui teste le
+tactile au chargement demande un rechargement après le changement, sans quoi la
+page reste dans l'état où elle a été construite.
+
 ---
 
 # Tests
