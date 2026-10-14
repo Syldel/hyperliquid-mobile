@@ -107,6 +107,23 @@
     </div>
   }
 
+  <!-- ── Retired field, translated on save ─────────────────────── -->
+  @if (legacyAtrCount(); as legacy) {
+    <div class="global-error legacy-notice">
+      <ion-icon name="swap-horizontal-outline" />
+      <span>
+        <!-- Aucune ponctuation ne suit `</code>` : le formateur y coupe la ligne, et la
+             virgule se retrouvait détachée du mot à l'écran (« atrMultiplier , which »). -->
+        {{ legacy === 1 ? '1 protection still carries' : legacy + ' protections still carry' }}
+        <code>atrMultiplier</code>
+        — a field the bot no longer reads, so it places nothing for
+        {{ legacy === 1 ? 'it' : 'them' }} as {{ legacy === 1 ? 'it stands' : 'they stand' }}.
+        {{ legacy === 1 ? 'Its' : 'Their' }} value is shown below as an ATR distance, and saving
+        writes {{ legacy === 1 ? 'it' : 'them' }} under the field in use.
+      </span>
+    </div>
+  }
+
   <!-- ── Entry cards ────────────────────────────────────────────── -->
   <div class="entries-container" formArrayName="entries">
     @for (ctrl of entries.controls; track ctrl; let i = $index) {

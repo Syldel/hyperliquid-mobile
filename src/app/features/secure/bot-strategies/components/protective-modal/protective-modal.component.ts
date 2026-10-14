@@ -48,6 +48,7 @@ import {
   checkmarkOutline,
   closeOutline,
   shieldCheckmarkOutline,
+  swapHorizontalOutline,
   trashOutline,
   trendingDownOutline,
   trendingUpOutline,
@@ -73,6 +74,8 @@ import {
   toProtectiveEntry,
   toProtectiveEntryForm,
   toProtectiveStrategy,
+  migratedAtrMultiplier,
+  type StoredProtectiveEntry,
 } from '../../domain/protective-entry-form.util';
 import { distanceUnitSuffix } from '../../domain/protective-distance.util';
 
@@ -223,6 +226,7 @@ export class ProtectiveModalComponent implements OnInit {
       closeOutline,
       shieldCheckmarkOutline,
       checkmarkOutline,
+      swapHorizontalOutline,
     });
   }
 
@@ -249,7 +253,7 @@ export class ProtectiveModalComponent implements OnInit {
     return this.entries.at(i);
   }
 
-  private buildEntryGroup(entry?: Partial<ProtectiveOrderEntry>): ProtectiveEntryGroup {
+  private buildEntryGroup(entry?: StoredProtectiveEntry): ProtectiveEntryGroup {
     const value = toProtectiveEntryForm(entry);
 
     return this.fb.nonNullable.group({
@@ -411,6 +415,21 @@ export class ProtectiveModalComponent implements OnInit {
   distanceUnitLabel(i: number): string {
     return distanceUnitSuffix(this.entryGroup(i).controls.distanceUnit.value);
   }
+
+  /**
+   * Combien d'entrées arrivent sous le champ retiré `atrMultiplier`.
+   *
+   * La migration est explicite, donc elle s'annonce : l'utilisateur doit savoir
+   * que la valeur affichée vient d'un ancien champ, et qu'enregistrer la
+   * réécrira sous le nouveau. Sans cette ligne, la conversion serait exacte et
+   * silencieuse — ce que ce dépôt refuse autant qu'une perte.
+   */
+  readonly legacyAtrCount = computed(
+    () =>
+      (this.pair().strategy?.protective?.entries ?? []).filter(
+        (entry) => migratedAtrMultiplier(entry) !== null,
+      ).length,
+  );
 
   hasExistingStrategy(): boolean {
     return !!this.pair().strategy?.protective;

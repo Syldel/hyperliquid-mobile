@@ -2,6 +2,7 @@ import type {
   DistanceUnit,
   FollowMode,
   PriceAnchor,
+  PriceDistance,
   ProtectiveOrderEntry,
   ProtectiveOrderStrategy,
   TpslType,
@@ -103,8 +104,58 @@ export const DEFAULT_TPSL: TpslType = 'tp';
  *   `tradingSettings` en `Record<string, any>` sans schéma par champ. Aucun
  *   lecteur, nulle part. ⚠️ Son origine reste inconnue, et rien n'a cherché
  *   d'autres vestiges ailleurs que sur les entrées protectrices.
+ * - `atrMultiplier` (2026-10-14) — **traduit avant d'être jeté**, et c'est la
+ *   seule entrée de cette liste dans ce cas : `migratedAtrMultiplier` en tire
+ *   la distance, et il ne part qu'une fois sa valeur recueillie. Les types
+ *   partagés refusent le champ nommément (`RETIRED_ATR_MULTIPLIER`) en donnant
+ *   la traduction exacte, et le bot ne le lit plus nulle part.
  */
-const RETIRED_ENTRY_FIELDS: readonly string[] = ['label'];
+const RETIRED_ENTRY_FIELDS: readonly string[] = ['label', 'atrMultiplier'];
+
+/**
+ * Une entrée **telle qu'elle dort en base**, par opposition au type que le
+ * paquet partagé décrit aujourd'hui : elle peut porter `atrMultiplier` et
+ * aucun `distance`, alors que `ProtectiveOrderEntry` déclare `distance`
+ * obligatoire. Le type décrivait ce que ce mobile **écrit**, pas ce qui a été
+ * écrit avant lui — même divergence que `StoredPairStrategy`, et c'est elle
+ * qui avait laissé le cas sans traitement : rien à la compilation ne suggérait
+ * qu'il existait.
+ */
+export type StoredProtectiveEntry = Partial<ProtectiveOrderEntry> & {
+  /** Le champ retiré. Voir `RETIRED_ENTRY_FIELDS` et `migratedAtrMultiplier`. */
+  atrMultiplier?: number;
+};
+
+/**
+ * La distance d'une entrée écrite avant le renommage, ou `null` quand il n'y a
+ * rien à traduire.
+ *
+ * ⚠️ **Pourquoi traduire plutôt que refuser.** La règle du dépôt est qu'un
+ * champ abandonné « se refuse bruyamment, il ne se lit pas au cas où » — et
+ * elle vise la lecture *silencieuse*, celle qui ferait vivre l'ancien format
+ * indéfiniment. Les deux autres branches que le CLAUDE.md autorise ont été
+ * pesées : refuser d'ouvrir la modale laisserait l'utilisateur sans aucun
+ * chemin pour réparer depuis l'app, et remplir avec le défaut (ce que faisait
+ * `?? DEFAULT_ATR_MULTIPLIER`) écrasait silencieusement ses valeurs — mesuré
+ * le 2026-10-14, les quatre protections du compte portent 1.5 · 2 · 1.5 · 1 et
+ * le formulaire affichait 1.5 quatre fois.
+ *
+ * Reste la migration explicite : la valeur est lue, la modale **annonce** d'où
+ * elle vient, et l'ancien champ disparaît à l'enregistrement. La traduction
+ * n'est pas devinée, elle est celle que les types partagés dictent dans leur
+ * propre message de refus (`atrMultiplier 1.5` ⇒ `{ unit: 'ATR', value: 1.5 }`).
+ *
+ * `distance` l'emporte toujours : une entrée qui porte les deux a déjà été
+ * réécrite par un build récent, et c'est le champ courant qui fait foi.
+ */
+export function migratedAtrMultiplier(entry?: StoredProtectiveEntry): PriceDistance | null {
+  if (entry?.distance) return null;
+
+  const legacy = entry?.atrMultiplier;
+  if (typeof legacy !== 'number' || !Number.isFinite(legacy)) return null;
+
+  return { unit: 'ATR', value: legacy };
+}
 
 /**
  * Le seul cast du fichier, et il porte sur un **sous-ensemble du même objet** :
@@ -117,31 +168,18 @@ function withoutRetiredFields<T extends object>(value: T): T {
 }
 
 /** Éclate une entrée stockée en une ligne de formulaire. */
-export function toProtectiveEntryForm(
-  entry?: Partial<ProtectiveOrderEntry>,
-): ProtectiveEntryFormValue {
+export function toProtectiveEntryForm(entry?: StoredProtectiveEntry): ProtectiveEntryFormValue {
   const { tpsl, distance, sizePercent, anchor, followMode, boundedByEntry, ...rest } = entry ?? {};
 
-  /**
-   * ⚠️ **Mesuré le 2026-10-14, et volontairement pas corrigé ici.** Les quatre
-   * protections du compte de développement portent `atrMultiplier`
-   * (1.5 · 2 · 1.5 · 1) et aucun `distance` : le champ a été renommé, et les
-   * types partagés refusent l'ancien nommément (`RETIRED_ATR_MULTIPLIER`). Les
-   * deux `??` ci-dessous remplissent donc le formulaire avec `1.5` sur les
-   * **quatre** lignes — relevé dans le navigateur, quatre `distanceValue` à 1.5
-   * contre 1.5 · 2 · 1.5 · 1 en base. Ouvrir la modale puis enregistrer écrase
-   * le stop à 2×ATR et le gain à 1×ATR, sans que rien ne le dise.
-   *
-   * Lire `atrMultiplier` ici serait une migration implicite, que ce dépôt
-   * refuse (« un champ abandonné se refuse bruyamment, il ne se lit pas au cas
-   * où »). Il reste à trancher entre migrer explicitement et refuser d'ouvrir.
-   * La liste, elle, ne ment plus : le badge écrit `no distance` au lieu d'un
-   * `×ATR` inventé (`protective-distance.util.ts`).
-   */
+  // La distance courante, ou celle de l'ancien champ traduite. Les défauts ne
+  // servent plus qu'à une entrée **neuve** : s'en servir pour une entrée
+  // existante écrasait des valeurs que l'utilisateur avait réglées.
+  const effective = distance ?? migratedAtrMultiplier(entry);
+
   return {
     tpsl: tpsl ?? DEFAULT_TPSL,
-    distanceUnit: distance?.unit ?? DEFAULT_DISTANCE_UNIT,
-    distanceValue: distance?.value ?? DEFAULT_ATR_MULTIPLIER,
+    distanceUnit: effective?.unit ?? DEFAULT_DISTANCE_UNIT,
+    distanceValue: effective?.value ?? DEFAULT_ATR_MULTIPLIER,
     sizePercent: sizePercent ?? DEFAULT_SIZE_PERCENT,
     anchor: anchor ?? IMPLICIT_ANCHOR,
     followMode: followMode ?? DEFAULT_FOLLOW_MODE,

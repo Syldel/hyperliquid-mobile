@@ -162,6 +162,31 @@
     color: var(--ion-color-danger);
     border: 1px solid rgba(var(--ion-color-danger-rgb), 0.3);
   }
+
+  /*
+   * Ton plus bas que les deux au-dessus : une entrée écrite sous l'ancien champ
+   * n'est pas une erreur de l'utilisateur, c'est un format qui a bougé sous
+   * elle. Le rouge perdrait son sens à couvrir les deux — même raison que la
+   * variante `--warning` de `trading-pair-modal`, dont ce bloc reprend le
+   * couple mesuré : `warning-shade` sur un fond à 12 %, 5,11:1 en clair et
+   * 6,56:1 en sombre (voir docs/theming.md).
+   */
+  &.legacy-notice {
+    align-items: flex-start;
+    background: rgba(var(--ion-color-warning-rgb), 0.12);
+    color: var(--ion-color-warning-shade);
+    border: 1px solid rgba(var(--ion-color-warning-rgb), 0.35);
+    font-weight: 500;
+    line-height: 1.4;
+
+    ion-icon {
+      margin-top: 2px;
+    }
+
+    code {
+      font-size: 0.95em;
+    }
+  }
 }
 
 // ─── Entry cards ─────────────────────────────────────────────────────────────

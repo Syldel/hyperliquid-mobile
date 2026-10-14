@@ -4,7 +4,10 @@ import type {
   RuleNode,
 } from '@syldel/trading-shared-types';
 import {
+  DEFAULT_ATR_MULTIPLIER,
   IMPLICIT_ANCHOR,
+  migratedAtrMultiplier,
+  type StoredProtectiveEntry,
   toProtectiveEntry,
   toProtectiveEntryForm,
   toProtectiveStrategy,
@@ -187,6 +190,101 @@ describe('toProtectiveEntryForm / toProtectiveEntry', () => {
       boundedByEntry: false,
       carried: {},
     });
+  });
+});
+
+/**
+ * La règle que ce bloc garde : **une entrée existante ne reçoit jamais une
+ * valeur par défaut.** Les défauts sont pour une entrée neuve ; appliqués à une
+ * entrée réglée, ils écrasent un choix de l'utilisateur.
+ *
+ * Mesuré le 2026-10-14 dans le navigateur : les quatre protections du compte de
+ * développement portent `atrMultiplier` 1.5 · 2 · 1.5 · 1 et aucun `distance`,
+ * et le formulaire affichait **1.5 quatre fois**. Ouvrir la modale puis
+ * enregistrer aurait donc remplacé le stop à 2×ATR et le gain à 1×ATR.
+ */
+describe('migration of the retired atrMultiplier', () => {
+  it('reads the stored multiple instead of the default', () => {
+    const legacy: StoredProtectiveEntry = { tpsl: 'sl', atrMultiplier: 2, sizePercent: 50 };
+
+    expect(toProtectiveEntryForm(legacy).distanceValue).toBe(2);
+    expect(toProtectiveEntryForm(legacy).distanceUnit).toBe('ATR');
+  });
+
+  it('keeps each of the four values the account really holds', () => {
+    // Le cas tel qu'il dort en base, et non un échantillon : c'est la seule
+    // forme qui aurait attrapé le défaut, puisque la première entrée vaut
+    // justement 1.5 — la valeur par défaut qui masquait les trois autres.
+    const stored: StoredProtectiveEntry[] = [
+      { tpsl: 'sl', atrMultiplier: 1.5, sizePercent: 50 },
+      { tpsl: 'sl', atrMultiplier: 2, sizePercent: 50 },
+      { tpsl: 'tp', atrMultiplier: 1.5, sizePercent: 50 },
+      { tpsl: 'tp', atrMultiplier: 1, sizePercent: 50 },
+    ];
+
+    expect(stored.map((e) => toProtectiveEntryForm(e).distanceValue)).toEqual([1.5, 2, 1.5, 1]);
+  });
+
+  it('writes the translated distance and drops the retired field', () => {
+    const legacy: StoredProtectiveEntry = { tpsl: 'tp', atrMultiplier: 1, sizePercent: 50 };
+
+    expect(toProtectiveEntry(toProtectiveEntryForm(legacy))).toEqual({
+      tpsl: 'tp',
+      distance: { unit: 'ATR', value: 1 },
+      sizePercent: 50,
+      anchor: IMPLICIT_ANCHOR,
+      followMode: 'FIXED',
+      boundedByEntry: false,
+    });
+  });
+
+  it('lets the field in use win when an entry carries both', () => {
+    // Une entrée qui porte les deux a déjà été réécrite par un build récent :
+    // c'est `distance` qui fait foi, l'ancien n'étant plus qu'un vestige.
+    const both: StoredProtectiveEntry = {
+      tpsl: 'sl',
+      distance: { unit: 'PERCENT', value: 10 },
+      atrMultiplier: 2,
+      sizePercent: 50,
+    };
+
+    expect(migratedAtrMultiplier(both)).toBeNull();
+    expect(toProtectiveEntryForm(both).distanceValue).toBe(10);
+    expect(toProtectiveEntryForm(both).distanceUnit).toBe('PERCENT');
+  });
+
+  it('refuses to translate what cannot be a multiple', () => {
+    // Même partition qu'ailleurs : ce dont ce build est certain se tranche, le
+    // reste ne s'invente pas. Rien à traduire n'est pas une traduction à zéro.
+    expect(migratedAtrMultiplier(undefined)).toBeNull();
+    expect(migratedAtrMultiplier({ tpsl: 'sl' })).toBeNull();
+    expect(migratedAtrMultiplier({ atrMultiplier: NaN })).toBeNull();
+    expect(migratedAtrMultiplier({ atrMultiplier: '2' as unknown as number })).toBeNull();
+  });
+
+  it('translates without touching the unit it is given', () => {
+    // La traduction est celle que les types partagés dictent dans leur propre
+    // message de refus : `atrMultiplier 1.5` vaut `{ unit: 'ATR', value: 1.5 }`.
+    expect(migratedAtrMultiplier({ atrMultiplier: 1.5 })).toEqual({ unit: 'ATR', value: 1.5 });
+  });
+
+  it('still gives a brand new entry its default', () => {
+    // Le défaut garde sa raison d'être : il n'écrase rien sur une entrée qui
+    // n'existe pas encore.
+    expect(toProtectiveEntryForm(undefined).distanceValue).toBe(DEFAULT_ATR_MULTIPLIER);
+  });
+
+  it('⚠️ still defaults an existing entry that carries neither field', () => {
+    /**
+     * Le résidu assumé du même défaut : sans `distance` **ni** `atrMultiplier`,
+     * il n'y a rien à lire, et le formulaire retombe sur 1.5 sans que la modale
+     * l'annonce — le bandeau ne compte que les entrées traduisibles. Aucune
+     * entrée du compte n'est dans ce cas au 2026-10-14 ; la liste, elle, le dit
+     * déjà (`no distance`). Épinglé pour que ce soit un choix et non un oubli.
+     */
+    expect(toProtectiveEntryForm({ tpsl: 'sl', sizePercent: 50 }).distanceValue).toBe(
+      DEFAULT_ATR_MULTIPLIER,
+    );
   });
 });
 
