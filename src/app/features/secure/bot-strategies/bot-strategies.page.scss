@@ -115,3 +115,18 @@
   font-weight: 600;
   text-decoration: underline;
 }
+
+/*
+ * Le bouton d'activation d'une paire collait au contenu : mesuré à **0 px**
+ * entre le bord droit de l'`ion-label` et celui de l'`ion-toggle`, l'encadré
+ * rouge « not runnable » venant toucher l'interrupteur. Deux éléments qui se
+ * touchent se lisent comme un seul bloc, et c'est l'interrupteur qui arme la
+ * paire.
+ *
+ * Posé sur le rang de paire seulement (`ion-item-sliding >`) : l'interrupteur
+ * de l'`ion-item-divider`, qui commande l'exchange entier, fait face à un
+ * simple titre et n'a rien à écarter.
+ */
+ion-item-sliding > ion-item ion-toggle {
+  margin-inline-start: 12px;
+}
