@@ -263,6 +263,32 @@ export class MenuControllerStub {
   }
 }
 
+/**
+ * `AlertController` : même forme inerte que `ModalControllerStub`, et pour la
+ * même raison — un composant qui enchaîne `present()` puis `onDidDismiss()`
+ * doit pouvoir le faire sans planter.
+ *
+ * Le rôle `cancel` par défaut fait conclure « l'utilisateur a annulé », donc
+ * n'écrit rien : un spec qui veut jouer une saisie réelle remplace ce double,
+ * comme `strategies.page.spec.ts` le fait pour la feuille d'actions.
+ */
+@Injectable({ providedIn: 'root' })
+export class AlertControllerStub {
+  /** Options de chaque alerte ouverte, pour qu'un spec vérifie ce qui a été demandé. */
+  readonly presented: Record<string, unknown>[] = [];
+
+  async create(options: Record<string, unknown> = {}): Promise<{
+    present: () => Promise<void>;
+    onDidDismiss: () => Promise<{ data: undefined; role: string }>;
+  }> {
+    this.presented.push(options);
+    return {
+      present: async () => {},
+      onDidDismiss: async () => ({ data: undefined, role: 'cancel' }),
+    };
+  }
+}
+
 /** `ToastController` : seul `create().present()` est appelé par les composants du repo. */
 @Injectable({ providedIn: 'root' })
 export class ToastControllerStub {
@@ -479,6 +505,7 @@ export {
   IonToggleStub as IonToggle,
   IonToolbarStub as IonToolbar,
   ActionSheetControllerStub as ActionSheetController,
+  AlertControllerStub as AlertController,
   MenuControllerStub as MenuController,
   ModalControllerStub as ModalController,
   ToastControllerStub as ToastController,

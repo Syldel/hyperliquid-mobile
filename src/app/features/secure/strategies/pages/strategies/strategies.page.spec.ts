@@ -1,9 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { AuthService } from '@auth/auth.service';
-import { ActionSheetController, ToastController } from '@ionic/angular/standalone';
+import { ActionSheetController, AlertController, ToastController } from '@ionic/angular/standalone';
 import type { StrategyDocument } from '../../models/strategy-document.model';
 import { StrategyLibraryService } from '../../services/strategy-library.service';
-import { StrategiesPage } from './strategies.page';
+import { StrategiesPage, importSummary } from './strategies.page';
 
 /**
  * La page est testée pour un seul point : ce qu'elle fait quand la
@@ -198,5 +198,199 @@ describe('StrategiesPage after a write', () => {
 
     expect(host.querySelectorAll('ion-item')).toHaveLength(0);
     expect(host.textContent).toContain('No strategy yet');
+  });
+});
+
+/**
+ * Le troisième point : **ce qui entre par le presse-papier ne doit ni écraser,
+ * ni disparaître en silence.**
+ *
+ * La bibliothèque vit en stockage local et n'a pas d'autre copie. Un import
+ * vient d'un texte étranger — écrit par une IA, recollé d'un autre appareil —
+ * et c'est exactement le moment où un écrasement coûte le travail de
+ * l'utilisateur, et où un abandon muet lui fait croire que tout est passé.
+ */
+describe('StrategiesPage importing from the clipboard', () => {
+  let page: StrategiesPage;
+  let toastCtrl: { messages: string[] };
+  let written: StrategyDocument[][];
+  let pasted: string | null;
+  let alertRole: string;
+
+  const stored: StrategyDocument = {
+    id: 'st_1',
+    name: 'Breakout',
+    rules: {},
+    createdAt: 1,
+    updatedAt: 1,
+    schemaVersion: 1,
+  };
+
+  beforeEach(() => {
+    written = [];
+    pasted = null;
+    alertRole = 'confirm';
+
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: StrategyLibraryService,
+          useValue: {
+            documents: () => [stored],
+            load: async () => [stored],
+            importMissing: async (documents: StrategyDocument[]) => {
+              written.push(documents);
+              return documents;
+            },
+          },
+        },
+        {
+          provide: AlertController,
+          useValue: {
+            create: async () => ({
+              present: async () => {},
+              onDidDismiss: async () => ({
+                data: pasted === null ? undefined : { values: { json: pasted } },
+                role: alertRole,
+              }),
+            }),
+          },
+        },
+        { provide: AuthService, useValue: { isLoggedIn: () => true } },
+      ],
+    });
+
+    toastCtrl = TestBed.inject(ToastController) as unknown as typeof toastCtrl;
+    toastCtrl.messages.length = 0;
+
+    page = TestBed.runInInjectionContext(() => new StrategiesPage());
+    page.documents.set([stored]);
+  });
+
+  it('writes a strategy whose id is free, and says so', async () => {
+    pasted = JSON.stringify({ id: 'st_2', name: 'Fresh', rules: { long: {} } });
+
+    await page.pasteImport();
+
+    expect(written[0]?.map((d) => d.id)).toEqual(['st_2']);
+    expect(toastCtrl.messages.at(-1)).toContain('1 imported');
+  });
+
+  it('never overwrites a stored strategy that shares an id', async () => {
+    /**
+     * Le cas qui coûte cher : même `id`, contenu différent. L'entrant devient
+     * une copie, et le document en bibliothèque n'est pas réécrit.
+     */
+    pasted = JSON.stringify({ id: 'st_1', name: 'Breakout rewritten', rules: { short: {} } });
+
+    await page.pasteImport();
+
+    expect(written[0]).toHaveLength(1);
+    expect(written[0]?.[0]?.id).not.toBe('st_1');
+    expect(written[0]?.[0]?.name).toContain('(imported)');
+    expect(toastCtrl.messages.at(-1)).toContain('their id was taken');
+  });
+
+  it('writes nothing when the paste is already in the library', async () => {
+    pasted = JSON.stringify(stored);
+
+    await page.pasteImport();
+
+    expect(written).toEqual([]);
+    expect(toastCtrl.messages.at(-1)).toContain('already there');
+  });
+
+  it('names what it refused instead of counting it out', async () => {
+    // « 1 imported » tout court laisserait chercher ce qu'est devenue l'autre.
+    pasted = JSON.stringify([{ id: 'st_3', name: 'Good', rules: {} }, { name: 'No rules' }]);
+
+    await page.pasteImport();
+
+    expect(toastCtrl.messages.at(-1)).toContain('1 imported');
+    expect(toastCtrl.messages.at(-1)).toContain('carries no rules');
+  });
+
+  it('says the clipboard held no JSON rather than staying quiet', async () => {
+    pasted = 'definitely not json';
+
+    await page.pasteImport();
+
+    expect(written).toEqual([]);
+    expect(toastCtrl.messages.at(-1)).toContain('does not contain valid JSON');
+  });
+
+  it('does nothing at all when the alert is dismissed', async () => {
+    alertRole = 'cancel';
+    pasted = JSON.stringify({ id: 'st_4', name: 'Ignored', rules: {} });
+
+    await page.pasteImport();
+
+    expect(written).toEqual([]);
+    expect(toastCtrl.messages).toEqual([]);
+  });
+
+  it('says so when the library cannot be written', async () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: StrategyLibraryService,
+          useValue: {
+            documents: () => [],
+            load: async () => [],
+            importMissing: async () => {
+              throw new Error('no wallet');
+            },
+          },
+        },
+        {
+          provide: AlertController,
+          useValue: {
+            create: async () => ({
+              present: async () => {},
+              onDidDismiss: async () => ({
+                data: { values: { json: JSON.stringify({ name: 'X', rules: {} }) } },
+                role: 'confirm',
+              }),
+            }),
+          },
+        },
+        { provide: AuthService, useValue: { isLoggedIn: () => true } },
+      ],
+    });
+    const failing = TestBed.inject(ToastController) as unknown as typeof toastCtrl;
+    failing.messages.length = 0;
+    const brokenPage = TestBed.runInInjectionContext(() => new StrategiesPage());
+
+    await brokenPage.pasteImport();
+
+    expect(failing.messages.at(-1)).toContain('could not be written');
+  });
+});
+
+describe('importSummary', () => {
+  const decision = (outcome: 'added' | 'copied' | 'already-present') => ({
+    document: { id: 'x', name: 'n', rules: {}, createdAt: 0, updatedAt: 0, schemaVersion: 1 },
+    outcome,
+    originalName: 'n',
+  });
+
+  it('counts each outcome apart, because they are not the same news', () => {
+    const line = importSummary(
+      [decision('added'), decision('copied'), decision('already-present')],
+      [],
+    );
+
+    expect(line).toContain('1 imported');
+    expect(line).toContain('1 kept as a copy');
+    expect(line).toContain('1 already there');
+  });
+
+  it('keeps the refusals verbatim rather than summing them', () => {
+    expect(importSummary([], ['Entry 2 has no name.'])).toContain('Entry 2 has no name.');
+  });
+
+  it('says plainly when nothing came in', () => {
+    expect(importSummary([], [])).toBe('Nothing imported.');
   });
 });

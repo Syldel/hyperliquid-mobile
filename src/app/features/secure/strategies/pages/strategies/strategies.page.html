@@ -4,6 +4,15 @@
   emptyMessage="No strategy yet. Tap + to build one."
   (dataLoaded)="onDataLoaded($event)"
 >
+  <ng-template #endButtons>
+    <ion-button (click)="pasteImport()" aria-label="Import strategies from JSON">
+      <ion-icon slot="icon-only" name="clipboard-outline" />
+    </ion-button>
+    <ion-button (click)="copyAll()" aria-label="Copy the whole library as JSON">
+      <ion-icon slot="icon-only" name="copy-outline" />
+    </ion-button>
+  </ng-template>
+
   <ion-list>
     @for (document of documents(); track document.id) {
     <ion-item button (click)="openBuilder(document)">
