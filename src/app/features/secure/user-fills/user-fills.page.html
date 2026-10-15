@@ -4,6 +4,12 @@
   emptyMessage="No fills found for this period"
   (dataLoaded)="onDataLoaded($event)"
 >
+  <ng-template #endButtons>
+    <ion-button id="fees-info" aria-label="How fees are read on this screen">
+      <ion-icon slot="icon-only" name="information-circle-outline" />
+    </ion-button>
+  </ng-template>
+
   <div filters class="date-filters">
     <div class="date-filters__inputs">
       <ion-item lines="none">
@@ -77,23 +83,6 @@
     </ion-item>
   </div>
 
-  <!--
-    Les taux du compte, à côté des frais qu'ils expliquent : chaque ligne de la
-    liste porte un `Fee` en USDC que rien ne permettait de vérifier. Avec les
-    deux taux, `fee / (px × sz)` doit tomber sur l'un d'eux — ou sur sa version
-    HIP-3, qui vaut `× 2 × 0,1` sur un marché en growth mode.
-  -->
-  <div filters class="fee-banner">
-    @if (feeRates(); as rates) {
-    <span class="fee-banner__label">Your rates</span>
-    <span class="fee-banner__value">taker {{ rates.taker }} · maker {{ rates.maker }}</span>
-    } @else {
-    <!-- Un trou visible plutôt qu'un taux inventé : voir docs/conventions.md. -->
-    <span class="fee-banner__label">Your rates</span>
-    <span class="fee-banner__value fee-banner__value--missing">{{ feeRatesNote() }}</span>
-    }
-  </div>
-
   <div
     filters
     class="pnl-banner"
@@ -109,7 +98,18 @@
       <ion-label>
         <div class="fill-half" [class]="isOpen(fill) ? 'fill-half--left' : 'fill-half--right'">
           <div class="fill-header">
-            <span class="fill-coin">{{ displayCoin(fill.coin) }}</span>
+            <span class="fill-market">
+              <span class="fill-coin">{{ displayCoin(fill.coin) }}</span>
+              @if (builderDexOf(fill.coin)) {
+              <!--
+                « HIP-3 » et non le nom du dex : celui-ci est déjà dans le nom du
+                marché (`xyz:BRENTOIL`), le répéter n'apprendrait rien. Ce que la
+                puce apporte, c'est le **motif** — cette ligne paie l'échelle de
+                son déployeur, pas le palier annoncé en tête d'écran.
+              -->
+              <ion-badge color="medium" class="fill-dex">HIP-3</ion-badge>
+              }
+            </span>
             <ion-badge [color]="fill.side === 'B' ? 'success' : 'danger'">
               {{ fill.side === 'B' ? 'BUY' : 'SELL' }}
             </ion-badge>
@@ -136,3 +136,79 @@
     }
   </ion-list>
 </app-refreshable-layout>
+
+<!--
+  ⚠️ **Le palier n'est pas ce qu'on paie partout, et c'est tout le sujet.**
+  `userFees` rend un palier **unique pour tout le compte** — la documentation
+  d'Hyperliquid l'écrit : « all assets, including HIP-3 perps, share one fee
+  tier per user ». Mais sur un marché HIP-3, le taux payé vaut ce palier
+  multiplié par l'échelle de son déployeur, par 0,1 s'il est en growth mode,
+  et par (1 − parrainage). L'écran ne peut pas le calculer : personne ne lit
+  cette échelle dans cet écosystème.
+
+  Il l'a longtemps affiché sous le titre « Your rates », ce qui se lisait « ce
+  que tu paies ». Puis dans un bandeau permanent, qui coûtait une ligne de
+  l'écran à une information **de référence** — consultée une fois, pas
+  surveillée — et qui occupait la même place pour dire « unreadable » quand
+  les taux ne venaient pas.
+
+  D'où une modale, et deux choses qui restent **dans le flux** parce qu'elles
+  avertissent plutôt qu'elles n'informent : la puce `HIP-3` sur la ligne
+  concernée, et le `Fee` de chaque remplissage. La modale, elle, dit comment
+  les rapprocher — `fee / (px × sz)` doit retomber sur l'un des deux taux —,
+  ce que le bandeau laissait deviner.
+-->
+<!--
+  ⚠️ **Hors de `app-refreshable-layout`, et pas par goût.** Placée dans le
+  contenu projeté, elle disparaissait du DOM dès que la liste était vide : la
+  mise en page rend alors son état vide **à la place** du contenu (le même
+  piège que `strategies.page.spec.ts` documente). Or c'est justement quand il
+  n'y a aucun remplissage qu'on peut vouloir lire ce que l'écran compte.
+-->
+<ion-modal trigger="fees-info" class="fees-modal" #feesInfo>
+  <ng-template>
+    <ion-header>
+      <ion-toolbar>
+        <ion-title>Fees on this screen</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="feesInfo.dismiss()">Close</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+
+    <ion-content class="ion-padding fees-info">
+      <h2 class="fees-info__heading">Your account tier</h2>
+      @if (feeRates(); as rates) {
+      <p class="fees-info__rates">taker {{ rates.taker }} · maker {{ rates.maker }}</p>
+      } @else {
+      <!-- Un trou visible plutôt qu'un taux inventé : voir docs/conventions.md. -->
+      <p class="fees-info__rates fees-info__rates--missing">{{ feeRatesNote() }}</p>
+      }
+      <p>
+        Hyperliquid charges one tier per account, the same for every asset. It is what
+        <code>userFees</code>
+        reports, and what the figures above come from.
+      </p>
+
+      <h2 class="fees-info__heading">Checking a line</h2>
+      <p>
+        Each fill shows the fee it actually paid. Divided by its notional —
+        <code>fee / (price × size)</code>
+        — it should land on one of the two rates above.
+      </p>
+
+      <h2 class="fees-info__heading">Why HIP-3 lines differ</h2>
+      <p>
+        On a market deployed by a third party, the rate is the tier multiplied by that deployer's
+        own fee scale, by 0.1 if the market runs in growth mode, and by one minus your referral
+        discount. Under growth mode Hyperliquid documents the taker between 0.0045% and 0.009% —
+        five to ten times below the 0.045% baseline.
+      </p>
+      <p>
+        This screen cannot compute that rate, so it does not pretend to: the lines concerned carry a
+        <strong>HIP-3</strong>
+        badge instead.
+      </p>
+    </ion-content>
+  </ng-template>
+</ion-modal>

@@ -1,4 +1,9 @@
-import { formatDecimalRate, formatRatePercent, parseDecimalRate } from './fee-rate.utils';
+import {
+  builderDexOf,
+  formatDecimalRate,
+  formatRatePercent,
+  parseDecimalRate,
+} from './fee-rate.utils';
 
 /**
  * Chaque test fixe une lecture dont l'erreur se verrait sur un écran de frais :
@@ -87,5 +92,36 @@ describe('formatDecimalRate', () => {
     // annoncerait la gratuité.
     expect(formatDecimalRate('')).toBeNull();
     expect(formatDecimalRate(undefined)).toBeNull();
+  });
+});
+
+/**
+ * La règle que ce bloc garde : **le palier du compte ne vaut pas partout.**
+ *
+ * `userFees` rend un palier unique — la documentation d'Hyperliquid l'écrit —
+ * mais un marché HIP-3 le multiplie par l'échelle de son déployeur, et par 0,1
+ * de plus s'il est en *growth mode*. L'écran ne peut pas calculer ce taux ;
+ * il doit au moins savoir **sur quelles lignes** son chiffre ne s'applique pas.
+ */
+describe('builderDexOf', () => {
+  it('names the dex of a market deployed by a third party', () => {
+    expect(builderDexOf('xyz:BRENTOIL')).toBe('xyz');
+    expect(builderDexOf('test:AAPL')).toBe('test');
+  });
+
+  it('says nothing for a market where the account tier applies as it stands', () => {
+    // Le dex principal et le spot veulent dire la même chose ici — le palier
+    // s'applique — alors que `hlPerpDexOf` les distingue (`''` contre `null`).
+    // Les ramener à un seul `null` est ce qui permet au gabarit de n'avoir
+    // qu'un test à faire.
+    expect(builderDexOf('BTC')).toBeNull();
+    expect(builderDexOf('ETH')).toBeNull();
+    expect(builderDexOf('@107')).toBeNull();
+    expect(builderDexOf('PURR/USDC')).toBeNull();
+  });
+
+  it('does not take an empty or malformed name for a builder market', () => {
+    expect(builderDexOf('')).toBeNull();
+    expect(builderDexOf(':')).toBeNull();
   });
 });

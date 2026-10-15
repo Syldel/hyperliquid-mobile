@@ -37,30 +37,6 @@
 
 // Le bandeau des taux se range comme celui du PnL, mais sans teinte : il
 // n'annonce ni gain ni perte, il donne la règle qui explique la colonne `Fee`.
-.fee-banner {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 16px;
-  font-size: 0.8rem;
-  // Le même gris que `.fill-row`, qui porte la ligne `Fee:` que ce bandeau
-  // explique : même rôle, même page, donc même teinte. Mesuré sur ce fond,
-  // 6,00:1 en sombre et 5,21:1 en clair — une première version prenait
-  // `--ion-text-color-step-300` en invoquant un contraste insuffisant, ce qui
-  // est vrai sur un fond relevé (`.backtest-block` de la watchlist) mais pas
-  // ici, où le fond est celui de la page. Voir docs/theming.md.
-  color: var(--ion-color-medium);
-  font-variant-numeric: tabular-nums;
-
-  &__label {
-    font-weight: 500;
-  }
-
-  &__value--missing {
-    font-style: italic;
-  }
-}
 
 .pnl-banner {
   display: flex;
@@ -120,9 +96,38 @@ ion-item {
     }
   }
 
+  /* Le marché et, s'il y a lieu, le dex qui en fixe les frais : groupés, sinon
+     le `space-between` de `.fill-header` les séparerait de part en part. */
+  .fill-market {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 6px;
+    min-width: 0;
+  }
+
   .fill-coin {
     font-weight: 600;
     font-size: 1rem;
+  }
+
+  /* Un marché HIP-3 ne paie pas le palier affiché en tête d'écran : il le
+     multiplie par l'échelle de son déployeur, que personne ne lit dans cet
+     écosystème. La puce dit donc le motif, faute de pouvoir le chiffrer. */
+  .fill-dex {
+    /* ⚠️ Sans cela, elle est **rognée** : mesuré à 360 px sur `xyz:BRENTOIL`,
+       il ne restait que « H ». Le nom d'un marché HIP-3 est long par nature —
+       il porte son préfixe de dex —, donc c'est la puce qui passe à la ligne,
+       jamais elle qui se coupe. */
+    flex: 0 0 auto;
+    font-size: 0.62rem;
+    font-weight: 600;
+
+    /* ⚠️ Les puces de cet écran sont atténuées à 0,75, ce qui faisait tomber
+       celle-ci à **4,44:1** en clair — sous le seuil de 4,5 pour du texte de
+       9,9 px. L'opacité ne se lit pas dans `color` : elle compose vers le fond,
+       et seule une mesure le montre (voir docs/conventions.md). */
+    opacity: 1;
   }
 
   .fill-dir {
@@ -158,4 +163,48 @@ ion-item {
   .fill-fee {
     font-size: 0.68rem;
   }
+}
+
+/* La modale d'information sur les frais, ouverte depuis l'en-tête.
+   Du texte de lecture : interlignage confortable, et des titres qui séparent
+   les trois questions — ce que vaut le palier, comment vérifier une ligne,
+   pourquoi une ligne HIP-3 n'y obéit pas. */
+.fees-info {
+  p {
+    margin: 0 0 12px;
+    font-size: 0.88rem;
+    line-height: 1.45;
+  }
+
+  code {
+    font-size: 0.85em;
+    /* Un fond très léger suffit à détacher le code du texte : le contraste du
+       texte lui-même ne bouge pas, il reste celui du paragraphe. */
+    padding: 1px 4px;
+    border-radius: 4px;
+    background: var(--ion-color-step-100, rgba(128, 128, 128, 0.15));
+  }
+}
+
+.fees-info__heading {
+  margin: 18px 0 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ion-color-medium);
+
+  &:first-child {
+    margin-top: 0;
+  }
+}
+
+.fees-info__rates {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.fees-info__rates--missing {
+  font-style: italic;
+  color: var(--ion-color-medium);
 }

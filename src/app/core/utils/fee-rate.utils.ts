@@ -1,3 +1,5 @@
+import { hlPerpDexOf } from '@syldel/hl-shared-types';
+
 /**
  * ============================================================================
  * 💱 LIRE ET ÉCRIRE UN TAUX DE FRAIS
@@ -54,4 +56,31 @@ export function formatRatePercent(fraction: number): string {
 export function formatDecimalRate(raw: string | null | undefined): string | null {
   const fraction = parseDecimalRate(raw);
   return fraction === null ? null : formatRatePercent(fraction);
+}
+
+/**
+ * Le dex d'un marché **déployé par un tiers** (HIP-3), ou `null` quand le
+ * palier du compte s'applique tel quel.
+ *
+ * ⚠️ **Ce n'est pas une question de nommage, c'est une question de frais.** Le
+ * point de terminaison `userFees` rend un palier **unique pour tout le
+ * compte** — la documentation d'Hyperliquid le dit : « all assets, including
+ * HIP-3 perps, share one fee tier per user ». Mais ce que l'on paie sur un
+ * marché HIP-3 vaut ce palier **multiplié** : taux du trader × échelle de frais
+ * du déployeur × 0,1 si le marché est en *growth mode* × (1 − remise de
+ * parrainage). Sous *growth mode*, la documentation chiffre le taker entre
+ * 0,0045 % et 0,009 %, soit cinq à dix fois moins que les 0,045 % du palier de
+ * base.
+ *
+ * L'écran des remplissages affichait donc « Your rates » au-dessus d'une liste
+ * où certaines lignes pouvaient avoir payé tout autre chose. Il ne peut pas
+ * calculer le vrai taux — l'échelle du déployeur n'est lue par personne dans
+ * cet écosystème, voir `nest-trading-bot/docs/known-gaps.md` — mais il peut
+ * **dire lesquelles sont concernées**, et c'est ce que cette fonction permet.
+ *
+ * `hlPerpDexOf` rend `''` pour le dex principal et `null` hors perp : les deux
+ * veulent dire « le palier s'applique », d'où un seul `null` ici.
+ */
+export function builderDexOf(market: string): string | null {
+  return hlPerpDexOf(market) || null;
 }

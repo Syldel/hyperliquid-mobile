@@ -1,18 +1,26 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { formatDecimalRate } from '@utils/fee-rate.utils';
+import { addIcons } from 'ionicons';
+import { informationCircleOutline } from 'ionicons/icons';
+import { builderDexOf, formatDecimalRate } from '@utils/fee-rate.utils';
 import {
   IonBadge,
   IonButton,
+  IonButtons,
+  IonContent,
   IonDatetime,
   IonDatetimeButton,
   IonItem,
   IonLabel,
   IonList,
+  IonHeader,
+  IonIcon,
   IonModal,
   IonSelect,
   IonSelectOption,
+  IonTitle,
+  IonToolbar,
 } from '@ionic/angular/standalone';
 import { AppLifecycleService } from '@services/app-lifecycle.service';
 import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
@@ -39,6 +47,12 @@ import { interval, Observable } from 'rxjs';
     IonSelect,
     IonSelectOption,
     IonButton,
+    IonButtons,
+    IonContent,
+    IonHeader,
+    IonIcon,
+    IonTitle,
+    IonToolbar,
   ],
   templateUrl: './user-fills.page.html',
   styleUrls: ['./user-fills.page.scss'],
@@ -101,6 +115,7 @@ export class UserFillsPage extends MenuBasePage {
 
   constructor() {
     super();
+    addIcons({ informationCircleOutline });
 
     // Met à jour maxDate chaque minute
     interval(60_000)
@@ -189,6 +204,17 @@ export class UserFillsPage extends MenuBasePage {
 
   displayCoin(coin: string): string {
     return this.hlMarket.displayCoin(coin);
+  }
+
+  /**
+   * Le dex d'un marché HIP-3, ou `null` quand le palier du compte s'applique.
+   *
+   * Affiché sur la ligne parce que la bannière, elle, ne peut rien en dire :
+   * le taux payé y vaut le palier multiplié par l'échelle du déployeur, que
+   * personne ne lit dans cet écosystème. Voir `fee-rate.utils.ts`.
+   */
+  builderDexOf(coin: string): string | null {
+    return builderDexOf(coin);
   }
 
   private toLocalISO(date: Date): string {
