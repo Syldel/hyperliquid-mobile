@@ -294,6 +294,101 @@ describe('AuthService', () => {
     });
   });
 
+  /**
+   * Une restauration qui échoue laisse les signaux vides, et vide n'est pas
+   * « rien à restaurer ». Écrire à partir de cet état remplacerait les jetons et
+   * les wallets stockés par une table à un seul élément.
+   */
+  describe('a session restore that failed', () => {
+    const outcomeOfLogin = (token = MOCK_TOKEN) => {
+      mockJwtDecode.mockReturnValue(MOCK_PAYLOAD);
+      const outcome = new Promise<unknown>((resolve) =>
+        service.loginWithWallet(MOCK_ADDRESS, 'password').subscribe({
+          next: () => resolve('ok'),
+          error: (e) => resolve(e),
+        }),
+      );
+      httpMock.expectOne('http://api.test/auth/login').flush({ access_token: token });
+      return outcome;
+    };
+
+    beforeEach(() => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      secureStorageMock.get.mockRejectedValue(new Error('keychain locked'));
+    });
+
+    it('is reported, and clears once a later restore succeeds', async () => {
+      await service.restoreSession();
+      expect(service.restoreFailed()).toBe(true);
+
+      secureStorageMock.get.mockResolvedValue(null);
+      await service.restoreSession();
+
+      expect(service.restoreFailed()).toBe(false);
+    });
+
+    it('refuses a login rather than overwrite the stored tokens and wallets', async () => {
+      await service.restoreSession();
+      secureStorageMock.set.mockClear();
+      storageMock.set.mockClear();
+
+      const result = await outcomeOfLogin();
+
+      expect(result).toBeInstanceOf(Error);
+      expect((result as Error).message).toMatch(/will not be overwritten/);
+      expect(secureStorageMock.set).not.toHaveBeenCalled();
+      expect(storageMock.set).not.toHaveBeenCalled();
+      expect(service.currentAddress()).toBeNull();
+      expect(service.tokens()).toEqual({});
+    });
+
+    it('retries the restore before refusing, since the failure is often passing', async () => {
+      await service.restoreSession();
+      expect(service.restoreFailed()).toBe(true);
+      secureStorageMock.get.mockResolvedValue(null);
+
+      const result = await outcomeOfLogin();
+
+      expect(result).toBe('ok');
+      expect(service.restoreFailed()).toBe(false);
+      expect(secureStorageMock.set).toHaveBeenCalledWith('tokens', { [MOCK_ADDRESS]: MOCK_TOKEN });
+    });
+
+    it('keeps refusing when the retry reads the wallets but the keychain still fails', async () => {
+      storageMock.get.mockImplementation((key: string) =>
+        Promise.resolve(key === 'userWallets' ? [MOCK_PAYLOAD_2] : null),
+      );
+      await service.restoreSession();
+      secureStorageMock.set.mockClear();
+
+      const result = await outcomeOfLogin();
+
+      expect(result).toBeInstanceOf(Error);
+      expect(secureStorageMock.set).not.toHaveBeenCalled();
+    });
+
+    it('refuses to remove a wallet, which would also rewrite the token table', async () => {
+      await service.restoreSession();
+      secureStorageMock.set.mockClear();
+      storageMock.set.mockClear();
+
+      await expect(service.removeUserWallet(MOCK_ADDRESS)).rejects.toThrow(
+        /will not be overwritten/,
+      );
+
+      expect(secureStorageMock.set).not.toHaveBeenCalled();
+      expect(storageMock.set).not.toHaveBeenCalled();
+    });
+
+    it('also holds when the plain storage is what failed', async () => {
+      secureStorageMock.get.mockResolvedValue(null);
+      storageMock.get.mockRejectedValue(new Error('preferences unavailable'));
+      await service.restoreSession();
+
+      expect(service.restoreFailed()).toBe(true);
+    });
+  });
+
   describe('removeUserWallet', () => {
     beforeEach(async () => {
       await loginWallet(service, httpMock, MOCK_TOKEN, MOCK_ADDRESS, MOCK_PAYLOAD);

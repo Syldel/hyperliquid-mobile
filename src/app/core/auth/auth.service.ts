@@ -54,6 +54,18 @@ export class AuthService {
 
   readonly ready$ = new BehaviorSubject(false);
 
+  /**
+   * Pourquoi la dernière restauration a échoué, ou `null` si elle a réussi.
+   *
+   * Un échec laisse les signaux **vides**, et vide n'est pas « rien à restaurer » :
+   * la connexion suivante réécrivait alors la table des jetons et la liste des
+   * wallets à partir de cet état, effaçant ceux des autres wallets dès que le
+   * trousseau redevenait lisible. Tant que ceci n'est pas `null`, plus aucune
+   * écriture dérivée de l'état en mémoire n'a lieu (`assertSessionRestored`).
+   */
+  private readonly _restoreError = signal<unknown>(null);
+  readonly restoreFailed = computed(() => this._restoreError() !== null);
+
   constructor() {
     this.setupAutoLogout();
     this.restoreSession();
@@ -62,6 +74,7 @@ export class AuthService {
   // --- Session restore ---
 
   async restoreSession(): Promise<void> {
+    this._restoreError.set(null);
     try {
       const [userWallets, tokenMap, currentAddress] = await Promise.all([
         this.storage.get<JwtPayload[]>('userWallets'),
@@ -80,6 +93,7 @@ export class AuthService {
       this._currentAddress.set(currentAddress);
     } catch (err) {
       console.error('Error restoring session', err);
+      this._restoreError.set(err);
     } finally {
       this.ready$.next(true);
     }
@@ -99,7 +113,27 @@ export class AuthService {
       .pipe(switchMap((res) => from(this.handleAuthResponse(res))));
   }
 
+  /**
+   * Refuse d'écrire tant que ce qui est stocké n'a pas pu être lu.
+   *
+   * Une restauration ratée (trousseau verrouillé, stockage illisible) est
+   * retentée une fois — l'échec est souvent passager. Si elle échoue encore, on
+   * lève : écrire maintenant, c'est remplacer ce qui est stocké par un état
+   * vide que l'on prendrait pour la vérité.
+   */
+  private async assertSessionRestored(): Promise<void> {
+    if (!this.restoreFailed()) return;
+
+    await this.restoreSession();
+    if (this.restoreFailed()) {
+      throw new Error(
+        'Stored sign-in data could not be read, so it will not be overwritten. Restart the app, or unlock the device keychain, and try again.',
+      );
+    }
+  }
+
   private async handleAuthResponse({ access_token }: AuthResponse): Promise<void> {
+    await this.assertSessionRestored();
     const payload = jwtDecode<JwtPayload>(access_token);
 
     const address = payload.wallet;
@@ -127,6 +161,7 @@ export class AuthService {
   }
 
   async removeUserWallet(walletAddress: string): Promise<void> {
+    await this.assertSessionRestored();
     this._userWallets.update((wallets) => wallets.filter((w) => w.wallet !== walletAddress));
     this._tokens.update(({ [walletAddress]: _, ...rest }) => rest);
 

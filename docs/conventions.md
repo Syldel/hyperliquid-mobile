@@ -460,19 +460,58 @@ orchestrent — et ce sont eux dont une panne muette se paie. C'est la dette act
 domaine est très bien couvert (arbre de règles, chemins, anomalies, échelles, séries) ; la
 couche service beaucoup moins.
 
-Testés : `auth.service`, `bot.service`, `strategy-library.service`, et le
-`strategy-builder.store`.
+Testés : `auth.service`, `bot.service`, `strategy-library.service`, `user.service`,
+`chart-analysis.service`, `available-capital.service`, `config.service`, `storage.service`,
+`secure.storage.service`, `watchlist.service`, et le `strategy-builder.store`. Les deux derniers sont de minces
+enveloppes HTTP : leur spec épingle le **contrat de l'appel** (verbe, URL lue à l'appel,
+corps transmis tel quel, jeton demandé ou non, erreur non avalée), et chaque test a été
+éprouvé en cassant le code (huit mutations, huit tuées, le 2026-10-15). Ce qu'ils ne
+couvrent pas : ce que l'écran fait de la réponse, qui vit dans les pages.
+
+`available-capital.service` est d'une autre nature : il porte de la **logique** (TTL, requête
+en vol partagée, échec non figé, `invalidate`). Sa spec fixe les trois règles — ne pas
+bombarder, ne pas figer une panne, ne pas faire passer l'ignorance pour un zéro — et a été
+éprouvée par douze mutations, toutes tuées (le 2026-10-15). Deux d'entre elles ont dû être
+rejouées : une ne compilait pas, une ne changeait rien au comportement.
 
 Pas encore couverts, par ordre de ce que leur défaillance coûterait :
 
-| Service                                      | Ce qu'une panne muette y coûterait                         |
-| -------------------------------------------- | ---------------------------------------------------------- |
-| `user.service`                               | l'écriture de la config de trading sur le compte           |
-| `chart-analysis.service`                     | l'analyse et le backtest, donc toute décision prise dessus |
-| `available-capital.service`                  | le capital auquel un ratio s'applique                      |
-| `storage.service` / `secure.storage.service` | la persistance sous tout le reste                          |
-| `watchlist.service`, `config.service`        | les réglages et la liste suivie                            |
-| `hyperliquid-*`                              | données de marché et statut d'ordre                        |
+| Service         | Ce qu'une panne muette y coûterait  |
+| --------------- | ----------------------------------- |
+| `hyperliquid-*` | données de marché et statut d'ordre |
+
+✅ **Quatre défauts relevés en écrivant ces specs, corrigés le 2026-10-15** — chacun a son test,
+et chaque correctif a été éprouvé en le cassant (dix-sept mutations, toutes tuées, dont une
+rejouée parce qu'elle ne compilait pas) :
+
+- `StorageService` écrit **tout en JSON, chaînes comprises**. Une chaîne qui ressemblait à du
+  JSON revenait transformée (`'123'` rendait le nombre `123`). La lecture reste tolérante : une
+  ancienne chaîne brute (`dark`, `0x…`) revient telle quelle, donc aucune migration. ⚠️ Seule une
+  ancienne chaîne brute qui _ressemblait_ à du JSON resterait mal lue ; aucune n'existe.
+- `set(k, undefined)` (ou une fonction) **lève** `TypeError` en nommant la clé, au lieu d'écrire
+  la chaîne `"undefined"`. Pour effacer : `null`, ou `remove`. Même règle côté
+  `SecureStorageService`, où une erreur de programmation ne se déguise pas en `false`.
+- `SecureStorageService.get` distingue **absent** (`null`) de **illisible** (lève
+  `SecureStorageReadError`). L'existence se demande à `keys()` et non au texte du rejet de
+  `get`, qui se reformule d'une version du plugin à l'autre — un message inconnu aurait été pris
+  pour une absence, le défaut même qu'on corrige.
+- `ConfigService.loadConfig` complète **champ par champ** depuis le défaut du build, avec un
+  `console.warn` qui nomme les champs, conserve les champs qu'il ne connaît pas (une config
+  écrite par un build plus récent n'est pas amputée) et **refuse** une valeur qui n'est pas une
+  chaîne ou un objet — la config courante reste en place.
+
+Et la conséquence côté session : `AuthService` ne **réécrit** plus jetons ni wallets tant que la
+restauration a échoué (`restoreFailed()`, `assertSessionRestored`). Un trousseau verrouillé
+laissait les signaux vides, et la connexion suivante remplaçait la table des jetons stockée par
+un seul élément, effaçant ceux des autres wallets une fois le trousseau redevenu lisible. Une
+restauration ratée est retentée une fois avant de refuser ; `login` et `removeUserWallet`
+lèvent alors un message qui dit quoi faire.
+
+⚠️ Non vérifié : le chemin d'**écriture** du nouveau format dans le navigateur (aucun réglage de
+l'utilisateur n'a été réécrit pour le mesurer) ; il l'est par les specs, dont le double du plugin
+est copié de son implémentation web. Et sur un appareil réel, `keys()` du plugin natif n'a pas
+été exercé. Reste aussi sans interface : `restoreFailed()` n'est montré nulle part, l'utilisateur
+ne voit l'échec qu'au moment de se connecter.
 
 Les services de pane et d'overlay (`expressions-pane`, `strategy-positions-pane`,
 `indicator-overlay`) sont le cas traité plus haut : leur logique testable est déjà sortie,

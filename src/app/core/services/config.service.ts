@@ -17,12 +17,58 @@ export class ConfigService {
     return this._config$.asObservable();
   }
 
+  /**
+   * Applique la config stockée par-dessus le défaut du build — **champ par
+   * champ**, et en le disant.
+   *
+   * Elle remplaçait le défaut en entier : un champ ajouté depuis à `AppConfig`
+   * se lisait `undefined`, d'où des requêtes vers `undefined/auth/me`, sans
+   * aucune erreur. Un champ **absent** reprend désormais le défaut du build, et
+   * un `console.warn` le nomme ; la prochaine sauvegarde réécrit une config
+   * complète. Un champ qui n'est pas une chaîne, ou une valeur qui n'est pas un
+   * objet, est un stockage **corrompu** : on lève, et la config courante (le
+   * défaut) reste en place — mieux qu'une URL devinée.
+   *
+   * Les champs inconnus de ce build sont conservés : une config écrite par une
+   * version plus récente ne doit pas être amputée par celle-ci.
+   */
   async loadConfig(): Promise<AppConfig> {
-    const storedConfig = await this.storage.get<AppConfig>(this.STORAGE_KEY);
-    if (storedConfig) {
-      this._config$.next(storedConfig);
+    const stored = await this.storage.get<unknown>(this.STORAGE_KEY);
+    if (stored !== null && stored !== undefined) {
+      this._config$.next(this.reconcileWithDefaults(stored));
     }
     return this._config$.value!;
+  }
+
+  private reconcileWithDefaults(stored: unknown): AppConfig {
+    if (typeof stored !== 'object' || Array.isArray(stored)) {
+      throw new Error(
+        `Stored configuration "${this.STORAGE_KEY}" is not an object (${Array.isArray(stored) ? 'array' : typeof stored}); keeping the build default.`,
+      );
+    }
+
+    const defaults = environment.defaultConfig;
+    const record = stored as Record<string, unknown>;
+    const filled: string[] = [];
+
+    for (const key of Object.keys(defaults) as (keyof AppConfig)[]) {
+      const value = record[key];
+      if (value === undefined) {
+        filled.push(key);
+      } else if (typeof value !== 'string') {
+        throw new Error(
+          `Stored configuration "${this.STORAGE_KEY}": "${key}" is a ${value === null ? 'null' : typeof value}, not a URL string; keeping the build default.`,
+        );
+      }
+    }
+
+    if (filled.length > 0) {
+      console.warn(
+        `[ConfigService] Stored configuration lacks ${filled.join(', ')}; using the build default for ${filled.length > 1 ? 'them' : 'it'}.`,
+      );
+    }
+
+    return { ...defaults, ...record } as AppConfig;
   }
 
   async saveConfig(config: AppConfig): Promise<void> {
