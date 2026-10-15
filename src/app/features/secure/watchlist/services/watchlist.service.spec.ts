@@ -3,6 +3,7 @@ import { AuthService } from '@auth/auth.service';
 import { StorageService } from '@storage/storage.service';
 import { BehaviorSubject } from 'rxjs';
 import { StrategyLibraryService } from '../../strategies/services/strategy-library.service';
+import type { WatchlistItem } from '../models/watchlist-item.model';
 import { WatchlistService } from './watchlist.service';
 
 /**
@@ -144,5 +145,134 @@ describe('WatchlistService', () => {
 
     address = WALLET_A;
     expect((await service.load()).map((i) => i.coin)).toEqual(['BTC']);
+  });
+});
+
+/**
+ * Ce que le premier bloc ne fixe pas : la normalisation d'un nom, le doublon,
+ * la suppression, et surtout l'**ordre** de la reprise des anciens charts.
+ */
+describe('WatchlistService — names, removal and legacy charts', () => {
+  let service: WatchlistService;
+  let storage: StorageStub;
+  let order: string[];
+
+  const item = (coin: string, extra: Partial<WatchlistItem> = {}): WatchlistItem => ({
+    coin,
+    interval: '1h',
+    addedAt: 1,
+    ...extra,
+  });
+
+  beforeEach(() => {
+    storage = new StorageStub();
+    order = [];
+    const set = storage.set.bind(storage);
+    storage.set = async (key, value) => {
+      order.push('storage.set');
+      return set(key, value);
+    };
+
+    TestBed.configureTestingModule({
+      providers: [
+        WatchlistService,
+        { provide: StorageService, useValue: storage },
+        {
+          provide: AuthService,
+          useValue: { currentAddress: () => WALLET_A, ready$: new BehaviorSubject(true) },
+        },
+        {
+          provide: StrategyLibraryService,
+          useValue: {
+            load: async () => [],
+            importMissing: async (docs: { id: string }[]) => {
+              order.push(`library.importMissing(${docs.map((d) => d.id)})`);
+              return [];
+            },
+          },
+        },
+      ],
+    });
+    service = TestBed.inject(WatchlistService);
+  });
+
+  it('trims the name, so " BTC " and "BTC" are the same pair', async () => {
+    await service.add(' BTC ');
+    await service.add('BTC');
+
+    expect(service.items().map((i) => i.coin)).toEqual(['BTC']);
+  });
+
+  it('defaults to the 1h interval', async () => {
+    await service.add('BTC');
+
+    expect(service.getByCoin('BTC')?.interval).toBe('1h');
+  });
+
+  it('does not add a pair twice, keeps the first interval and does not rewrite the storage', async () => {
+    await service.add('BTC', '1h');
+    order.length = 0;
+
+    await service.add('BTC', '4h');
+
+    expect(service.getByCoin('BTC')?.interval).toBe('1h');
+    expect(order).toEqual([]);
+  });
+
+  it('keeps a HIP-3 market name whole', async () => {
+    await service.add('xyz:BRENTOIL');
+
+    expect(service.getByCoin('xyz:BRENTOIL')).toBeDefined();
+  });
+
+  it('removes only the named pair, in memory and in the storage', async () => {
+    await service.add('BTC');
+    await service.add('ETH');
+
+    await service.remove('BTC');
+
+    expect(service.items().map((i) => i.coin)).toEqual(['ETH']);
+    const stored = storage.store.get('watchlist_items') as Record<string, WatchlistItem[]>;
+    expect(stored[WALLET_A].map((i) => i.coin)).toEqual(['ETH']);
+  });
+
+  it('changes nothing when asked to update a pair that is not there', async () => {
+    await service.add('BTC');
+
+    await service.update('SOL', { interval: '1d' });
+
+    expect(service.items().map((i) => i.coin)).toEqual(['BTC']);
+    expect(service.getByCoin('BTC')?.interval).toBe('1h');
+  });
+
+  describe('a chart that still carries a full copy of its strategy', () => {
+    const legacy = {
+      ...item('BTC'),
+      activeStrategy: {
+        id: 's1',
+        name: 'Old',
+        rules: { long: { entry: { type: 'logical', operator: 'AND', conditions: [] } } },
+      },
+    } as unknown as WatchlistItem;
+
+    // Une référence ne doit jamais pointer, même brièvement, sur une stratégie
+    // absente de la bibliothèque.
+    it('writes the recovered document to the library before the migrated item', async () => {
+      storage.store.set('watchlist_items', { [WALLET_A]: [legacy] });
+
+      const items = await service.load();
+
+      expect(order).toEqual(['library.importMissing(s1)', 'storage.set']);
+      expect(items[0].strategyRefs).toEqual([{ strategyId: 's1', visible: true }]);
+      expect('activeStrategy' in items[0]).toBe(false);
+    });
+
+    it('writes nothing when there is nothing to migrate', async () => {
+      storage.store.set('watchlist_items', { [WALLET_A]: [item('BTC')] });
+
+      await service.load();
+
+      expect(order).toEqual([]);
+    });
   });
 });
