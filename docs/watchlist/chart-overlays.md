@@ -293,6 +293,21 @@ Freqtrade (`market_change`). L'écart avantage la référence, donc désavantage
 une asymétrie conservatrice, que la note des limites chiffre (`0.09%` d'aller-retour épargné
 au palier de base) plutôt que de la taire.
 
+⚠️ **Et le palier appliqué est celui du dex principal, sur tous les marchés.** Un marché
+HIP-3 — ceux dont le nom porte un préfixe de dex, `xyz:BRENTOIL` — ne paie pas ce palier : il
+paie le palier du compte multiplié par l'échelle de son déployeur, et par 0,1 de plus s'il
+tourne en _growth mode_, **des deux côtés**. Mesuré sur 62 remplissages réels du dex `xyz`
+(`nest-trading-bot/docs/hyperliquid/live-check.md`) : **0,0090 %** en taker et **0,0030 %**
+en maker, contre les 0,045 % que le rapport facture. Sur ces marchés, le backtest compte donc
+**cinq fois trop** de frais ; sur un marché HIP-3 **sans** growth mode, deux fois trop peu
+(`0,045 % × 2 = 0,09 %`).
+
+Ce n'est pas une fatalité : Hyperliquid expose `deployerFeeScale` et `growthMode` **par
+marché** dans la méta d'un dex perp — relevé sur 134 marchés `xyz` sur 134. Personne ne les
+lit encore côté calcul, et c'est le point 11 de `nest-trading-bot/docs/known-gaps.md`. La
+page des remplissages, elle, ne prétend plus le contraire : sa modale d'information donne les
+chiffres mesurés et marque les lignes concernées d'une puce `HIP-3`.
+
 **Trois lectures d'un même creux**, dans le tableau, parce qu'un seul chiffre ne répond pas
 à trois questions (types partagés 0.31.0) :
 

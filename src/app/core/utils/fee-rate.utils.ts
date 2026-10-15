@@ -66,17 +66,25 @@ export function formatDecimalRate(raw: string | null | undefined): string | null
  * point de terminaison `userFees` rend un palier **unique pour tout le
  * compte** — la documentation d'Hyperliquid le dit : « all assets, including
  * HIP-3 perps, share one fee tier per user ». Mais ce que l'on paie sur un
- * marché HIP-3 vaut ce palier **multiplié** : taux du trader × échelle de frais
- * du déployeur × 0,1 si le marché est en *growth mode* × (1 − remise de
- * parrainage). Sous *growth mode*, la documentation chiffre le taker entre
- * 0,0045 % et 0,009 %, soit cinq à dix fois moins que les 0,045 % du palier de
- * base.
+ * marché HIP-3 vaut ce palier **multiplié**, par l'échelle de son déployeur et
+ * par 0,1 s'il tourne en *growth mode*.
  *
- * L'écran des remplissages affichait donc « Your rates » au-dessus d'une liste
- * où certaines lignes pouvaient avoir payé tout autre chose. Il ne peut pas
- * calculer le vrai taux — l'échelle du déployeur n'est lue par personne dans
- * cet écosystème, voir `nest-trading-bot/docs/known-gaps.md` — mais il peut
- * **dire lesquelles sont concernées**, et c'est ce que cette fonction permet.
+ * Mesuré, et pas déduit : `nest-trading-bot/docs/hyperliquid/live-check.md` a
+ * relevé 415 remplissages réels, dont **62 sur le dex `xyz`** — tous
+ * exactement à `0,045 % × 2 × 0,1 = 0,009 %` en taker et
+ * `0,015 % × 2 × 0,1 = 0,003 %` en maker, sans la moindre variation. Le
+ * facteur du déployeur s'applique donc **aux deux côtés**, et un marché HIP-3
+ * en growth mode coûte **cinq fois moins** que le palier affiché, pas plus.
+ *
+ * ⚠️ **Cet écran ne calcule pas ce taux, mais rien ne l'en empêcherait.** Une
+ * version antérieure de ce commentaire affirmait que l'échelle du déployeur
+ * « n'est lue par personne » : c'est faux, Hyperliquid l'expose par marché
+ * (`deployerFeeScale`, `growthMode` dans la méta d'un dex perp, relevé sur
+ * 134 marchés `xyz` sur 134), et le mobile appelle déjà cette route ailleurs.
+ * Ne pas le calculer est une **décision de périmètre** — il faudrait une
+ * requête par dex présent dans les remplissages, et la remise de parrainage
+ * resterait inconnue —, pas une impossibilité. Ce que la fonction permet,
+ * c'est de **dire quelles lignes sont concernées**.
  *
  * `hlPerpDexOf` rend `''` pour le dex principal et `null` hors perp : les deux
  * veulent dire « le palier s'applique », d'où un seul `null` ici.

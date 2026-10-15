@@ -142,9 +142,16 @@
   `userFees` rend un palier **unique pour tout le compte** — la documentation
   d'Hyperliquid l'écrit : « all assets, including HIP-3 perps, share one fee
   tier per user ». Mais sur un marché HIP-3, le taux payé vaut ce palier
-  multiplié par l'échelle de son déployeur, par 0,1 s'il est en growth mode,
-  et par (1 − parrainage). L'écran ne peut pas le calculer : personne ne lit
-  cette échelle dans cet écosystème.
+  multiplié par l'échelle de son déployeur, et par 0,1 de plus s'il tourne en
+  growth mode — **des deux côtés**, taker comme maker. Mesuré sur 62
+  remplissages réels du dex `xyz` : 0,0090 % et 0,0030 %, soit cinq fois
+  **moins** que le palier, pas plus (`nest-trading-bot/docs/hyperliquid/live-check.md`).
+
+  ⚠️ Cet écran ne le calcule pas, et ce n'est **pas** une impossibilité :
+  Hyperliquid expose `deployerFeeScale` et `growthMode` par marché. Une version
+  antérieure de ce commentaire disait le contraire. C'est une décision de
+  périmètre — une requête par dex présent dans la liste, et la remise de
+  parrainage resterait inconnue.
 
   Il l'a longtemps affiché sous le titre « Your rates », ce qui se lisait « ce
   que tu paies ». Puis dans un bandeau permanent, qui coûtait une ligne de
@@ -200,12 +207,22 @@
       <h2 class="fees-info__heading">Why HIP-3 lines differ</h2>
       <p>
         On a market deployed by a third party, the rate is the tier multiplied by that deployer's
-        own fee scale, by 0.1 if the market runs in growth mode, and by one minus your referral
-        discount. Under growth mode Hyperliquid documents the taker between 0.0045% and 0.009% —
-        five to ten times below the 0.045% baseline.
+        fee scale, and by 0.1 again if the market runs in growth mode. Both sides are scaled, taker
+        and maker.
       </p>
       <p>
-        This screen cannot compute that rate, so it does not pretend to: the lines concerned carry a
+        Measured on real fills rather than deduced: every
+        <code>xyz</code>
+        market runs at a scale of 1.0 with growth mode on, which bills
+        <strong>0.0090%</strong>
+        taker and
+        <strong>0.0030%</strong>
+        maker — five times below the tier above, not above it.
+      </p>
+      <p>
+        This screen shows the tier, not the rate of each market: that would take one request per
+        venue in the list, and your referral discount is not readable here. The lines concerned
+        carry a
         <strong>HIP-3</strong>
         badge instead.
       </p>
