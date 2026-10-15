@@ -324,6 +324,47 @@ celle du contraste. ⚠️ Le préréglage `mobile` émule **aussi un appareil t
 tactile au chargement demande un rechargement après le changement, sans quoi la
 page reste dans l'état où elle a été construite.
 
+## Un badge monoligne se centre sur ses capitales, et se mesure
+
+Le texte d'un `ion-badge` se lisait **1,4 px trop haut** — sur `BUY` / `SELL` de
+Trade History comme sur le compteur d'ordres de l'en-tête du détail. Mesuré le
+2026-10-15 : 3,67 px d'espace au-dessus de l'encre, 6,53 px en dessous, dans un
+badge de 18 px. Rien ne le signalait, et l'œil ne le désigne pas : il voit une
+pastille « un peu bancale ». Ionic centre la **boîte de ligne** (`padding: 3px 4px
+4px`), et dans Roboto l'encre des capitales n'y est pas centrée.
+
+La règle, pour tout élément à **une seule ligne** de texte dans une boîte à fond
+(badge, puce, compteur, étiquette de côté) :
+
+- **`text-box: trim-both cap alphabetic`** sur le conteneur de blocs qui porte le
+  texte, et un padding **symétrique**. La boîte de ligne est rognée aux
+  capitales et à la ligne de base : le padding devient la seule marge. Global
+  pour `ion-badge` dans `src/styles.scss` — ne pas le refaire par composant.
+- **Le texte nu d'un enfant flex n'est pas un conteneur de blocs** : `text-box`
+  ne s'y applique pas. Un badge centré par flex (le compteur rond) enveloppe son
+  texte dans un `span` en `display: block`, c'est lui qui porte la règle.
+- **Un rond tant qu'un chiffre y tient, une pastille au-delà** : hauteur fixe,
+  `min-width` égal à la hauteur, `border-radius` de la **moitié** de la hauteur.
+  `border-radius: 50%` déformerait la pastille en ellipse à deux chiffres.
+- **Un repli, parce que le WebView n'est pas Chrome** : `text-box` demande
+  Chrome 133 ou Safari 18.2. Sous `@supports not`, le décalage mesuré sur Roboto
+  (0,128 em) est reporté dans le padding. C'est une approximation **par police**,
+  exacte sur Roboto et pas ailleurs : si l'appareil sert une autre police, le
+  repli peut laisser un reste, et seul `text-box` garantit l'alignement.
+
+**Se vérifie par mesure, pas à l'œil** : un demi-pixel ne se voit pas sur une
+capture, et c'est ce demi-pixel qui fait un badge bancal. Poser une sonde
+`inline-block` de hauteur nulle sur la ligne de base du badge donne la position
+de la baseline ; `measureText().actualBoundingBoxAscent` donne la hauteur de
+l'encre. L'écart entre l'espace du haut et celui du bas doit tomber sous 0,1 px
+(mesuré après correctif : 0,02 px sur `BUY`, `SELL` ; 0,12 px sur le compteur à
+1, 2 et 3 chiffres). Le **repli se mesure aussi**, en forçant `text-box: none`
+et son padding sur un badge : 5,09 px / 5,09 px sur Roboto.
+
+⚠️ Cette mesure est celle d'une **police**, d'un **navigateur** et d'un **écran** :
+elle n'a pas été refaite sur un appareil réel (iOS, Android), où la police
+système peut différer.
+
 ---
 
 # Tests

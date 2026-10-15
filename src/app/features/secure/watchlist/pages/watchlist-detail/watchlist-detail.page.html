@@ -8,7 +8,7 @@
       <ion-icon slot="icon-only" name="receipt-outline" />
       @if ((coinSnapshot()?.openOrders || []).length > 0) {
       <ion-badge class="open-orders-badge">
-        {{ (coinSnapshot()?.openOrders || []).length }}
+        <span class="open-orders-badge__text">{{ (coinSnapshot()?.openOrders || []).length }}</span>
       </ion-badge>
       }
     </ion-button>

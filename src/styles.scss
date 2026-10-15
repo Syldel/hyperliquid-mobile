@@ -43,10 +43,34 @@ body {
   }
 }
 
+/* Un badge monoligne centre son texte sur ses **capitales**, pas sur sa ligne.
+
+   Le défaut d'Ionic (`padding: 3px 4px 4px`) centre la boîte de ligne, et dans
+   Roboto l'encre n'y est pas centrée : mesuré le 2026-10-15 sur `BUY` / `SELL`
+   (Trade History), 3,67 px au-dessus du texte pour 6,53 px en dessous — le texte
+   se lit **1,4 px trop haut**, sur un badge de 18 px. Sans erreur, sans rien à
+   signaler, et sur chaque pastille de l'app.
+
+   `text-box` rogne la boîte de ligne sur la hauteur des capitales et la ligne de
+   base : le padding devient alors la seule marge, et elle est symétrique.
+   Un texte à descendantes (« carried in ») les laisse déborder dans le padding
+   du bas, ce qui est la convention typographique. */
 ion-badge {
   font-weight: 500;
   font-size: 0.7rem;
   opacity: 0.75;
+  padding-block: 5px;
+  text-box: trim-both cap alphabetic;
+}
+
+/* Repli pour un WebView sans `text-box` (Chrome < 133, Safari < 18.2) : le même
+   décalage, mesuré sur Roboto — 0,128 em —, reporté dans le padding. Une
+   approximation par police : ailleurs que Roboto elle peut laisser un reste. */
+@supports not (text-box: trim-both cap alphabetic) {
+  ion-badge {
+    padding-top: calc(3px + 0.128em);
+    padding-bottom: calc(4px - 0.128em);
+  }
 }
 
 /* Ionic peint le texte d'une `ion-chip` colorée avec `--ion-color-shade`, la

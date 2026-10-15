@@ -9,14 +9,35 @@
   top: -6px;
   right: -8px;
   font-size: 11px;
-  min-width: 18px;
   --background: var(--ion-color-danger, #eb445a);
   z-index: 8000;
   opacity: 1;
-  border-radius: 10px;
-  display: flex;
+
+  /* Un rond tant qu'il tient sur un chiffre, une pastille horizontale au-delà :
+     hauteur fixe, largeur minimale égale à la hauteur, et un rayon de la moitié
+     de la hauteur — qui reste rond à 18 px et devient un stade à 10 ou 100. */
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  vertical-align: middle;
+  height: 18px;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+
+  /* Le texte est dans un `span` : `text-box` ne s'applique qu'à un conteneur de
+     blocs, pas au texte nu d'un enfant flex. Voir `ion-badge` dans styles.scss. */
+  &__text {
+    display: block;
+    line-height: 1;
+    text-box: trim-both cap alphabetic;
+  }
+}
+
+@supports not (text-box: trim-both cap alphabetic) {
+  .open-orders-badge__text {
+    transform: translateY(0.128em);
+  }
 }
 
 /* ── Stats header ─────────────────────────────────── */
