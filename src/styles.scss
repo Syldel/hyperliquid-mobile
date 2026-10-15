@@ -83,6 +83,33 @@ ion-badge {
   .stalled__why {
     color: var(--ion-color-danger);
   }
+
+  /* Le contour de la pastille de stratégie, côté sombre — voir la règle
+     ci-dessous pour ce qu'il répare. */
+  .strategy-dot {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55);
+  }
+}
+
+/* La pastille qui relie une stratégie à ses marqueurs vit sur des fonds
+   **mi-tons** : `#383838` en sombre, `#e3e4e4` en clair (mesurés). Or la palette
+   de `strategy-color.util.ts` est elle-même de luminance moyenne — c'est ce
+   qu'impose un contraste tenu contre le fond presque noir **et** le fond presque
+   blanc du chart, là où la couleur est le seul identifiant. Mi-ton sur mi-ton :
+   mesuré le 2026-10-15, 7 des 12 couleurs tombaient sous 3:1 sur la puce sombre.
+
+   Le contour résout la contradiction sans rogner la palette : c'est la **forme**
+   de la pastille qui devient perceptible, pendant que sa couleur continue de
+   n'avoir à se distinguer que des onze autres (ΔE2000 ≥ 15, épinglé par un
+   test). Mesuré : le trait tient 4,3:1 sur la puce claire et 4,9:1 sur la
+   sombre.
+
+   Règle globale plutôt que recopiée : `.strategy-dot` est défini à l'identique
+   dans trois feuilles (watchlist-detail, backtest-report-modal,
+   strategy-picker-modal), et `when-dark` n'est pas atteignable depuis une
+   feuille de composant. */
+.strategy-dot {
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
 }
 
 /* `ion-padding` pose 16px en haut du contenu, et une liste `inset` ajoute sa

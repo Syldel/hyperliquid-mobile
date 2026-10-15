@@ -217,8 +217,9 @@ par wallet. Une paire du bot en garde un instantané, donc le bot continue de to
 les stratégies elles-mêmes sont perdues.
 
 C'est **assumé** : tant qu'il n'y a qu'un utilisateur, l'objectif est de valider
-l'architecture et le rule-builder avant de figer une persistance. La réponse prévue est un
-import/export JSON, qui ouvre en prime l'écriture assistée de stratégies. Voir
+l'architecture et le rule-builder avant de figer une persistance. La réponse est un
+import/export JSON **par le presse-papier**, en place depuis le 2026-10-15, qui ouvre en
+prime l'écriture assistée de stratégies (`domain/strategy-transfer.util.ts`). Voir
 [../roadmap.md](../roadmap.md#décidé--la-bibliothèque-reste-locale) avant d'entreprendre
 quoi que ce soit sur ce sujet.
 

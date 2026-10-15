@@ -126,8 +126,9 @@ cohérent** :
    Ce que la phase B laisse ouvert par ailleurs est listé dans
    `nest-trading-bot/docs/known-gaps.md`.
 
-5. **C — import / export JSON**, détaillé plus bas. Au-delà de la sauvegarde, il ouvre
-   l'écriture assistée de stratégies.
+5. **Fait — C, import / export JSON** (2026-10-15), par le **presse-papier**. Le circuit
+   visé est ouvert : une IA écrit du JSON, on le colle dans la bibliothèque, on le
+   backteste dans `watchlist-detail`, on le confie au bot. Détail des décisions plus bas.
 
 ## Plus tard : simuler `latent` et `protective`
 
@@ -243,7 +244,7 @@ qu'on y range.
 
 Ne pas construire de bibliothèque persistante côté serveur sans une décision explicite.
 
-## L'étape suivante : import / export JSON
+## Fait : import / export JSON, par le presse-papier
 
 La réponse immédiate au risque de perte, et elle apporte plus que de la sauvegarde.
 
@@ -276,17 +277,39 @@ Ce qui est produit doit être **validé par le bot avant d'être remis** :
 JSON non validé contredirait l'exigence du projet — c'est exactement le genre
 d'approximation qui se paie plus tard.
 
-Tant que l'import n'existe pas dans l'interface, le chemin praticable est d'écrire le
-document dans `CapacitorStorage.strategy_library`, sous la clé du wallet courant.
+L'import existe depuis le 2026-10-15 : les deux boutons de la barre de la page Strategies
+copient la bibliothèque entière et ouvrent une zone où coller du JSON ; la feuille d'actions
+d'une stratégie porte « Copy as JSON ».
 
-### Questions ouvertes sur ce format
+### Les questions du format, tranchées
 
-À trancher au moment de le construire, pas avant :
+Les trois ont été réglées **par précédent** plutôt qu'au goût, et `strategy-transfer.util.ts`
+porte le raisonnement :
 
-- un fichier = une stratégie, ou un lot ?
-- à l'import, conserver l'`id` du document (au risque d'écraser une stratégie existante)
-  ou en régénérer un ?
-- que faire d'un document dont le `schemaVersion` dépasse celui du build qui l'importe ?
+- **un lot**, parce que `StrategyLibraryService.importMissing` prend déjà un tableau — une
+  stratégie seule est un tableau d'un ;
+- **l'`id` est conservé**, comme le fait délibérément la migration des anciens charts : ça
+  rend l'import idempotent et laisse un sens aux références. Jamais au prix d'un
+  écrasement, voir ci-dessous ;
+- **un `schemaVersion` plus élevé n'est pas rabaissé** : le document continue de se déclarer
+  comme venant d'un build plus récent, ce dont `isFromNewerSchema` se sert pour avertir.
+
+⚠️ Le seul écart avec l'existant est voulu. `importMissing` saute un `id` déjà connu **sans
+un mot** : c'est juste pour une reprise de données, où l'on ne veut pas remplacer ce que
+l'utilisateur a édité, et faux pour un texte étranger — coller trois stratégies et n'en voir
+apparaître que deux en silence est la défaillance que ce dépôt met en premier. Un `id` pris
+donne donc « déjà là » quand le contenu est identique, sinon une **copie sous un nouvel
+`id`**, annoncée. Et chaque entrée refusée est nommée, jamais comptée.
+
+⚠️ **Le presse-papier, et pas un fichier.** `@capacitor/filesystem` et `@capacitor/share`
+sont absents, et aucun dossier `android/` n'existe encore : il n'y aurait rien pour les
+éprouver. Mesuré dans le navigateur le 2026-10-15, **lire** le presse-papier est refusé
+(`NotAllowedError`) ; l'import prend donc son texte dans une zone de saisie, et seule
+l'écriture passe par `navigator.clipboard`.
+
+⚠️ L'import **n'appelle pas** `POST /exchanges/strategies/validate` : la bibliothèque
+accepte déjà les brouillons, et la validation vit là où elle se montre déjà — le builder,
+l'attachement à un chart, l'envoi au bot.
 
 ## Plus tard : une bibliothèque persistante
 
