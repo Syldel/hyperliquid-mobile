@@ -348,10 +348,33 @@ aurait rapporté » :
 
 | Écart                                                            | D'où il vient                                                  |
 | ---------------------------------------------------------------- | -------------------------------------------------------------- |
-| trades au prix de clôture de la bougie du signal                 | le moteur ; un live ne peut pas traiter à une clôture déjà vue |
+| trades au prix de clôture de la bougie du signal                 | le moteur ; le bot, lui, exécute **30 s après** cette clôture  |
 | ni funding, ni slippage                                          | la simulation ; les **frais**, eux, sont comptés depuis 0.27.0 |
 | TP/SL (`protective`), ordres latents, `exitBehavior` non simulés | `/analysis` ne reçoit que les règles                           |
 | taille constante, rendements additionnés                         | le rapport ; ni levier ni réinvestissement                     |
+
+**Les 30 secondes, chiffrées.** C'était la dernière étape ouverte de « rendre la simulation
+digne de confiance », et elle se solde par une limite écrite plutôt que par un moteur
+d'exécution. Mesuré le 2026-10-14 sur **162 signaux réels** d'un croisement HMA (BTC, ETH,
+SOL, 15 min, 3 jours), en comptant l'écart dans le sens qui dessert le trade — un achat
+souffre d'une hausse, une vente d'une baisse : **+1,53 point de base en moyenne** par
+exécution, IC 95 % `[0,22 ; 3,00]`, t = 2,14, et **50,6 %** d'exécutions défavorables. Le
+biais existe, et il est petit devant son bruit (écart-type 9,13) ; la médiane, elle, vaut
++0,39.
+
+⚠️ La mesure porte sur **+60 s** — Hyperliquid ne sert rien sous la minute. Si la dérive
+s'accumule linéairement, le chiffre à +30 s vaut plutôt **0,8 point de base** ; c'est une
+inférence. Projeté sur 302 trades, 4 à 9 points de rendement, contre **27 points** pour les
+frais déjà comptés.
+
+Pourquoi ne pas corriger : il faudrait une seconde série de bougies d'une minute à chaque
+backtest (24 requêtes pour 500 bougies de 4 h, contre la règle qui passe avant tout), pour
+un biais dont le **signe dépend du type de stratégie** — un croisement de moyennes est du
+momentum, le prix continue dans le sens du signal ; un retour à la moyenne irait plausiblement
+dans l'autre sens. Et s'aligner sur l'ouverture de la bougie suivante, comme Freqtrade
+(« Entries happen at open-price ») et TradingView, ne déplacerait les chiffres que de **0,12
+point de base** : sur un marché continu, `open(T)` vaut `close(T−1 min)`, au tick près dans
+33 à 42 % des cas. Méthode complète : `nest-trading-bot/docs/trading/execution-price-gap.md`.
 
 Les deux écarts que corrigeait l'étape B — trades de l'amorçage comptés, long et short
 additionnés alors que le bot ne peut pas tenir les deux — sont traités par le rapport

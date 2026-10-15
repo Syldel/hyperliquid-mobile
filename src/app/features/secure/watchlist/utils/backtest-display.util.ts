@@ -57,6 +57,8 @@ export function backtestLimits(fees: readonly number[]): readonly string[] {
   return [
     'Simplified simulation — not what the bot would have earned.',
     fillLine(fees),
+    'The bot fills ~30 s after that close, not at it — measured around 1 basis point ' +
+      'against the trade on a momentum strategy, and its sign depends on the strategy.',
     "Drawdowns are given twice: on candle closes, and at each candle's worst point — " +
       'the second is the deeper, and even it is a lower bound.',
     holdLine(fees),
@@ -64,6 +66,39 @@ export function backtestLimits(fees: readonly number[]): readonly string[] {
     'Each trade counts at the same size; returns are added, not compounded.',
   ];
 }
+
+/**
+ * ⚠️ **Le délai d'exécution est une limite documentée, pas un défaut en
+ * attente.** Le backtest exécute au close de la bougie du signal, le bot
+ * exécute 30 s après la frontière (`resolveLivePrice`, source
+ * `last-candle-close`). Mesuré le 2026-10-14 sur 162 signaux réels d'une
+ * stratégie de croisement HMA (BTC, ETH, SOL, 15 min, 3 jours), en comptant
+ * l'écart dans le sens qui dessert le trade — un achat souffre d'une hausse,
+ * une vente d'une baisse :
+ *
+ * - **+1,53 point de base en moyenne** par exécution, intervalle de confiance
+ *   à 95 % `[0,22 ; 3,00]`, t = 2,14, et **50,6 %** d'exécutions défavorables.
+ *   Le biais existe donc, mais il est petit devant son propre bruit
+ *   (écart-type 9,13) : c'est la moyenne qui penche, pas la médiane (+0,39) ;
+ * - la mesure porte sur **+60 s**, faute de bougies sous la minute : si la
+ *   dérive s'accumule linéairement, le vrai chiffre à +30 s est de l'ordre de
+ *   **0,8 point de base**. C'est une inférence, pas un relevé ;
+ * - projeté sur 302 trades, de 4 à 9 points de rendement, contre **27 points**
+ *   pour les frais déjà comptés.
+ *
+ * Corriger coûterait une seconde série de bougies d'une minute à chaque
+ * backtest — 24 requêtes pour 500 bougies de 4 h, contre la règle qui passe
+ * avant tout — pour un biais dont le **signe dépend du type de stratégie** :
+ * un croisement de moyennes est du momentum, le prix continue dans le sens du
+ * signal ; un retour à la moyenne irait plausiblement dans l'autre sens.
+ *
+ * ⚠️ Et aligner l'exécution sur l'ouverture de la bougie suivante, comme
+ * Freqtrade (« Entries happen at open-price ») et TradingView (défaut du
+ * simulateur), ne changerait **rien** : sur un marché continu, `open(T)` vaut
+ * `close(T−1 min)` à 0,12 point de base près, identiques au tick près dans 33
+ * à 42 % des cas. Méthode et relevé complets :
+ * `nest-trading-bot/docs/trading/execution-price-gap.md`.
+ */
 
 /**
  * La ligne qui dit **de quoi** les chiffres sont nets, et sous quelle hypothèse.

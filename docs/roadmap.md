@@ -106,9 +106,25 @@ cohérent** :
    premier retour sur investissement de cette étape. Détail dans
    `nest-trading-bot/docs/known-gaps.md`.
 
-   **Reste l'étape 3** : simuler au prix que le live peut réellement obtenir — le backtest
-   exécute au close de la bougie du signal, le live 30 s après. Ce que la phase B laisse
-   ouvert par ailleurs est listé dans `nest-trading-bot/docs/known-gaps.md`.
+   **Fait — étape 3, l'écart mesuré puis documenté** (2026-10-14). Le backtest exécute au
+   close de la bougie du signal, le live 30 s après : restait à savoir ce que ça coûte.
+   Mesuré sur **162 signaux réels** d'un croisement HMA (BTC, ETH, SOL, 15 min, 3 jours),
+   compté dans le sens qui dessert le trade — **+1,53 point de base en moyenne** par
+   exécution, IC 95 % `[0,22 ; 3,00]`, t = 2,14, **50,6 %** d'exécutions défavorables. Soit
+   4 à 9 points de rendement sur 302 trades, contre 27 points pour les frais.
+
+   **La conclusion est de ne pas corriger**, et elle est argumentée plutôt que subie :
+   simuler le prix à +30 s demanderait une seconde série de bougies d'une minute à chaque
+   backtest — 24 requêtes pour 500 bougies de 4 h, contre la règle qui passe avant tout —
+   pour un biais dont le **signe dépend du type de stratégie**, et que la mesure n'établit
+   que sur du momentum. Et s'aligner sur l'ouverture de la bougie suivante, comme Freqtrade
+   et TradingView, ne déplacerait les chiffres que de 0,12 point de base, `open(T)` valant
+   `close(T−1 min)` sur un marché continu. L'écart est donc **écrit sous le bilan**, comme
+   le funding et le slippage. Méthode et relevé :
+   `nest-trading-bot/docs/trading/execution-price-gap.md`.
+
+   Ce que la phase B laisse ouvert par ailleurs est listé dans
+   `nest-trading-bot/docs/known-gaps.md`.
 
 5. **C — import / export JSON**, détaillé plus bas. Au-delà de la sauvegarde, il ouvre
    l'écriture assistée de stratégies.

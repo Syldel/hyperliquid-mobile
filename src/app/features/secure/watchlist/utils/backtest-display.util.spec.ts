@@ -152,11 +152,30 @@ describe('backtestLimits', () => {
     }
   });
 
-  it('keeps the three limits that do not depend on the tier', () => {
-    expect(backtestLimits([TAKER])).toHaveLength(6);
+  it('keeps the four limits that do not depend on the tier', () => {
+    expect(backtestLimits([TAKER])).toHaveLength(7);
     expect(joined([TAKER])).toContain('simplified simulation');
     expect(joined([TAKER])).toContain('take-profit / stop-loss');
     expect(joined([TAKER])).toContain('added, not compounded');
+    expect(joined([TAKER])).toContain('30 s after');
+  });
+
+  it('says the bot fills later than the backtest, and which way it leans', () => {
+    /**
+     * Le backtest exécute au close de la bougie du signal, le bot 30 s après
+     * la frontière. Mesuré le 2026-10-14 sur 162 signaux réels : +1,53 point
+     * de base en moyenne **contre** le trade, IC 95 % [0,22 ; 3,00], t = 2,14.
+     *
+     * Les deux moitiés comptent. Taire l'écart ferait lire le chiffre comme un
+     * prix que le bot peut obtenir ; l'annoncer sans dire que son **signe
+     * dépend de la stratégie** ferait croire à une taxe constante, alors que
+     * la mesure ne porte que sur un croisement de moyennes, donc du momentum.
+     */
+    const line = backtestLimits([TAKER]).find((l) => l.includes('30 s after'));
+
+    expect(line).toBeDefined();
+    expect(line).toMatch(/basis point/i);
+    expect(line).toMatch(/depends on the strategy/i);
   });
 
   it('says the benchmark pays no fee, and what that is worth to it', () => {
