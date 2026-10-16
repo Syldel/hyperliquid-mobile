@@ -462,6 +462,33 @@ mesuré que sur `PURR/USDC`.
 `submit()`, le bandeau). Les décisions sont dans des fonctions pures testées (40 tests, neuf
 mutations tuées) ; le câblage n'a été vérifié que dans le navigateur.
 
+## Le bouton « + » disparaissait avec la liste vide
+
+**✅ Corrigé le 2026-10-16.** Signalé par l'utilisateur : plus de bouton « + » sur
+« Open Orders ».
+
+**Mesuré.** Sans ordre ouvert, `RefreshableLayout` est dans l'état vide (`isEmpty()` vrai) et
+n'affiche **que** le message « No open order found » : son contenu projeté — dont le
+`<ion-fab>` posé par la page — n'était pas rendu. Le bouton n'existait donc pas dans le DOM, et
+sans lui on ne pouvait créer aucun ordre depuis cette page. Rien n'était cassé par un changement
+récent : le commutateur vide / contenu du layout date du 2026-03-27, le bouton a été ajouté dans
+ce contenu le 2026-06-26, et il n'a été visible que tant qu'il y avait au moins un ordre.
+
+**Les traces d'un défaut déjà rencontré.** `strategies` et `watchlist` posent leur bouton
+**à côté** du layout plutôt que dedans : un contournement du même piège, jamais écrit.
+
+**Ce qui est fait.** Le layout a un emplacement `<ng-content select="ion-fab" />` **toujours
+rendu**, hors des blocs vide / contenu. Une page n'a rien à changer : son `<ion-fab>` y est
+projeté tout seul. Mesuré avec la liste vide : le bouton est dans le DOM (56 × 56 px, dans la
+fenêtre), et un clic ouvre bien le formulaire d'ordre. « Bot Strategies », la seule autre page à
+poser son bouton dans le layout, n'est pas touchée (sa donnée n'est pas une liste).
+
+**⚠️ Pas vérifié.** Le cas avec au moins un ordre ouvert — aucun n'existe sur le compte de
+développement, et en placer un n'est pas un test acceptable. Le contenu projeté par défaut n'a
+pas changé, seul l'emplacement du bouton, mais ce n'est pas mesuré. `strategies` et `watchlist`
+n'ont pas été ramenés dans le layout : ils fonctionnent, et le faire serait un changement sans
+gain visible.
+
 ## Précédent
 
 Le dernier risque refermé — une expression malformée faisant rejeter toute la requête

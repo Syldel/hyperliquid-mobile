@@ -55,5 +55,14 @@
     @if (!isLoading() && !isEmpty()) {
       <ng-content />
     }
+
+    <!--
+      Toujours rendu, HORS des blocs ci-dessus : un bouton flottant d'ajout posé dans le
+      layout disparaissait avec le contenu quand la liste était vide — donc, sans aucun
+      élément, plus aucun moyen d'en créer un (« Open Orders » sans ordre ouvert,
+      mesuré le 2026-10-16). `strategies` et `watchlist` l'avaient contourné en le posant
+      À CÔTÉ du layout.
+    -->
+    <ng-content select="ion-fab" />
   </ion-content>
 }
