@@ -193,6 +193,26 @@ ne les lit pas : un changement de type qui passe `typecheck`, `lint` et les test
 casser `ng build` (mesuré le 2026-10-16 sur `order-form`, TS2322 dans le gabarit). C'est
 pourquoi `verify` finit par le build, et pourquoi il ne se remplace pas par les trois premiers.
 
+**Hooks Git (Husky), depuis le 2026-10-16.** Le mobile n'a pas de CI : les hooks sont son
+seul contrôle automatique.
+
+- `pre-commit` → `lint-staged` : `eslint --fix` puis `prettier --write` sur les fichiers
+  **indexés** seulement (`.lintstagedrc.json`), environ une à trois secondes. Une faute
+  qu'ESLint ne sait pas corriger (une forme ancienne d'Angular, une variable inutilisée)
+  bloque le commit ; un format ou un `any` corrigeable est réécrit et réindexé.
+- `pre-push` → `npm run verify` (21 secondes mesurées) : le seul endroit où tournent les
+  tests et le build. Pas en `pre-commit` : 21 s à chaque commit pousse à `--no-verify`.
+- Installés par `prepare` (`husky || true`) au `npm install`. Sur une autre machine (le
+  MacBook), il faut donc un `npm install` ; `--ignore-scripts` les saute, et `npx husky`
+  les installe à la main.
+- `git commit --no-verify` et `git push --no-verify` contournent tout. Éprouvés dans un clone
+  jetable : un fichier mal formaté est corrigé au commit, une forme ancienne d'Angular est
+  refusée, un push avec un test cassé est refusé et rien n'arrive sur le dépôt distant.
+
+⚠️ Ne pas copier ce `prepare` dans `trading-shared-types`, dont le `prepare` construit
+`dist/` pour ses consommateurs : voir son README (`husky || true && npm run build` y saute le
+build sous Windows).
+
 **Un `npm install` d'une dépendance n'atteint pas un `ng serve` déjà lancé.** Angular
 pré-bundle les dépendances au démarrage, et ce cache ne s'invalide pas : le serveur
 continue de servir l'ancienne version pendant que `tsc`, `ng build` et les tests, eux,
