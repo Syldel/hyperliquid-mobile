@@ -142,7 +142,7 @@ types partagés est épinglée par tag git (`github:Syldel/trading-shared-types#
 la faire évoluer est une décision, pas un détail d'implémentation.
 
 **L'Angular moderne est la norme ; l'ancien est du code de compatibilité.** Angular 21,
-zoneless, tout standalone — relevé le 2026-09-29 : 164 `inject()` contre 2 constructeurs,
+zoneless, tout standalone — relevé le 2026-09-29 : 164 `inject()` contre 2 constructeurs (zéro depuis le 2026-10-16),
 188 `@if` et zéro `*ngIf`, aucun `@Input()` dans le code applicatif, zéro `NgModule`.
 Introduire l'une de ces formes anciennes est donc une **régression**, pas un choix de
 style. Quelle primitive prendre selon ce qu'on écrit, et ce qui reste légitimement en

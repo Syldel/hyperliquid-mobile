@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, OnInit, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
   IonButton,
@@ -47,6 +54,9 @@ import { INTERVAL_LABELS, WatchlistItem } from '../../models/watchlist-item.mode
   styleUrls: ['./add-watchlist-modal.component.scss'],
 })
 export class AddWatchlistModalComponent implements OnInit {
+  private readonly fb = inject(FormBuilder);
+  private readonly modalCtrl = inject(ModalController);
+
   form!: FormGroup;
 
   readonly intervals = CANDLE_INTERVALS;
@@ -61,10 +71,7 @@ export class AddWatchlistModalComponent implements OnInit {
   readonly headerTitle = computed(() => (this.isEditMode() ? 'Edit pair' : 'Add to watchlist'));
   readonly submitButtonLabel = computed(() => (this.isEditMode() ? 'Save' : 'Add'));
 
-  constructor(
-    private fb: FormBuilder,
-    private modalCtrl: ModalController,
-  ) {
+  constructor() {
     addIcons({ chevronForwardOutline });
   }
 

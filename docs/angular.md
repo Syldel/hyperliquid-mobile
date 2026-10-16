@@ -14,7 +14,7 @@ Ce n'est pas une intention, c'est l'état du code. Compté le 2026-09-29 sur `sr
 | `@angular/core` | **21.2.24**, `zone.js` absent même en transitif             |                                               |
 | Composants      | 51, tous standalone                                         | **0 `NgModule`**                              |
 | Gabarits        | 188 `@if`, 80 `@for`, 6 `@let`, 4 `@empty`                  | **0 `*ngIf`, `*ngFor`, `ngClass`, `ngStyle`** |
-| Injection       | 163 `inject()` dans 55 fichiers                             | 5 fichiers à `constructor(private …)`         |
+| Injection       | 163 `inject()` dans 55 fichiers                             | **0 `constructor(private …)`**                |
 | Entrées         | 38 `input()`, dont 18 `input.required()`                    | **0 `@Input()`**                              |
 | Sorties         | 13 `output()` dans 10 fichiers                              | **0 `@Output()`, 0 `EventEmitter`**           |
 | Signaux         | 185 `signal`, 154 `computed`, 20 `effect`, 3 `linkedSignal` |                                               |
@@ -30,9 +30,10 @@ constructeur serait une **régression**, pas un choix de style.
 et donc par `npm run verify`) : `@Input`, `@Output`, `@ViewChild(ren)`, `@ContentChild(ren)`,
 `@NgModule` et `EventEmitter` par `no-restricted-syntax`, `*ngIf` / `*ngFor` par
 `template/prefer-control-flow`, l'injection par constructeur par `prefer-inject`. Vérifié sur
-des fichiers-sondes (chaque forme ancienne est signalée), puis retirés. Les deux seules
-exceptions sont **nommées dans la config** : `shared/testing/ionic-stubs.ts` pour les
-décorateurs, et les cinq fichiers à constructeur ci-dessous pour `prefer-inject`.
+des fichiers-sondes (chaque forme ancienne est signalée), puis retirés. La seule exception
+est **nommée dans la config** : `shared/testing/ionic-stubs.ts`, pour les décorateurs.
+`prefer-inject` n'en a plus aucune depuis le 2026-10-16 : les cinq fichiers qui avaient
+encore un `constructor(private …)` ont été convertis (voir plus bas).
 
 ⚠️ Non activé exprès : `@angular-eslint/prefer-signals` (214 occurrences). Il n'interdit rien
 d'ancien, il exige `readonly` sur chaque signal et chaque sortie — du style, pas une protection.
@@ -114,12 +115,15 @@ relevé mémoire.
 
 À traiter quand on passe à côté, pas comme un chantier :
 
-- **`constructor(private …)` dans cinq fichiers** : `config.service.ts`, `theme.service.ts`,
-  `login.page.ts`, `url-config.page.ts` et `add-watchlist-modal.component.ts`. Ce tableau
-  disait « deux » jusqu'au 2026-10-16 : c'est ESLint qui a compté les trois autres. Ils sont
-  exemptés de `prefer-inject` **par nom** dans `eslint.config.mjs`, et **seuls** ceux-là :
-  un sixième constructeur échoue. On les convertit avec un test d'abord (voir plus bas) ;
-  `config.service.ts` en a un depuis le 2026-10-15, `theme.service.ts` non ;
+- ~~`constructor(private …)` dans cinq fichiers~~ — **fait le 2026-10-16** : `config.service`,
+  `theme.service`, `login.page`, `url-config.page` et `add-watchlist-modal.component` sont
+  passés à `inject()`. Ce tableau disait « deux » : c'est ESLint qui a compté les trois
+  autres. Pour les deux services, un spec a été écrit **avant** (`theme.service.spec.ts`,
+  13 tests, dont ceux écrits sur l'ancienne version, rejoués à l'identique après ; `config.service.spec.ts` existait). Pour les trois
+  composants, qui n'ont pas de spec, la conversion était mécanique (paramètre → champ
+  `inject()`, corps du constructeur inchangé) et a été contrôlée dans le navigateur : la
+  page de connexion liste ses wallets, la modale d'URL se remplit depuis `ConfigService`,
+  la modale d'ajout crée son formulaire. ⚠️ Pas de test automatisé pour ces trois-là ;
 - **`standalone: true` écrit 52 fois** alors que c'est le défaut depuis Angular 19. Bruit
   pur, à retirer au fil de l'eau ;
 - **`ChangeDetectionStrategy.OnPush` sur 18 composants applicatifs sur 51.** En zoneless

@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { AuthService } from '@auth/auth.service';
@@ -29,16 +29,16 @@ import { WalletItemComponent } from './wallet-item/wallet-item.component';
   ],
 })
 export class LoginPage extends BasePage {
+  private readonly auth = inject(AuthService);
+  private readonly config = inject(ConfigService);
+  private readonly router = inject(Router);
+  private readonly modalCtrl = inject(ModalController);
+
   readonly wallets = computed(() => {
     return this.auth.userWallets()?.map((u) => ({ name: u.username, address: u.wallet }));
   });
 
-  constructor(
-    private readonly auth: AuthService,
-    private readonly config: ConfigService,
-    private readonly router: Router,
-    private readonly modalCtrl: ModalController,
-  ) {
+  constructor() {
     super();
     addIcons({ arrowBack, add, globeOutline });
   }

@@ -1,4 +1,4 @@
-import { Component, input, OnInit, output } from '@angular/core';
+import { Component, inject, input, OnInit, output } from '@angular/core';
 import {
   FormBuilder,
   FormControl,
@@ -46,16 +46,16 @@ type FormConfig = {
   providers: [ModalController],
 })
 export class UrlConfigPage implements OnInit {
+  private readonly fb = inject(FormBuilder);
+  private readonly modalCtrl = inject(ModalController);
+
   initialConfig = input.required<AppConfig>();
 
   configSaved = output<AppConfig>();
 
   configForm: FormGroup<FormConfig>;
 
-  constructor(
-    private readonly fb: FormBuilder,
-    private readonly modalCtrl: ModalController,
-  ) {
+  constructor() {
     this.configForm = this.fb.nonNullable.group<FormConfig>({
       userServiceUrl: this.fb.nonNullable.control('', [
         Validators.required,

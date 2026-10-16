@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { AppConfig } from '@models/app-config.interface';
 import { StorageService } from '@storage/storage.service';
 import { environment } from 'environments/environment';
@@ -6,12 +6,11 @@ import { BehaviorSubject, Observable } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class ConfigService {
+  private readonly storage = inject(StorageService);
   private readonly STORAGE_KEY = 'app_hl_config';
   private readonly _config$ = new BehaviorSubject<AppConfig>({
     ...environment.defaultConfig,
   });
-
-  constructor(private readonly storage: StorageService) {}
 
   get config$(): Observable<AppConfig> {
     return this._config$.asObservable();

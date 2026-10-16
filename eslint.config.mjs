@@ -100,19 +100,8 @@ export default tseslint.config(
 
   // ── Exceptions, nommées ─────────────────────────────────────────────────────
 
-  {
-    // `docs/angular.md`, « Ce qui est de l'ancien et mériterait de partir » :
-    // des constructeurs `(private …)` qu'on ne convertit pas sans test d'abord.
-    // La règle reste en erreur partout ailleurs : le NOUVEAU constructeur échoue.
-    files: [
-      'src/app/core/services/config.service.ts',
-      'src/app/core/services/theme.service.ts',
-      'src/app/features/auth/login/login.page.ts',
-      'src/app/features/auth/url-config/url-config.page.ts',
-      'src/app/features/secure/watchlist/components/add-watchlist-modal/add-watchlist-modal.component.ts',
-    ],
-    rules: { '@angular-eslint/prefer-inject': 'off' },
-  },
+  // Aucune exception à `prefer-inject` : les cinq fichiers à constructeur
+  // `(private …)` ont été convertis le 2026-10-16, et la règle échoue partout.
 
   {
     // Les faux composants imitent l'API d'Ionic, qui est décoratrice : les

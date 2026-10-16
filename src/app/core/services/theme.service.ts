@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { inject, Injectable, signal } from '@angular/core';
 import { StorageService } from '@storage/storage.service';
 
 export type Theme = 'light' | 'dark' | 'auto';
@@ -7,6 +7,7 @@ export type Theme = 'light' | 'dark' | 'auto';
   providedIn: 'root',
 })
 export class ThemeService {
+  private readonly storage = inject(StorageService);
   private readonly THEME_STORAGE_KEY = 'app-theme-preference';
 
   private _isDarkMode = signal<boolean>(false);
@@ -15,11 +16,7 @@ export class ThemeService {
   isDarkMode = this._isDarkMode.asReadonly();
   currentTheme = this._currentTheme.asReadonly();
 
-  private prefersDarkQuery!: MediaQueryList;
-
-  constructor(private storage: StorageService) {
-    this.prefersDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
-  }
+  private readonly prefersDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
   /**
    * Initialise le thème au démarrage de l'app
