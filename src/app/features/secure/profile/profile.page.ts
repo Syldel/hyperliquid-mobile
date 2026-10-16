@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, OnInit } from '@angular/core';
 import {
   IonButton,
   IonContent,
@@ -33,7 +33,7 @@ import { TokenExpiryComponent } from './components/token-expiry.component';
   ],
   templateUrl: './profile.page.html',
 })
-export class ProfilePage extends MenuBasePage {
+export class ProfilePage extends MenuBasePage implements OnInit {
   private readonly modalCtrl = inject(ModalController);
   private readonly lifecycle = inject(AppLifecycleService);
 

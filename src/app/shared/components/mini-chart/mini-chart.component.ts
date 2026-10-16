@@ -20,6 +20,7 @@ import {
   IChartApi,
   ISeriesApi,
   LineWidth,
+  UTCTimestamp,
   createChart,
 } from 'lightweight-charts';
 import { firstValueFrom } from 'rxjs';
@@ -154,7 +155,7 @@ export class MiniChartComponent implements OnDestroy {
   private renderCandles(candles: CandleSnapshot[]): void {
     this.areaSeries?.setData(
       candles.map((c) => ({
-        time: Math.floor(c.t / 1000) as any,
+        time: Math.floor(c.t / 1000) as UTCTimestamp,
         value: parseFloat(c.c),
       })),
     );

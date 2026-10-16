@@ -291,8 +291,22 @@ export class OrderFormComponent implements OnInit {
 
     effect(() => {
       const triggerPx = this.triggerPx();
-      const isMarket = this.isMarket();
-      const isBuy = this.isBuy();
+      // Lus pour être SUIVIS, pas pour leur valeur : le bloc `untracked` ci-dessous
+      // ne suit rien, donc ces deux lectures sont tout ce qui relance l'effet
+      // quand le type d'ordre ou le sens change.
+      //
+      // ⚠️ Mesuré dans le navigateur le 2026-10-16, en les retirant puis en
+      // rejouant le même scénario :
+      // - `isMarket` : basculer Market/Limit RÉÉCRIT le prix limite depuis le prix
+      //   de déclenchement, **même si l'utilisateur l'avait saisi à la main**
+      //   (12345 devenait 49950 ; sans la lecture, il restait 12345). C'est le
+      //   comportement d'avant la règle de lint, conservé tel quel. Personne n'a
+      //   décidé que c'était voulu — à trancher, pas à supprimer en passant ;
+      // - `isBuy` : aucun effet observable. L'effet ci-dessus recalcule `triggerPx`
+      //   depuis le prix limite quand le sens change, ce qui relance celui-ci de
+      //   toute façon. Gardé par prudence, pas par nécessité démontrée.
+      void this.isMarket();
+      void this.isBuy();
       untracked(() => {
         if (this.orderKind() !== 'trigger') return;
         const trigger = parseFloat(triggerPx);
@@ -338,6 +352,16 @@ export class OrderFormComponent implements OnInit {
 
   private buildFetchFn() {
     const selectedCoin = this.selectedCoin();
+    // Un objet non nul, exprès : `RefreshableLayout` lit `null` comme « vide ».
+    //
+    // ⚠️ Le `any` n'est pas gratuit : ce faux objet est émis tel quel par
+    // `dataLoaded` jusqu'à `onDataLoaded(data: HlActiveAssetData | null)`, qui lit
+    // `data.markPx` et `data.leverage` — absents ici, donc `currentPrice` reçoit
+    // `NaN` et `leverage` `undefined`. Le typer honnêtement fait échouer le build
+    // du gabarit (TS2322, mesuré le 2026-10-16), et c'est ce qui l'a révélé. À
+    // traiter : un marqueur que `onDataLoaded` reconnaît, plutôt qu'un faux
+    // `HlActiveAssetData`.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (!selectedCoin) return () => of({ fake: true } as any);
 
     return () => {

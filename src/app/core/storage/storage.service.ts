@@ -21,7 +21,7 @@ export class StorageService {
    * chaîne `"undefined"` — une écriture réussie d'une donnée qui n'existe pas.
    * Pour effacer, `null` ou `remove`.
    */
-  async set<T = any>(key: string, value: T): Promise<void> {
+  async set<T = unknown>(key: string, value: T): Promise<void> {
     const encoded = JSON.stringify(value);
     if (encoded === undefined) {
       throw new TypeError(
@@ -32,7 +32,7 @@ export class StorageService {
   }
 
   /** Récupère une valeur, si c'était un objet, on parse automatiquement */
-  async get<T = any>(key: string): Promise<T | null> {
+  async get<T = unknown>(key: string): Promise<T | null> {
     const { value } = await Preferences.get({ key });
     if (!value) return null;
 

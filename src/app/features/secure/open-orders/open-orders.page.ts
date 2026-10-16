@@ -1,5 +1,14 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
+import {
+  Component,
+  computed,
+  DestroyRef,
+  effect,
+  inject,
+  OnInit,
+  signal,
+  untracked,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import {
@@ -52,7 +61,7 @@ import { OrderFormComponent } from './open-form/order-form.component';
   templateUrl: './open-orders.page.html',
   styleUrls: ['./open-orders.page.scss'],
 })
-export class OpenOrdersPage extends MenuBasePage {
+export class OpenOrdersPage extends MenuBasePage implements OnInit {
   private readonly hlInfo = inject(HyperliquidInfoService);
   private readonly lifecycle = inject(AppLifecycleService);
   private readonly route = inject(ActivatedRoute);

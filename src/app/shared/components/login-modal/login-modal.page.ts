@@ -119,12 +119,13 @@ export class LoginModalPage {
       } catch (err) {
         let message = 'Login failed. Please try again.';
 
-        if ((err as any)?.status === 0) {
+        const status = (err as { status?: unknown } | null)?.status;
+        if (status === 0) {
           message = 'Network error or CORS policy problem.';
         }
 
         const toast = await this.toastCtrl.create({
-          message: message + ' (status: ' + (err as any)?.status + ')',
+          message: message + ' (status: ' + String(status) + ')',
           duration: 4000,
           color: 'danger',
           position: 'top',

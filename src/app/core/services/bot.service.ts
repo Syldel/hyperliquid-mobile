@@ -41,7 +41,7 @@ export class BotService {
           this.metadataCachedAt = Date.now();
         }),
         shareReplay(1),
-        tap({ finalize: () => (this.inFlight$ = null) } as any),
+        tap({ finalize: () => (this.inFlight$ = null) }),
       );
 
     return this.inFlight$;

@@ -80,9 +80,8 @@ export class AddWatchlistModalComponent implements OnInit {
   async openMarketPicker(): Promise<void> {
     if (this.isEditMode()) return;
 
-    const { MarketPickerModalComponent } = await import(
-      '@shared/components/market-picker-modal/market-picker-modal.component' as any
-    );
+    const { MarketPickerModalComponent } =
+      await import('@shared/components/market-picker-modal/market-picker-modal.component');
 
     const modal = await this.modalCtrl.create({
       component: MarketPickerModalComponent,

@@ -7,6 +7,7 @@ import {
   untracked,
 } from '@angular/core';
 import { Router } from '@angular/router';
+import { CandleInterval } from '@syldel/hl-shared-types';
 import {
   IonFab,
   IonFabButton,
@@ -63,7 +64,7 @@ export class WatchlistPage {
     });
     await modal.present();
 
-    const { data, role } = await modal.onDidDismiss<{ coin: string; interval: any }>();
+    const { data, role } = await modal.onDidDismiss<{ coin: string; interval: CandleInterval }>();
     if (role !== 'confirm' || !data) return;
 
     // Le succès s'annonçait avant d'être acquis : sans wallet, l'écriture

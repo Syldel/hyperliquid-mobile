@@ -429,6 +429,9 @@ export class TradingPairModalComponent implements OnInit {
       Validators.required,
       this.pairNameExistsValidator(),
     ]),
+    // `null as any` : un contrôle non nullable sans valeur initiale valide. Le
+    // validateur `required` refuse `null` tant que rien n'est choisi.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     strategy: this.fb.nonNullable.control<StrategyMeta>(null as any, Validators.required),
     exitBehavior: this.fb.nonNullable.control<ExitBehavior>('STRATEGY_SIGNAL', Validators.required),
     ratio: this.fb.nonNullable.control(0, [
@@ -436,6 +439,7 @@ export class TradingPairModalComponent implements OnInit {
       Validators.min(0),
       Validators.max(100),
     ]),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     interval: this.fb.nonNullable.control<ChartInterval>(null as any, Validators.required),
     enabled: this.fb.nonNullable.control(true),
   });
@@ -615,7 +619,7 @@ export class TradingPairModalComponent implements OnInit {
    */
   private buildStrategyParamsForm(
     params: StrategyParameter[],
-    existingValues?: Record<string, any>,
+    existingValues?: Record<string, unknown>,
   ): void {
     const scalars = params.filter((param) => param.type !== 'rule-builder');
     const controls: Record<string, FormControl> = {};

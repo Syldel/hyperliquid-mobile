@@ -69,6 +69,7 @@ import {
   IPriceLine,
   ISeriesApi,
   Time,
+  UTCTimestamp,
   createChart,
 } from 'lightweight-charts';
 import { firstValueFrom } from 'rxjs';
@@ -930,7 +931,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   private renderCandles(candles: CandleSnapshot[]): void {
     this.candleSeries?.setData(
       candles.map((c) => ({
-        time: Math.floor(c.t / 1000) as any,
+        time: Math.floor(c.t / 1000) as UTCTimestamp,
         open: parseFloat(c.o),
         high: parseFloat(c.h),
         low: parseFloat(c.l),
@@ -940,7 +941,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
 
     this.volumeSeries?.setData(
       candles.map((c) => ({
-        time: Math.floor(c.t / 1000) as any,
+        time: Math.floor(c.t / 1000) as UTCTimestamp,
         value: parseFloat(c.v),
         color: parseFloat(c.c) >= parseFloat(c.o) ? 'rgba(45,211,111,0.4)' : 'rgba(235,68,90,0.4)',
       })),
@@ -1196,7 +1197,6 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     const isTrigger = chain[0].order.isTrigger;
     const orderType = chain[0].order.orderType.toLowerCase();
     const isTP = orderType.includes('take profit');
-    const isSL = orderType.includes('stop');
 
     let color: string;
     if (isTrigger) {
@@ -1240,7 +1240,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
         ? ((Math.round(nextTerminal.statusTimestamp / 1000 / intervalSec) *
             intervalSec) as unknown as Time)
         : visibleRange.to;
-      let xEnd = this.chart!.timeScale().timeToCoordinate(snappedEnd);
+      const xEnd = this.chart!.timeScale().timeToCoordinate(snappedEnd);
       if (xEnd === null) continue;
 
       // ── Segment horizontal ────────────────────────────────────────────────

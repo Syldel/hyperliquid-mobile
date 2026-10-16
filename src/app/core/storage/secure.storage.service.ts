@@ -71,7 +71,7 @@ export class SecureStorageService {
    * reformule d'une version du plugin à l'autre, et un message inconnu serait
    * alors pris pour une absence — le défaut qu'on corrige, en silence.
    */
-  async get<T = any>(key: string): Promise<T | null> {
+  async get<T = unknown>(key: string): Promise<T | null> {
     let rawValue: string | undefined;
     try {
       const { value: keys } = await SecureStoragePlugin.keys();
@@ -94,7 +94,7 @@ export class SecureStorageService {
     }
   }
 
-  async set(key: string, data: any): Promise<boolean> {
+  async set(key: string, data: unknown): Promise<boolean> {
     // Hors du `try` : un `undefined` est une erreur de programmation, pas une
     // panne du trousseau, et ne doit pas se faire passer pour un `false`.
     const value = this._stringifyContent(key, data);

@@ -6,6 +6,7 @@ import {
   effect,
   inject,
   input,
+  OnInit,
   output,
   signal,
   TemplateRef,
@@ -57,7 +58,7 @@ export interface PageHeaderParams {
   templateUrl: './refreshable-layout.component.html',
   styleUrls: ['./refreshable-layout.component.scss'],
 })
-export class RefreshableLayoutComponent<T> {
+export class RefreshableLayoutComponent<T> implements OnInit {
   private readonly toastController = inject(ToastController);
   private readonly modalCtrl = inject(ModalController);
   private readonly authService = inject(AuthService);
@@ -78,7 +79,7 @@ export class RefreshableLayoutComponent<T> {
 
   readonly isLoggedIn = computed(() => this.authService.isLoggedIn());
 
-  readonly endButtonsTpl = contentChild<TemplateRef<any>>('endButtons');
+  readonly endButtonsTpl = contentChild<TemplateRef<unknown>>('endButtons');
 
   constructor() {
     effect(() => {
@@ -104,16 +105,27 @@ export class RefreshableLayoutComponent<T> {
   }
 
   private async load(isRefresh = false) {
-    isRefresh ? this.isRefreshing.set(true) : this.isLoading.set(true);
+    if (isRefresh) {
+      this.isRefreshing.set(true);
+    } else {
+      this.isLoading.set(true);
+    }
 
     try {
       const result = await this.toPromise(this.fetchFn()());
       this.data.set(result);
       this.dataLoaded.emit(result);
     } catch (e) {
+      // Le toast dit « ça a échoué », jamais pourquoi : sans cette ligne la cause
+      // (réseau, 401, réponse illisible) n'existait nulle part.
+      console.error('[RefreshableLayout] load failed', e);
       await this.showErrorToast();
     } finally {
-      isRefresh ? this.isRefreshing.set(false) : this.isLoading.set(false);
+      if (isRefresh) {
+        this.isRefreshing.set(false);
+      } else {
+        this.isLoading.set(false);
+      }
     }
   }
 

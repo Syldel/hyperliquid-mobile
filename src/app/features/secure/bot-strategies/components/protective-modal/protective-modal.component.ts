@@ -63,7 +63,6 @@ import {
   FollowMode,
   PriceAnchor,
   ProtectionAdvice,
-  ProtectiveOrderEntry,
   TpslType,
 } from '@syldel/trading-shared-types';
 import { BotService } from '@services/bot.service';
