@@ -11,14 +11,17 @@ import { ThemeService } from './theme.service';
  * sans test : il a été écrit sur la version à constructeur, puis rejoué à
  * l'identique après.
  *
- * ⚠️ Deux défauts relevés en l'écrivant, **non figés** ici (un test qui les
- * épinglerait fixerait le défaut avec) :
+ * Deux défauts relevés en l'écrivant, **corrigés le 2026-10-16** et épinglés par
+ * `the system preference listener` ci-dessous :
  *
- * - quand l'app démarre sur un thème **choisi** (`dark`) puis que l'utilisateur
- *   repasse à `auto`, aucun écouteur de préférence système n'est posé : l'écran
- *   ne suit plus le système avant le prochain démarrage ;
- * - `initialize()` pose un nouvel écouteur à chaque appel : deux appels, deux
+ * - quand l'app démarrait sur un thème **choisi** (`dark`) puis que l'utilisateur
+ *   repassait à `auto`, aucun écouteur de préférence système n'était posé : l'écran
+ *   ne suivait plus le système avant le prochain démarrage ;
+ * - `initialize()` posait un nouvel écouteur à chaque appel : deux appels, deux
  *   écouteurs.
+ *
+ * L'écouteur est désormais posé **une fois**, à la construction, et c'est lui qui
+ * vérifie s'il doit agir (`auto` seulement, et seulement après `initialize`).
  */
 
 /** Une `MediaQueryList` pilotable : `matches` se change, `change` s'émet à la main. */
@@ -159,6 +162,55 @@ describe('ThemeService', () => {
       expect(service.currentTheme()).toBe('light');
       expect(service.isDarkMode()).toBe(false);
       expect(html.classList.contains('light-theme')).toBe(true);
+    });
+  });
+
+  describe('the system preference listener', () => {
+    // Avant : chaque `initialize()` en `auto` en posait un de plus.
+    it('is installed once, however many times initialize runs', async () => {
+      create();
+
+      await service.initialize();
+      await service.initialize();
+      await service.initialize();
+
+      expect(query.listeners).toHaveLength(1);
+    });
+
+    // Avant : démarrer sur un thème choisi ne posait AUCUN écouteur, donc repasser à
+    // `auto` ensuite ne suivait plus le système avant le prochain démarrage.
+    it('follows the system after starting on a chosen theme and going back to auto', async () => {
+      store.set('app-theme-preference', 'dark');
+      query.matches = false;
+      create();
+      await service.initialize();
+      await service.setTheme('auto');
+      expect(service.isDarkMode()).toBe(false);
+
+      query.emit(true);
+
+      expect(service.isDarkMode()).toBe(true);
+      expect(html.style.colorScheme).toBe('dark');
+    });
+
+    it('does not act before initialize has loaded the saved choice', () => {
+      create();
+
+      query.emit(true);
+
+      expect(service.isDarkMode()).toBe(false);
+      expect(html.style.colorScheme).toBe('');
+    });
+
+    it('stays silent for a chosen theme even though it is installed', async () => {
+      store.set('app-theme-preference', 'light');
+      create();
+      await service.initialize();
+      expect(query.listeners).toHaveLength(1);
+
+      query.emit(true);
+
+      expect(service.isDarkMode()).toBe(false);
     });
   });
 

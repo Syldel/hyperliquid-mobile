@@ -18,12 +18,33 @@ export class ThemeService {
 
   private readonly prefersDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
+  /** Vrai une fois le thème sauvegardé lu : avant, un changement système n'est pas le nôtre à traiter. */
+  private initialized = false;
+
+  /**
+   * L'écouteur de préférence système est posé **une seule fois, ici**, et c'est lui qui
+   * décide s'il doit agir.
+   *
+   * Il était posé par `initialize()`, et seulement sur le chemin `auto` : démarrer sur un
+   * thème choisi (`dark`) puis repasser à `auto` ne posait donc jamais d'écouteur, et
+   * l'écran ne suivait plus le système avant le prochain démarrage ; deux appels à
+   * `initialize()` en posaient deux. Corrigé le 2026-10-16 (voir le spec).
+   */
+  constructor() {
+    this.prefersDarkQuery.addEventListener('change', (event) => {
+      if (this.initialized && this._currentTheme() === 'auto') {
+        this.applyTheme(event.matches);
+      }
+    });
+  }
+
   /**
    * Initialise le thème au démarrage de l'app
    * À appeler dans app.component.ts
    */
   async initialize(): Promise<void> {
     const savedTheme = await this.storage.get<Theme>(this.THEME_STORAGE_KEY);
+    this.initialized = true;
 
     if (savedTheme && savedTheme !== 'auto') {
       this._currentTheme.set(savedTheme);
@@ -39,12 +60,6 @@ export class ThemeService {
    */
   private initializeFromSystemPreference(): void {
     this.applyTheme(this.prefersDarkQuery.matches);
-
-    this.prefersDarkQuery.addEventListener('change', (e) => {
-      if (this._currentTheme() === 'auto') {
-        this.applyTheme(e.matches);
-      }
-    });
   }
 
   /**
