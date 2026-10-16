@@ -14,7 +14,7 @@ Ce n'est pas une intention, c'est l'état du code. Compté le 2026-09-29 sur `sr
 | `@angular/core` | **21.2.24**, `zone.js` absent même en transitif             |                                               |
 | Composants      | 51, tous standalone                                         | **0 `NgModule`**                              |
 | Gabarits        | 188 `@if`, 80 `@for`, 6 `@let`, 4 `@empty`                  | **0 `*ngIf`, `*ngFor`, `ngClass`, `ngStyle`** |
-| Injection       | 163 `inject()` dans 55 fichiers                             | 2 `constructor(private …)`                    |
+| Injection       | 163 `inject()` dans 55 fichiers                             | 5 fichiers à `constructor(private …)`         |
 | Entrées         | 38 `input()`, dont 18 `input.required()`                    | **0 `@Input()`**                              |
 | Sorties         | 13 `output()` dans 10 fichiers                              | **0 `@Output()`, 0 `EventEmitter`**           |
 | Signaux         | 185 `signal`, 154 `computed`, 20 `effect`, 3 `linkedSignal` |                                               |
@@ -25,6 +25,17 @@ dans `shared/testing/ionic-stubs.ts`, et c'est voulu (voir plus bas).
 
 Autrement dit : introduire un `@Input()`, un `*ngIf`, un `NgModule` ou une injection par
 constructeur serait une **régression**, pas un choix de style.
+
+**Depuis le 2026-10-16, ESLint le refuse** (`eslint.config.mjs`, lancé par `npm run lint`
+et donc par `npm run verify`) : `@Input`, `@Output`, `@ViewChild(ren)`, `@ContentChild(ren)`,
+`@NgModule` et `EventEmitter` par `no-restricted-syntax`, `*ngIf` / `*ngFor` par
+`template/prefer-control-flow`, l'injection par constructeur par `prefer-inject`. Vérifié sur
+des fichiers-sondes (chaque forme ancienne est signalée), puis retirés. Les deux seules
+exceptions sont **nommées dans la config** : `shared/testing/ionic-stubs.ts` pour les
+décorateurs, et les cinq fichiers à constructeur ci-dessous pour `prefer-inject`.
+
+⚠️ Non activé exprès : `@angular-eslint/prefer-signals` (214 occurrences). Il n'interdit rien
+d'ancien, il exige `readonly` sur chaque signal et chaque sortie — du style, pas une protection.
 
 ## Avant d'écrire, la question à se poser
 
@@ -103,8 +114,12 @@ relevé mémoire.
 
 À traiter quand on passe à côté, pas comme un chantier :
 
-- **`constructor(private …)` dans deux services** : `config.service.ts` et
-  `theme.service.ts` ;
+- **`constructor(private …)` dans cinq fichiers** : `config.service.ts`, `theme.service.ts`,
+  `login.page.ts`, `url-config.page.ts` et `add-watchlist-modal.component.ts`. Ce tableau
+  disait « deux » jusqu'au 2026-10-16 : c'est ESLint qui a compté les trois autres. Ils sont
+  exemptés de `prefer-inject` **par nom** dans `eslint.config.mjs`, et **seuls** ceux-là :
+  un sixième constructeur échoue. On les convertit avec un test d'abord (voir plus bas) ;
+  `config.service.ts` en a un depuis le 2026-10-15, `theme.service.ts` non ;
 - **`standalone: true` écrit 52 fois** alors que c'est le défaut depuis Angular 19. Bruit
   pur, à retirer au fil de l'eau ;
 - **`ChangeDetectionStrategy.OnPush` sur 18 composants applicatifs sur 51.** En zoneless

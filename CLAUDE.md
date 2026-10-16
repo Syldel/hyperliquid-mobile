@@ -179,12 +179,19 @@ npm test                  # vitest via @angular/build:unit-test
 npx ng test --watch=false # une seule passe
 npx ng build              # build de production
 npx tsc -p tsconfig.app.json --noEmit
+npm run lint              # ESLint + angular-eslint sur src/ (ts et html), sans rien écrire
+npm run lint:fix          # idem, avec --fix
 npm run format:check      # Prettier sur src/ et docs/, sans rien écrire
-npm run verify            # typecheck, format, tests, build — s'arrête au premier échec
+npm run verify            # typecheck, lint, format, tests, build — s'arrête au premier échec
 ```
 
 `verify` est le contrôle à lancer avant de proposer un commit. Les avertissements de budget de
 style au build (`protective-modal`, `watchlist-detail`) ne le font pas échouer.
+
+**Le build est le seul contrôle qui type-vérifie les gabarits.** `tsc -p tsconfig.app.json`
+ne les lit pas : un changement de type qui passe `typecheck`, `lint` et les tests peut encore
+casser `ng build` (mesuré le 2026-10-16 sur `order-form`, TS2322 dans le gabarit). C'est
+pourquoi `verify` finit par le build, et pourquoi il ne se remplace pas par les trois premiers.
 
 **Un `npm install` d'une dépendance n'atteint pas un `ng serve` déjà lancé.** Angular
 pré-bundle les dépendances au démarrage, et ce cache ne s'invalide pas : le serveur

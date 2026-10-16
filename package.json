@@ -19,8 +19,10 @@
     "format": "prettier --write \"src/**/*.{ts,html,scss,json,css}\" \"docs/**/*.md\"",
     "format:check": "prettier --check \"src/**/*.{ts,html,scss,json,css}\" \"docs/**/*.md\"",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "lint": "eslint \"src/**/*.{ts,html}\"",
+    "lint:fix": "eslint \"src/**/*.{ts,html}\" --fix",
     "test:ci": "ng test --watch=false",
-    "verify": "npm run typecheck && npm run format:check && npm run test:ci && npm run build",
+    "verify": "npm run typecheck && npm run lint && npm run format:check && npm run test:ci && npm run build",
     "postinstall": "npx capacitor-assets generate --android"
   },
   "private": true,
@@ -51,10 +53,15 @@
     "@angular/compiler-cli": "^21.2.24",
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.3.0",
+    "@eslint/js": "^9.39.5",
     "@types/node": "^25.5.0",
+    "angular-eslint": "^21.4.0",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
     "jsdom": "^28.1.0",
     "prettier": "^3.8.1",
     "typescript": "~5.9.3",
+    "typescript-eslint": "^8.71.2",
     "vitest": "^4.1.2"
   }
 }
