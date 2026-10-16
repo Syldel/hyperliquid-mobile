@@ -61,6 +61,7 @@ import {
   ProtectiveOrderFormComponent,
   ProtectiveOrderResult,
 } from '../protective-order-form/protective-order-form.component';
+import { NO_ASSET_SELECTED, readActiveAsset, type NoAssetSelected } from './active-asset.util';
 
 export type OrderFormMode = 'place' | 'modify';
 
@@ -350,19 +351,18 @@ export class OrderFormComponent implements OnInit {
     }
   }
 
-  private buildFetchFn() {
+  /**
+   * Le type de retour est explicite : sans lui, TypeScript infère l'union de DEUX
+   * fonctions et le gabarit ne sait plus quel `T` donner à `RefreshableLayout`
+   * (TS2322, mesuré le 2026-10-16).
+   *
+   * Sans actif choisi, on rend `NO_ASSET_SELECTED` plutôt que `null` : le layout
+   * lit `null` comme « vide » et ferait disparaître le formulaire. Voir
+   * `active-asset.util.ts`.
+   */
+  private buildFetchFn(): () => Observable<HlActiveAssetData | NoAssetSelected | null> {
     const selectedCoin = this.selectedCoin();
-    // Un objet non nul, exprès : `RefreshableLayout` lit `null` comme « vide ».
-    //
-    // ⚠️ Le `any` n'est pas gratuit : ce faux objet est émis tel quel par
-    // `dataLoaded` jusqu'à `onDataLoaded(data: HlActiveAssetData | null)`, qui lit
-    // `data.markPx` et `data.leverage` — absents ici, donc `currentPrice` reçoit
-    // `NaN` et `leverage` `undefined`. Le typer honnêtement fait échouer le build
-    // du gabarit (TS2322, mesuré le 2026-10-16), et c'est ce qui l'a révélé. À
-    // traiter : un marqueur que `onDataLoaded` reconnaît, plutôt qu'un faux
-    // `HlActiveAssetData`.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (!selectedCoin) return () => of({ fake: true } as any);
+    if (!selectedCoin) return () => of(NO_ASSET_SELECTED);
 
     return () => {
       this.loadCapital(selectedCoin);
@@ -370,10 +370,25 @@ export class OrderFormComponent implements OnInit {
     };
   }
 
-  onDataLoaded(data: HlActiveAssetData | null): void {
-    if (!data) return;
-    this.currentPrice.set(parseFloat(data.markPx));
-    this.leverage.set(data.leverage);
+  onDataLoaded(data: HlActiveAssetData | NoAssetSelected | null): void {
+    const reading = readActiveAsset(data);
+    switch (reading.status) {
+      case 'none':
+        return;
+      case 'ok':
+        this.currentPrice.set(reading.price);
+        this.leverage.set(reading.leverage);
+        return;
+      case 'unreadable-price':
+        // Pas de `NaN` dans le signal : le gabarit l'afficherait (« NaN » dans le champ
+        // de prix). Et pas de prix de l'actif précédent, qui serait faux pour celui-ci.
+        console.error(
+          `[OrderForm] ${this.selectedCoin()}: the mark price is not a price (${JSON.stringify(reading.raw)}).`,
+        );
+        this.currentPrice.set(null);
+        this.leverage.set(reading.leverage);
+        return;
+    }
   }
 
   private loadCapital(pairName: string): void {
