@@ -620,6 +620,42 @@ Formater **fichier par fichier** reste possible :
 npx prettier --write <chemin> [<chemin>…]
 ```
 
+**Les six dépôts, au 2026-10-16.** Chacun a sa config Prettier, des fins de ligne LF imposées
+par `.gitattributes`, et deux familles de largeur :
+
+| Largeur | Dépôts                                                            |
+| ------- | ----------------------------------------------------------------- |
+| 100     | `hyperliquid-mobile`, `hl-shared-types`, `trading-shared-types`   |
+| 80      | `nest-trading-bot`, `nest-hyperliquid-gateway`, `nest-mongo-user` |
+
+Les bibliothèques de types suivent le mobile, qui les consomme ; les services Nest gardent 80,
+parce que passer à 100 y réécrirait 102 fichiers sur 137 (bot) et 41 sur 59 (gateway), sans
+rien gagner. Hors du mobile, le format se contrôle **par ESLint** (`prettier/prettier` en
+erreur) : `npm run lint` pour le gateway et `hl-shared-types`, `lint:check` pour le bot
+(`lint` porte `--fix`).
+
+Deux règles à ne pas rouvrir :
+
+- **Aucune surcharge `endOfLine: 'auto'` dans ESLint.** Elle contredit `.prettierrc` (`lf`) et
+  laisse passer un CRLF. Retirée du bot, du gateway et de `nest-mongo-user` ; un fichier CRLF
+  y est maintenant refusé (`Delete ␍`), mesuré.
+- **`noSemi` n'existe pas** : c'est `semi`. Prettier l'ignore avec un avertissement à chaque
+  passage ; il était dans le gateway et `nest-mongo-user`.
+
+Deux exceptions qui n'en sont plus :
+
+- `trading-shared-types` n'avait **ni config ni dépendance** Prettier : le lancer appliquait ses
+  défauts (guillemets doubles) à 36 fichiers sur 43. Il a maintenant la config de
+  `hl-shared-types`, un `format` / `format:check`, et la règle dans ESLint ; la passe de
+  reformatage est isolée dans son propre commit, listé dans `.git-blame-ignore-revs`.
+- `nest-trading-bot/docs/` était hors format (18 fichiers) et évité par prudence. Formaté le
+  2026-10-16, et vérifié : une fois ôtée la ponctuation purement structurelle, le texte de
+  chacun des 18 fichiers est identique à l'ancien. ⚠️ Une seule altération réelle est apparue,
+  dans `known-gaps.md` : une phrase dont une ligne commençait par `+ 25 (momentum)` se lisait
+  comme un élément de liste. Prettier l'avait rendu explicite ; la phrase a été réécrite pour
+  qu'aucune ligne ne commence par `+`, `-` ou `*`. **Un signe d'opération en tête de ligne,
+  dans une phrase enroulée à la main, est un élément de liste en Markdown.**
+
 ---
 
 # Git
