@@ -489,6 +489,50 @@ pas changé, seul l'emplacement du bouton, mais ce n'est pas mesuré. `strategie
 n'ont pas été ramenés dans le layout : ils fonctionnent, et le faire serait un changement sans
 gain visible.
 
+## Modifier un ordre déclencheur remplaçait son prix limite
+
+**✅ Corrigé le 2026-10-16.** Trouvé en examinant si la réécriture du prix limite à la bascule
+Market/Limit était voulue.
+
+**Mesuré.** L'effet qui dérive le prix limite du déclencheur (déclencheur ± 0,1 %) n'avait **pas
+de garde `isModify()`**, contrairement à l'effet voisin. Formulaire ouvert en modification sur
+trois ordres factices (rien n'a été envoyé) : un _Stop Limit_ et un _Stop Market_ de limite
+80000 et de déclencheur 81000 affichaient **81081** dès l'ouverture, avant tout geste de
+l'utilisateur ; un ordre limite simple restait intact. Un « Update order » aurait donc envoyé un
+autre prix limite que celui de l'ordre, sans avertissement.
+
+**Ce qui est fait.** La décision est une fonction pure testée, `limitFromTrigger`
+(`open-orders/open-form/order-limit.util.ts`). En modification, elle ne propose rien **tant que
+le déclencheur est celui de l'ordre** ; dès que l'utilisateur le change, le limite suit de
+nouveau, comme à la création. Elle ne propose rien non plus pour un ordre limite, ni sans
+déclencheur valable. Mesuré sur les mêmes trois ordres factices : à l'ouverture les limites
+restent à 80000 ; après avoir modifié le déclencheur à 82000, le limite des deux ordres
+déclencheurs passe à 82082 ; et pour un **nouvel** ordre le limite est toujours dérivé du
+déclencheur (80919 pour un déclencheur à 81000, côté vente). 14 tests, huit mutations tuées.
+
+**Une régression attrapée avant de committer.** Le premier garde coupait _tout_ recalcul en
+modification, y compris le suivi du limite quand l'utilisateur change le déclencheur — un
+comportement qui existait et que l'ancien effet assurait. Mesuré (le limite restait à 80000
+après un déclencheur à 82000), puis corrigé en comparant le déclencheur à celui de l'ordre
+ouvert. Un test et une mutation (« le garde coupe tout en modification ») l'épinglent.
+
+**Changer d'actif repart du marché du nouvel actif.** Prix limite, déclencheur et taille saisis
+concernaient l'actif précédent : un stop vendeur à 80080 survivait sur un ETH à 2414 (mesuré le
+2026-10-16). En création, ils sont remis à zéro puis pré-remplis une fois — limite au prix du
+marché, déclencheur dérivé, taille de 10 $ — dès que le prix **et** les décimales du marché sont
+arrivés. Mesuré sur BTC, ETH, `xyz:BRENTOIL` et kPEPE, en mode limite comme en mode
+déclencheur ; la modification d'un ordre existant n'est pas touchée. ⚠️ Non couvert par un test
+automatique (câblage du composant) ; un déclencheur pré-rempli au marché peut être refusé par la
+validation de prix tant que l'utilisateur ne l'a pas écarté.
+
+**⚠️ Ouvert, à trancher : la bascule « Market trigger » réécrit le prix limite.** En création,
+basculer le toggle recalcule le limite depuis le déclencheur, **même s'il avait été saisi à la
+main** (12345 redevenait 49950 ; mesuré). Activer Market s'y prête : le limite n'est alors qu'une
+borne de glissement. Désactiver Market (un _stop-limit_, où le limite est ce que l'utilisateur
+veut contrôler) est la direction suspecte. Rien ne dit que c'était voulu ; l'option envisagée est
+de recalculer à l'activation et de laisser le limite tel quel à la désactivation. Le commentaire
+de `order-form.component.ts`, au-dessus des deux lectures `void`, le dit au même endroit.
+
 ## Précédent
 
 Le dernier risque refermé — une expression malformée faisant rejeter toute la requête
