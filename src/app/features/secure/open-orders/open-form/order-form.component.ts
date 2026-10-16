@@ -61,7 +61,17 @@ import {
   ProtectiveOrderFormComponent,
   ProtectiveOrderResult,
 } from '../protective-order-form/protective-order-form.component';
-import { NO_ASSET_SELECTED, readActiveAsset, type NoAssetSelected } from './active-asset.util';
+import {
+  ACTIVE_ASSET_UNAVAILABLE,
+  blocksPlacement,
+  marketDataNotice,
+  marketDataStateOf,
+  NO_ASSET_SELECTED,
+  PRICE_CHECK_UNSUPPORTED,
+  readActiveAsset,
+  type ActiveAssetPayload,
+  type MarketDataState,
+} from './active-asset.util';
 
 export type OrderFormMode = 'place' | 'modify';
 
@@ -103,6 +113,16 @@ export class OrderFormComponent implements OnInit {
   szDecimals = signal<number>(3);
   currentPrice = signal<number | null>(null);
   leverage = signal<HlActiveAssetLeverage | null>(null);
+
+  /**
+   * Ce que le formulaire sait du marché de l'actif choisi. Tant que le prix manque
+   * (`unavailable`, `unsupported`), l'envoi est **bloqué** : sans prix, `isPriceInvalid`
+   * rend `false` et le garde-fou « un achat limite ne passe pas au-dessus du marché »
+   * cesse de s'exercer. Voir `active-asset.util.ts`.
+   */
+  marketData = signal<MarketDataState>('none');
+  marketNotice = computed(() => marketDataNotice(this.marketData()));
+  canRetryMarketData = computed(() => this.marketData() === 'unavailable');
   maxLeverage = signal<number | null>(null);
   activePosition = signal<{ isBuy: boolean; sz: string; entryPx: string } | null>(null);
 
@@ -168,6 +188,7 @@ export class OrderFormComponent implements OnInit {
   sizeUsdClass = computed(() => (this.isSizeInvalid() ? 'diff--danger' : ''));
 
   isFormInvalid = computed(() => {
+    if (blocksPlacement(this.marketData())) return true;
     const order = this.buildOrderDetails();
     if (!order.assetName || !order.limitPx || !order.sz) return true;
     if (parseFloat(order.sz) <= 0) return true;
@@ -246,6 +267,12 @@ export class OrderFormComponent implements OnInit {
         this.fetchFn.set(this.buildFetchFn());
         this.defaultSizeApplied = false;
         this.activePosition.set(null);
+        // Le prix, le levier et l'état de marché étaient ceux de l'actif PRÉCÉDENT
+        // jusqu'à la réponse suivante — et restaient tels quels si elle échouait
+        // (le prix de BTC sous un ETH choisi, mesuré le 2026-10-16).
+        this.currentPrice.set(null);
+        this.leverage.set(null);
+        this.marketData.set('none');
         if (!coin) return;
         if (this.isSpot()) {
           this.hlMarket.getSpotMeta().subscribe((meta) => {
@@ -352,17 +379,26 @@ export class OrderFormComponent implements OnInit {
   }
 
   /**
-   * Le type de retour est explicite : sans lui, TypeScript infère l'union de DEUX
-   * fonctions et le gabarit ne sait plus quel `T` donner à `RefreshableLayout`
-   * (TS2322, mesuré le 2026-10-16).
+   * Le type de retour est explicite : sans lui, TypeScript infère l'union de plusieurs
+   * fonctions et le gabarit ne sait plus quel `T` donner à `RefreshableLayout` (TS2322,
+   * mesuré le 2026-10-16).
    *
-   * Sans actif choisi, on rend `NO_ASSET_SELECTED` plutôt que `null` : le layout
-   * lit `null` comme « vide » et ferait disparaître le formulaire. Voir
-   * `active-asset.util.ts`.
+   * Aucun de ces cas ne rend `null` : le layout le lit comme « vide » et ferait disparaître
+   * le formulaire. Chacun a son marqueur nommé (`active-asset.util.ts`).
    */
-  private buildFetchFn(): () => Observable<HlActiveAssetData | NoAssetSelected | null> {
+  private buildFetchFn(): () => Observable<ActiveAssetPayload> {
     const selectedCoin = this.selectedCoin();
     if (!selectedCoin) return () => of(NO_ASSET_SELECTED);
+
+    // `activeAssetData` est une requête de perps : l'API répond 500 pour un actif spot
+    // (mesuré sur `PURR/USDC`). On ne l'envoie pas — elle échouerait à coup sûr, pour
+    // rien, et sur le poids d'IP.
+    if (this.isSpot()) {
+      return () => {
+        this.loadCapital(selectedCoin);
+        return of(PRICE_CHECK_UNSUPPORTED);
+      };
+    }
 
     return () => {
       this.loadCapital(selectedCoin);
@@ -370,25 +406,35 @@ export class OrderFormComponent implements OnInit {
     };
   }
 
-  onDataLoaded(data: HlActiveAssetData | NoAssetSelected | null): void {
+  /** Relance le chargement du prix : le même appel que le changement d'actif. */
+  retryMarketData(): void {
+    this.fetchFn.set(this.buildFetchFn());
+  }
+
+  onDataLoaded(data: ActiveAssetPayload): void {
     const reading = readActiveAsset(data);
-    switch (reading.status) {
-      case 'none':
-        return;
-      case 'ok':
-        this.currentPrice.set(reading.price);
-        this.leverage.set(reading.leverage);
-        return;
-      case 'unreadable-price':
-        // Pas de `NaN` dans le signal : le gabarit l'afficherait (« NaN » dans le champ
-        // de prix). Et pas de prix de l'actif précédent, qui serait faux pour celui-ci.
-        console.error(
-          `[OrderForm] ${this.selectedCoin()}: the mark price is not a price (${JSON.stringify(reading.raw)}).`,
-        );
-        this.currentPrice.set(null);
-        this.leverage.set(reading.leverage);
-        return;
+    const state = marketDataStateOf(reading);
+    // « Rien à lire » : l'état en place ne bouge pas.
+    if (state === null) return;
+    this.marketData.set(state);
+
+    if (reading.status === 'ok') {
+      this.currentPrice.set(reading.price);
+      this.leverage.set(reading.leverage);
+      return;
     }
+
+    // Dans tous les autres cas le prix est INCONNU : `null`, jamais `NaN` (le gabarit
+    // l'afficherait) ni le prix de l'actif précédent (faux pour celui-ci).
+    this.currentPrice.set(null);
+    if (reading.status === 'unreadable-price') {
+      console.error(
+        `[OrderForm] ${this.selectedCoin()}: the mark price is not a price (${JSON.stringify(reading.raw)}).`,
+      );
+      this.leverage.set(reading.leverage);
+      return;
+    }
+    this.leverage.set(null);
   }
 
   private loadCapital(pairName: string): void {
@@ -405,29 +451,19 @@ export class OrderFormComponent implements OnInit {
   }
 
   /**
-   * ⚠️ **Un échec ici fait disparaître tout le formulaire.** Ouvert, non corrigé.
-   *
-   * `catchError` rend `null`, et `RefreshableLayout` lit `null` comme « vide » : il
-   * remplace alors son contenu par l'état vide. Mesuré le 2026-10-16 en faisant
-   * échouer l'appel à l'API publique (choix d'un actif, puis refus de connexion) :
-   * la modale passe du formulaire complet — sens, sélecteur d'actif, bouton PLACE —
-   * à « New Order / No data found ». Aucun toast ; la cause n'existe que dans la
-   * console (`loadActiveAssetData error … status: 0`).
-   *
-   * Deux défauts en un : l'utilisateur ne peut plus ni changer d'actif ni passer
-   * d'ordre, et rien ne lui dit pourquoi. `null` sert ici à dire « échec » alors que
-   * le layout le lit comme « aucune donnée » — le même piège que `NO_ASSET_SELECTED`
-   * a réglé pour « aucun actif choisi » (`active-asset.util.ts`).
-   *
-   * Piste, non décidée : un marqueur d'échec typé, que `onDataLoaded` reconnaît, qui
-   * garde le formulaire affiché et annonce l'échec. Voir `docs/roadmap.md`,
-   * « Risques identifiés ».
+   * Un échec rend `ACTIVE_ASSET_UNAVAILABLE`, pas `null`. Il rendait `null`, que
+   * `RefreshableLayout` lit comme « vide » : tout le formulaire disparaissait derrière
+   * « No data found », sans toast, la cause dans la console seulement (mesuré le
+   * 2026-10-16). Le formulaire reste maintenant affiché, dit l'échec, et bloque l'envoi
+   * tant que le prix manque. Voir `docs/roadmap.md`, « Risques identifiés ».
    */
-  private loadActiveAssetData(coin: string): Observable<HlActiveAssetData | null> {
+  private loadActiveAssetData(
+    coin: string,
+  ): Observable<HlActiveAssetData | typeof ACTIVE_ASSET_UNAVAILABLE> {
     return this.hlInfo.getActiveAssetData(coin).pipe(
       catchError((err) => {
         console.error('loadActiveAssetData error', err);
-        return of(null);
+        return of(ACTIVE_ASSET_UNAVAILABLE);
       }),
     );
   }
@@ -625,6 +661,14 @@ export class OrderFormComponent implements OnInit {
 
   submit(): void {
     this.error.set(null);
+
+    // Le bouton est désactivé dans ce cas, mais `submit()` est public : le refus ne doit
+    // pas dépendre du seul bouton.
+    if (blocksPlacement(this.marketData())) {
+      this.error.set(marketDataNotice(this.marketData()));
+      return;
+    }
+
     const order = this.buildOrderDetails();
 
     if (!order.assetName || !order.limitPx || !order.sz) {

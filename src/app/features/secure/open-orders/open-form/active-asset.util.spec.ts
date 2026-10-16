@@ -1,5 +1,14 @@
 import type { HlActiveAssetData } from '@syldel/hl-shared-types';
-import { isNoAssetSelected, NO_ASSET_SELECTED, readActiveAsset } from './active-asset.util';
+import {
+  ACTIVE_ASSET_UNAVAILABLE,
+  blocksPlacement,
+  isNoAssetSelected,
+  marketDataNotice,
+  marketDataStateOf,
+  NO_ASSET_SELECTED,
+  PRICE_CHECK_UNSUPPORTED,
+  readActiveAsset,
+} from './active-asset.util';
 
 const leverage = { type: 'cross', value: 10 } as const;
 
@@ -102,5 +111,96 @@ describe('the "no asset selected" marker', () => {
 
   it('is a distinct object from a copy with the same shape', () => {
     expect(isNoAssetSelected({ kind: 'no-asset-selected' } as never)).toBe(false);
+  });
+});
+
+/**
+ * Quand `activeAssetData` échoue, le formulaire disparaissait derrière « No data found »
+ * (mesuré le 2026-10-16), sans toast, avec la cause dans la console seulement — et le prix
+ * de l'actif précédent restait en mémoire. Sans prix, `isPriceInvalid` rend `false` : le
+ * garde-fou « un achat limite ne passe pas au-dessus du marché » cesse de s'exercer. Le
+ * formulaire reste donc affiché, **dit** pourquoi, et bloque l'envoi.
+ */
+describe('a failed or unsupported price lookup', () => {
+  describe('readActiveAsset', () => {
+    it('reads the failure marker as unavailable — not as "nothing", which would hide the failure', () => {
+      expect(readActiveAsset(ACTIVE_ASSET_UNAVAILABLE)).toEqual({ status: 'unavailable' });
+    });
+
+    it('reads the spot marker as unsupported', () => {
+      expect(readActiveAsset(PRICE_CHECK_UNSUPPORTED)).toEqual({ status: 'unsupported' });
+    });
+  });
+
+  describe('the markers', () => {
+    it('are frozen and distinct from each other and from "no asset selected"', () => {
+      for (const marker of [ACTIVE_ASSET_UNAVAILABLE, PRICE_CHECK_UNSUPPORTED, NO_ASSET_SELECTED]) {
+        expect(Object.isFrozen(marker)).toBe(true);
+      }
+      expect(ACTIVE_ASSET_UNAVAILABLE).not.toBe(PRICE_CHECK_UNSUPPORTED);
+      expect(ACTIVE_ASSET_UNAVAILABLE).not.toBe(NO_ASSET_SELECTED);
+    });
+
+    it('are not mistaken for each other', () => {
+      expect(isNoAssetSelected(ACTIVE_ASSET_UNAVAILABLE)).toBe(false);
+      expect(isNoAssetSelected(PRICE_CHECK_UNSUPPORTED)).toBe(false);
+    });
+  });
+
+  describe('marketDataStateOf', () => {
+    it.each([
+      ['ok', { status: 'ok', price: 1, leverage }, 'ok'],
+      ['unreadable-price', { status: 'unreadable-price', raw: 'abc', leverage }, 'unavailable'],
+      ['unavailable', { status: 'unavailable' }, 'unavailable'],
+      ['unsupported', { status: 'unsupported' }, 'unsupported'],
+    ] as const)('maps a "%s" reading to the state %s', (_label, reading, expected) => {
+      expect(marketDataStateOf(reading)).toBe(expected);
+    });
+
+    // `none` = « rien à lire » : l'état en place ne bouge pas, donc pas d'état à imposer.
+    it('leaves the state alone on "none"', () => {
+      expect(marketDataStateOf({ status: 'none' })).toBeNull();
+    });
+  });
+
+  describe('blocksPlacement', () => {
+    it.each([
+      ['none', false],
+      ['ok', false],
+      ['unavailable', true],
+      ['unsupported', true],
+    ] as const)('for the state %s answers %s', (state, expected) => {
+      expect(blocksPlacement(state)).toBe(expected);
+    });
+  });
+
+  describe('marketDataNotice', () => {
+    it('says nothing when there is nothing to say', () => {
+      expect(marketDataNotice('none')).toBeNull();
+      expect(marketDataNotice('ok')).toBeNull();
+    });
+
+    it('explains an unavailable price and what it costs', () => {
+      expect(marketDataNotice('unavailable')).toMatch(
+        /could not be loaded.*price check.*disabled/i,
+      );
+    });
+
+    it('explains the spot case differently, since retrying cannot help', () => {
+      const spot = marketDataNotice('unsupported');
+
+      expect(spot).toMatch(/spot/i);
+      expect(spot).not.toBe(marketDataNotice('unavailable'));
+    });
+
+    // Tout état qui bloque doit avoir un message : un bouton désactivé sans raison dite
+    // est précisément la défaillance muette qu'on corrige.
+    it.each(['unavailable', 'unsupported'] as const)(
+      'has a message for every state that blocks (%s)',
+      (state) => {
+        expect(blocksPlacement(state)).toBe(true);
+        expect(marketDataNotice(state)).not.toBeNull();
+      },
+    );
   });
 });

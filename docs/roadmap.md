@@ -415,39 +415,52 @@ puis enregistrée, pas avant. Aucune migration ne balaie les documents.
 **⚠️ Ce qui reste ouvert** : d'où venait ce champ, et s'il existe d'autres vestiges du même
 genre ailleurs dans le document utilisateur. Rien n'a cherché hors des entrées protectrices.
 
-## Le formulaire d'ordre disparaît quand `activeAssetData` échoue
+## Le formulaire d'ordre disparaissait quand `activeAssetData` échouait
 
-**⚠️ Ouvert.** Découvert le 2026-10-16 en corrigeant le « NaN » du champ de prix
-(`open-orders/open-form/active-asset.util.ts`), puis **reproduit** : on fait échouer l'appel
-`activeAssetData` de l'API publique (redirigé vers un port refusé), après avoir choisi un
-actif.
+**✅ Corrigé le 2026-10-16** — découvert en réparant le « NaN » du champ de prix
+(`open-orders/open-form/active-asset.util.ts`), reproduit, puis traité avec la décision
+« bloquer l'envoi ».
 
-**Mesuré.** Avant l'échec, la modale « New Order » montre le formulaire complet : sens
-(LONG / SHORT), sélecteur d'actif, champs, bouton PLACE. Après : le texte entier de la modale
-est **« New Order / No data found »**. Plus rien à toucher, aucun toast, et la seule trace est
-`loadActiveAssetData error … status: 0, url: https://api.hyperliquid.xyz/info` dans la console.
+**Ce qui était mesuré.** On fait échouer l'appel `activeAssetData` de l'API publique après
+avoir choisi un actif : la modale « New Order » passait du formulaire complet (sens, sélecteur
+d'actif, bouton PLACE) à **« New Order / No data found »**. Aucun toast ; la seule trace était
+`loadActiveAssetData error … status: 0` dans la console. Et le prix de l'actif **précédent**
+restait en mémoire (le prix de BTC sous un ETH choisi). La cause : l'échec était rendu par
+`null`, que `RefreshableLayout` lit comme « vide ».
 
-**Pourquoi.** `loadActiveAssetData` attrape l'erreur et rend `null`. `RefreshableLayout` lit
-`null` comme « vide » et remplace son contenu par l'état vide. Le même `null` dit donc « échec »
-côté composant et « aucune donnée » côté layout.
+**Ce qui est fait.**
 
-**Ce que ça coûte.** Une panne passagère de l'API publique, ou une réponse refusée, prive
-l'utilisateur de tout le formulaire : il ne peut ni changer d'actif ni passer d'ordre, et rien
-ne lui dit pourquoi. Ce n'est pas une position prise sur une donnée fausse — l'ordre ne part
-pas —, mais c'est exactement le genre de défaillance que `CLAUDE.md` refuse : visible
-seulement pour qui ouvre la console.
+- L'échec rend un **marqueur typé et gelé**, `ACTIVE_ASSET_UNAVAILABLE`, comme « aucun actif
+  choisi » rend `NO_ASSET_SELECTED`. Le layout reçoit un objet non nul : le formulaire reste
+  affiché.
+- Un **bandeau** dit pourquoi, avec un bouton **Retry** (le même appel que le changement
+  d'actif). Le prix et le levier passent à `null` — jamais le prix de l'actif précédent — et
+  sont aussi remis à zéro à chaque changement d'actif.
+- **L'envoi est bloqué** tant que le prix manque, par le bouton **et** par `submit()` lui-même.
+  Pourquoi : sans prix, `isPriceInvalid` rend `false`, et le garde-fou « un achat limite ne
+  passe pas au-dessus du marché » cesse de s'exercer ; un ordre ainsi placé s'exécuterait
+  aussitôt comme taker. C'est l'option qui échoue bruyamment et tôt.
+- Un prix **illisible** (`markPx` qui n'est pas un décimal strictement positif) compte comme
+  indisponible : même conséquence.
 
-**Où chercher.** `loadActiveAssetData` et `onDataLoaded` dans `order-form.component.ts` ;
-`isEmpty()` dans `refreshable-layout.component.ts`. Le correctif de « aucun actif choisi »
-(un marqueur nommé, typé, que `onDataLoaded` reconnaît) est le précédent à suivre.
+**Mesuré après correction**, dans le navigateur, avec une vraie session : appel en échec →
+formulaire visible, bandeau, Retry, bouton désactivé alors que les champs sont valides (donc
+c'est bien l'absence de prix qui bloque), prix `null`, `submit()` refusé avec le message ;
+après Retry → état `ok`, prix de l'actif, bandeau parti, bouton actif.
 
-**Piste, non décidée.** Un marqueur d'échec typé, qui garde le formulaire affiché et annonce
-l'échec (toast ou bandeau), au lieu de `null`. À trancher : faut-il autoriser un ordre quand le
-prix de marché n'a pas pu être lu ? Aujourd'hui `currentPrice` reste `null` dans ce cas, et le
-champ de prix tombe sur `0.00`.
+**⚠️ Le spot, découvert en chemin — et pas un détail.** `activeAssetData` est une requête de
+**perps** : l'API répond **500** pour `PURR/USDC` (mesuré sur cet actif seulement). Le spot
+était donc déjà inutilisable depuis ce formulaire, avec exactement le même « No data found »,
+et chaque choix d'actif spot envoyait une requête qui échouait à coup sûr. Désormais aucune
+requête n'est envoyée pour un actif spot, un bandeau dit « the price check is not available
+for spot markets yet », et l'envoi est bloqué. **Ce n'est pas une régression, mais ce n'est
+pas non plus une réparation : passer un ordre spot depuis ce formulaire reste impossible.**
+Il manque une source de prix pour le spot (méta spot, ou mids), à décider. Le spot n'a été
+mesuré que sur `PURR/USDC`.
 
-**Hors de cette mesure** : l'échec de `getAvailableCapital`, lui, est déjà géré — il rend
-`{ status: 'unavailable' }` et n'efface rien.
+**Pas couvert par un test automatisé** : le câblage du composant (`isFormInvalid`, le garde de
+`submit()`, le bandeau). Les décisions sont dans des fonctions pures testées (40 tests, neuf
+mutations tuées) ; le câblage n'a été vérifié que dans le navigateur.
 
 ## Précédent
 

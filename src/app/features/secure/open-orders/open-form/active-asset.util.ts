@@ -29,12 +29,49 @@ export const NO_ASSET_SELECTED = Object.freeze({ kind: 'no-asset-selected' } as 
 
 export type NoAssetSelected = typeof NO_ASSET_SELECTED;
 
+/**
+ * « Le prix n'a pas pu être chargé » : l'échec de `activeAssetData`.
+ *
+ * Il était rendu par `null`, que le layout lit comme « vide » : tout le formulaire
+ * disparaissait derrière « No data found », sans toast. Un marqueur non nul garde le
+ * formulaire affiché, pour pouvoir **dire** l'échec. Mesuré le 2026-10-16.
+ */
+export const ACTIVE_ASSET_UNAVAILABLE = Object.freeze({
+  kind: 'active-asset-unavailable',
+} as const);
+
+export type ActiveAssetUnavailable = typeof ACTIVE_ASSET_UNAVAILABLE;
+
+/**
+ * Un actif **spot** : `activeAssetData` est une requête de perps, et l'API répond 500 pour
+ * un actif spot (mesuré sur `PURR/USDC`, 1 actif — pas sur tous). Plutôt que d'envoyer une
+ * requête qui échoue à coup sûr, on dit que le contrôle de prix n'existe pas pour le spot.
+ */
+export const PRICE_CHECK_UNSUPPORTED = Object.freeze({ kind: 'price-check-unsupported' } as const);
+
+export type PriceCheckUnsupported = typeof PRICE_CHECK_UNSUPPORTED;
+
+/** Tout ce que `RefreshableLayout` peut remettre à `onDataLoaded` pour ce formulaire. */
+export type ActiveAssetPayload =
+  | HlActiveAssetData
+  | NoAssetSelected
+  | ActiveAssetUnavailable
+  | PriceCheckUnsupported
+  | null;
+
+/** Ce que le formulaire sait du marché de l'actif choisi. */
+export type MarketDataState = 'none' | 'ok' | 'unavailable' | 'unsupported';
+
 export type ActiveAssetReading =
   /** Rien à lire (aucun actif choisi, ou chargement échoué) : l'état en place ne bouge pas. */
   | { status: 'none' }
   | { status: 'ok'; price: number; leverage: HlActiveAssetLeverage }
   /** Une réponse est arrivée, mais son `markPx` n'est pas un prix : on le dit, on n'en fait pas un `NaN`. */
-  | { status: 'unreadable-price'; raw: unknown; leverage: HlActiveAssetLeverage };
+  | { status: 'unreadable-price'; raw: unknown; leverage: HlActiveAssetLeverage }
+  /** L'appel a échoué : le prix n'est pas connu. */
+  | { status: 'unavailable' }
+  /** Le contrôle de prix n'existe pas pour ce marché (spot). */
+  | { status: 'unsupported' };
 
 /**
  * Une chaîne décimale simple, sans signe ni notation scientifique : la forme que
@@ -50,20 +87,80 @@ function readMarkPrice(raw: unknown): number | null {
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
-export function isNoAssetSelected(
-  data: HlActiveAssetData | NoAssetSelected | null,
-): data is NoAssetSelected {
+export function isNoAssetSelected(data: ActiveAssetPayload): data is NoAssetSelected {
   return data === NO_ASSET_SELECTED;
 }
 
-export function readActiveAsset(
-  data: HlActiveAssetData | NoAssetSelected | null,
-): ActiveAssetReading {
-  if (data === null || isNoAssetSelected(data)) return { status: 'none' };
+/**
+ * Les trois marqueurs, reconnus par **identité** : un objet de même forme ne passe pas. Le
+ * garde de type est ce qui permet à TypeScript de réduire l'union — une comparaison
+ * `data === MARQUEUR` ne le fait pas.
+ */
+function isMarker(
+  data: ActiveAssetPayload,
+): data is NoAssetSelected | ActiveAssetUnavailable | PriceCheckUnsupported {
+  return (
+    data === NO_ASSET_SELECTED ||
+    data === ACTIVE_ASSET_UNAVAILABLE ||
+    data === PRICE_CHECK_UNSUPPORTED
+  );
+}
+
+export function readActiveAsset(data: ActiveAssetPayload): ActiveAssetReading {
+  if (data === null) return { status: 'none' };
+  if (isMarker(data)) {
+    if (data === ACTIVE_ASSET_UNAVAILABLE) return { status: 'unavailable' };
+    if (data === PRICE_CHECK_UNSUPPORTED) return { status: 'unsupported' };
+    return { status: 'none' };
+  }
 
   const price = readMarkPrice(data.markPx);
   if (price === null) {
     return { status: 'unreadable-price', raw: data.markPx, leverage: data.leverage };
   }
   return { status: 'ok', price, leverage: data.leverage };
+}
+
+/**
+ * L'état de marché que impose une lecture, ou `null` quand la lecture dit seulement
+ * « rien à lire » : l'état en place ne bouge pas.
+ *
+ * Un prix illisible compte comme indisponible : dans les deux cas le formulaire n'a pas de
+ * prix, et c'est de l'absence de prix que découle tout le reste.
+ */
+export function marketDataStateOf(reading: ActiveAssetReading): MarketDataState | null {
+  switch (reading.status) {
+    case 'none':
+      return null;
+    case 'ok':
+      return 'ok';
+    case 'unreadable-price':
+    case 'unavailable':
+      return 'unavailable';
+    case 'unsupported':
+      return 'unsupported';
+  }
+}
+
+/**
+ * Sans prix, `isPriceInvalid` rend `false` : le garde-fou « un achat limite ne passe pas
+ * au-dessus du marché » cesse de s'exercer, et un ordre ainsi placé s'exécuterait aussitôt
+ * comme taker. Tant que le prix manque, l'envoi est donc bloqué — l'option qui échoue
+ * bruyamment et tôt.
+ */
+export function blocksPlacement(state: MarketDataState): boolean {
+  return state === 'unavailable' || state === 'unsupported';
+}
+
+/** Le message qui accompagne le blocage : un bouton désactivé sans raison dite est une défaillance muette. */
+export function marketDataNotice(state: MarketDataState): string | null {
+  switch (state) {
+    case 'unavailable':
+      return 'Market data could not be loaded, so the price check cannot run. Placing an order is disabled until it loads.';
+    case 'unsupported':
+      return 'The price check is not available for spot markets yet, so placing an order from this form is disabled.';
+    case 'none':
+    case 'ok':
+      return null;
+  }
 }

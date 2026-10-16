@@ -11,6 +11,15 @@
     </ion-button>
   </ng-template>
 
+  @if (marketNotice(); as notice) {
+    <div class="market-data-notice">
+      <p class="error-message error-message--small error-message--padded">{{ notice }}</p>
+      @if (canRetryMarketData()) {
+        <ion-button size="small" fill="outline" (click)="retryMarketData()">Retry</ion-button>
+      }
+    </div>
+  }
+
   <div class="form-section asset-side-row">
     <div>
       <p class="section-label">Asset</p>
