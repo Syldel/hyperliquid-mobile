@@ -16,8 +16,11 @@
     "android:run": "npx cap run android",
     "android:live": "sh scripts/android/live-reload.sh",
     "android:device": "sh scripts/android/build-android.sh debug development && adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
-    "format": "prettier --write \"src/**/*.{ts,html,scss,json,css}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,html,scss,json,css}\"",
+    "format": "prettier --write \"src/**/*.{ts,html,scss,json,css}\" \"docs/**/*.md\"",
+    "format:check": "prettier --check \"src/**/*.{ts,html,scss,json,css}\" \"docs/**/*.md\"",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "test:ci": "ng test --watch=false",
+    "verify": "npm run typecheck && npm run format:check && npm run test:ci && npm run build",
     "postinstall": "npx capacitor-assets generate --android"
   },
   "private": true,

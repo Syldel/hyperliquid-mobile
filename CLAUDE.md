@@ -179,7 +179,12 @@ npm test                  # vitest via @angular/build:unit-test
 npx ng test --watch=false # une seule passe
 npx ng build              # build de production
 npx tsc -p tsconfig.app.json --noEmit
+npm run format:check      # Prettier sur src/ et docs/, sans rien écrire
+npm run verify            # typecheck, format, tests, build — s'arrête au premier échec
 ```
+
+`verify` est le contrôle à lancer avant de proposer un commit. Les avertissements de budget de
+style au build (`protective-modal`, `watchlist-detail`) ne le font pas échouer.
 
 **Un `npm install` d'une dépendance n'atteint pas un `ng serve` déjà lancé.** Angular
 pré-bundle les dépendances au démarrage, et ce cache ne s'invalide pas : le serveur
