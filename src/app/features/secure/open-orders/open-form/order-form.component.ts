@@ -404,6 +404,25 @@ export class OrderFormComponent implements OnInit {
     });
   }
 
+  /**
+   * ⚠️ **Un échec ici fait disparaître tout le formulaire.** Ouvert, non corrigé.
+   *
+   * `catchError` rend `null`, et `RefreshableLayout` lit `null` comme « vide » : il
+   * remplace alors son contenu par l'état vide. Mesuré le 2026-10-16 en faisant
+   * échouer l'appel à l'API publique (choix d'un actif, puis refus de connexion) :
+   * la modale passe du formulaire complet — sens, sélecteur d'actif, bouton PLACE —
+   * à « New Order / No data found ». Aucun toast ; la cause n'existe que dans la
+   * console (`loadActiveAssetData error … status: 0`).
+   *
+   * Deux défauts en un : l'utilisateur ne peut plus ni changer d'actif ni passer
+   * d'ordre, et rien ne lui dit pourquoi. `null` sert ici à dire « échec » alors que
+   * le layout le lit comme « aucune donnée » — le même piège que `NO_ASSET_SELECTED`
+   * a réglé pour « aucun actif choisi » (`active-asset.util.ts`).
+   *
+   * Piste, non décidée : un marqueur d'échec typé, que `onDataLoaded` reconnaît, qui
+   * garde le formulaire affiché et annonce l'échec. Voir `docs/roadmap.md`,
+   * « Risques identifiés ».
+   */
   private loadActiveAssetData(coin: string): Observable<HlActiveAssetData | null> {
     return this.hlInfo.getActiveAssetData(coin).pipe(
       catchError((err) => {

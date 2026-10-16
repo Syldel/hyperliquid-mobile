@@ -415,6 +415,40 @@ puis enregistrée, pas avant. Aucune migration ne balaie les documents.
 **⚠️ Ce qui reste ouvert** : d'où venait ce champ, et s'il existe d'autres vestiges du même
 genre ailleurs dans le document utilisateur. Rien n'a cherché hors des entrées protectrices.
 
+## Le formulaire d'ordre disparaît quand `activeAssetData` échoue
+
+**⚠️ Ouvert.** Découvert le 2026-10-16 en corrigeant le « NaN » du champ de prix
+(`open-orders/open-form/active-asset.util.ts`), puis **reproduit** : on fait échouer l'appel
+`activeAssetData` de l'API publique (redirigé vers un port refusé), après avoir choisi un
+actif.
+
+**Mesuré.** Avant l'échec, la modale « New Order » montre le formulaire complet : sens
+(LONG / SHORT), sélecteur d'actif, champs, bouton PLACE. Après : le texte entier de la modale
+est **« New Order / No data found »**. Plus rien à toucher, aucun toast, et la seule trace est
+`loadActiveAssetData error … status: 0, url: https://api.hyperliquid.xyz/info` dans la console.
+
+**Pourquoi.** `loadActiveAssetData` attrape l'erreur et rend `null`. `RefreshableLayout` lit
+`null` comme « vide » et remplace son contenu par l'état vide. Le même `null` dit donc « échec »
+côté composant et « aucune donnée » côté layout.
+
+**Ce que ça coûte.** Une panne passagère de l'API publique, ou une réponse refusée, prive
+l'utilisateur de tout le formulaire : il ne peut ni changer d'actif ni passer d'ordre, et rien
+ne lui dit pourquoi. Ce n'est pas une position prise sur une donnée fausse — l'ordre ne part
+pas —, mais c'est exactement le genre de défaillance que `CLAUDE.md` refuse : visible
+seulement pour qui ouvre la console.
+
+**Où chercher.** `loadActiveAssetData` et `onDataLoaded` dans `order-form.component.ts` ;
+`isEmpty()` dans `refreshable-layout.component.ts`. Le correctif de « aucun actif choisi »
+(un marqueur nommé, typé, que `onDataLoaded` reconnaît) est le précédent à suivre.
+
+**Piste, non décidée.** Un marqueur d'échec typé, qui garde le formulaire affiché et annonce
+l'échec (toast ou bandeau), au lieu de `null`. À trancher : faut-il autoriser un ordre quand le
+prix de marché n'a pas pu être lu ? Aujourd'hui `currentPrice` reste `null` dans ce cas, et le
+champ de prix tombe sur `0.00`.
+
+**Hors de cette mesure** : l'échec de `getAvailableCapital`, lui, est déjà géré — il rend
+`{ status: 'unavailable' }` et n'efface rien.
+
 ## Précédent
 
 Le dernier risque refermé — une expression malformée faisant rejeter toute la requête
