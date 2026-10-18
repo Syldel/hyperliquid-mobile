@@ -687,6 +687,15 @@ jour où l'argent réel entre en jeu, et non pour être supposés connus.
    - **Un Take Profit limite** s'exécute en taker au prix du carnet (106.73 pour un déclencheur à
      106.73) : son plancher à 1,5 % n'a pas joué.
 
+   - **Troisième cas, et la fermeture** : un Stop Limit ETH posé dans l'**interface officielle** avec un
+     limite **très au-dessus** du déclencheur (limite 2380, déclencheur 2363.7) est **accepté** par
+     l'exchange, déclenché 2,2 s après sa pose, et son ordre est resté au carnet aussi longtemps qu'on
+     le voulait. Une vente **reduce-only IOC** passée alors dans notre formulaire a été acceptée,
+     exécutée en un fill à 2364.0, et l'ordre resté est passé en **`reduceOnlyCanceled` à la
+     milliseconde du fill**, sans jamais être exécuté. Notre formulaire, lui, bloque un limite de
+     vente au-dessus du déclencheur (`isLimitOnWrongSide`), voulu. Un quatrième essai (entrée à
+     2366.4, stop à 2365.9) n'a laissé l'ordre au carnet que 6,5 s : l'attente dépend du prix.
+
    _Le déclencheur se compare au mark price_, pas au carnet. Sur `io:ANTH` : mark 1904.2, milieu du
    carnet 1904.65, oracle 1902.4. Un stop remonté à 1904.0 (par le chart de l'interface officielle) a
    été **déclenché 1,2 s après sa pose**, alors que le carnet affichait un acheteur à 1906 : le mark
