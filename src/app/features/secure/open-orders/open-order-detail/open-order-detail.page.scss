@@ -34,3 +34,9 @@ ion-note {
   display: flex;
   text-transform: uppercase;
 }
+
+/* Voir `open-orders.page.scss` : le rouge du thème, sur plusieurs lignes. */
+.stuck-triggered ion-label {
+  color: var(--ion-color-danger);
+  font-weight: 600;
+}

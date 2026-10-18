@@ -44,9 +44,18 @@
             </ion-badge>
             <ion-badge color="medium">{{ openOrder.orderType }}</ion-badge>
             <ion-badge color="medium">{{ openOrder.tif }}</ion-badge>
+            @if (isStuckTriggered(openOrder)) {
+            <ion-badge color="danger">Triggered</ion-badge>
+            }
           </div>
           <p>Limit: {{ openOrder.limitPx }} · Sz: {{ openOrder.sz }}/{{ openOrder.origSz }}</p>
           <p>{{ openOrder.timestamp | date:'dd/MM/yy HH:mm' }}</p>
+          @if (isStuckTriggered(openOrder)) {
+          <p class="stuck-triggered" role="alert">
+            Triggered, but this order is still resting unfilled: the position is not protected by
+            it.
+          </p>
+          }
         </ion-label>
 
         <div slot="end" class="order-badges">

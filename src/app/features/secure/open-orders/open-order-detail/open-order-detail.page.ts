@@ -36,6 +36,7 @@ import { addIcons } from 'ionicons';
 import { closeOutline, createOutline, trashOutline } from 'ionicons/icons';
 import { of, switchMap } from 'rxjs';
 import { OrderFormComponent } from '../open-form/order-form.component';
+import { isStuckTriggeredOrder } from '../stuck-triggered-order.util';
 
 @Component({
   selector: 'app-open-order-detail',
@@ -56,6 +57,9 @@ import { OrderFormComponent } from '../open-form/order-form.component';
   styleUrls: ['./open-order-detail.page.scss'],
 })
 export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
+  /** Un stop déclenché dont l'ordre est resté au carnet (voir `stuck-triggered-order.util.ts`). */
+  readonly isStuckTriggered = isStuckTriggeredOrder;
+
   private readonly route = inject(ActivatedRoute);
   private readonly hlGateway = inject(HyperliquidGatewayService);
   private readonly market = inject(HyperliquidMarketService);

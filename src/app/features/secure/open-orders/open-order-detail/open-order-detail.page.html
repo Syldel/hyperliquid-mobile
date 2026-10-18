@@ -68,7 +68,14 @@
     </ion-note>
   </ion-item>
 
-  @if (o.isTrigger) {
+  @if (isStuckTriggered(o)) {
+  <ion-item lines="full" class="stuck-triggered">
+    <ion-label class="ion-text-wrap" role="alert">
+      Triggered, but this order is still resting unfilled at {{ o.limitPx }}: the position is not
+      protected by it. It fills only if the price comes back to that limit.
+    </ion-label>
+  </ion-item>
+  } @if (o.isTrigger) {
   <ion-item lines="full">
     <ion-label>Trigger</ion-label>
     <ion-note slot="end">{{ o.triggerCondition }} @ {{ o.triggerPx }}</ion-note>

@@ -37,6 +37,7 @@ import { addIcons } from 'ionicons';
 import { addOutline, createOutline } from 'ionicons/icons';
 import { forkJoin, map, Observable, of } from 'rxjs';
 import { OrderFormComponent } from './open-form/order-form.component';
+import { isStuckTriggeredOrder } from './stuck-triggered-order.util';
 
 @Component({
   selector: 'app-open-orders',
@@ -68,6 +69,12 @@ export class OpenOrdersPage extends MenuBasePage implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly hlMarket = inject(HyperliquidMarketService);
   private readonly modalCtrl = inject(ModalController);
+
+  /**
+   * Un stop déclenché dont l'ordre est resté au carnet : la liste le disait nulle part (voir
+   * `stuck-triggered-order.util.ts`).
+   */
+  readonly isStuckTriggered = isStuckTriggeredOrder;
 
   openOrders = signal<HLFrontendOpenOrder[]>([]);
   selectedDexNames = signal<string[] | null>(null);

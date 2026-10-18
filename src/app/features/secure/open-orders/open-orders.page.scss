@@ -44,3 +44,11 @@
   --padding-end: 4px;
   margin: 0;
 }
+
+/* Un stop déclenché resté au carnet : le texte prend le rouge du thème, comme `diff--danger`
+   (voir docs/theming.md). Plusieurs lignes : la colonne est étroite à 360 px. */
+.stuck-triggered {
+  color: var(--ion-color-danger) !important;
+  font-weight: 600;
+  white-space: normal;
+}

@@ -597,6 +597,19 @@ stop vendeur BTC, déclencheur 81000 : limite à 82000 → rouge (6,20:1 en clai
 360 px sans débordement), bouton désactivé ; limite à 80000 → plus de rouge, bouton actif. Égal au
 déclencheur reste permis.
 
+**Un stop déclenché resté au carnet se voit dans la liste des ordres** (`stuck-triggered-order.util.ts`,
+2026-10-18). Rien ne le disait : le badge « Trigger » n'apparaît que si `isTrigger` est vrai, et il vaut
+**faux** pour cet ordre, qui ressemblait à un ordre limite de vente ordinaire (`Stop Limit`, `Gtc`,
+`Reduce`) ; la ligne « Status » du détail vient d'un appel séparé et n'est pas garantie de dire
+« triggered » (non lu en réel : sur un ordre au repos elle dirait vraisemblablement `open`). La liste
+affiche maintenant un badge rouge **Triggered** et une phrase (« Triggered, but this order is still
+resting unfilled: the position is not protected by it. »), le détail une bannière qui nomme le
+limite. Même prédicat que le bot, strict (reduce-only, `isTrigger: false`, `triggerCondition:
+"Triggered"`). Mesuré dans le navigateur à 360 px, **avec des données de test locales** (la réponse de
+`frontendOpenOrders` interceptée dans la page ; rien n'a été envoyé) : texte rouge 6,11:1 en sombre et
+6,20:1 en clair, badge 7,61:1 et 6,21:1, aucun défilement horizontal. ⚠️ Pas vu sur un vrai ordre
+resté au carnet.
+
 ## À éprouver en réel : ce qu'aucun double ne peut établir
 
 Ces points ne se tranchent ni par la lecture du code ni dans le navigateur : il faut un
