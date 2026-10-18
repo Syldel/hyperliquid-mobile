@@ -551,8 +551,12 @@ concernaient l'actif précédent : un stop vendeur à 80080 survivait sur un ETH
 au prix du marché pour un ordre limite, taille de 10 $ — dès que le prix **et** les décimales du
 marché sont arrivés. Mesuré sur BTC, ETH, `xyz:BRENTOIL` et kPEPE.
 
-⚠️ **Non couvert par un test automatique : le câblage du composant** (effets, drapeau « saisi »,
-signaux). Seule la décision pure l'est ; le reste a été mesuré dans le navigateur. ⚠️ Un limite
+**Le câblage du composant est couvert depuis le 2026-10-18** (`order-form.component.spec.ts`, 12 tests,
+gabarit vidé et services doublés) : dérivation du limite, limite saisi qui fait autorité, vidage des
+champs au changement de type ou d'actif, retour au limite d'origine en modification. Éprouvé par
+mutation : cinq retraits dans le composant, chacun fait tomber au moins un test (le premier essai du
+vidage au changement de type survivait — le test passait par une autre voie, il a été réécrit).
+⚠️ Ce que le spec ne voit pas : le gabarit (rendu, classes rouges, bouton), mesuré dans le navigateur. ⚠️ Un limite
 saisi à la main **reste** quand on change le sens : il peut alors se trouver du mauvais côté du
 déclencheur (limite sous le déclencheur pour un achat). Refermé le 2026-10-18 : `isLimitOnWrongSide`
 bloque l'envoi (bouton et `submit()`), et la ligne « % from trigger » passe en rouge. Mesuré sur un
