@@ -73,6 +73,7 @@ import {
   type MarketDataState,
 } from './active-asset.util';
 import {
+  isLimitOnWrongSide,
   limitFromTrigger,
   orderPricesReady,
   type OriginalTriggerOrder,
@@ -202,13 +203,28 @@ export class OrderFormComponent implements OnInit {
     }),
   );
 
+  /**
+   * Le limite d'un ordre déclencheur est du mauvais côté du déclencheur (voir
+   * `isLimitOnWrongSide`). Distinct de `isPriceInvalid`, qui juge le DÉCLENCHEUR par rapport au
+   * marché : ici c'est le limite qui est en cause, et c'est lui qui rougit.
+   */
+  isLimitSideInvalid = computed(
+    () =>
+      this.orderKind() === 'trigger' &&
+      isLimitOnWrongSide({
+        isBuy: this.isBuy(),
+        limitPx: this.limitPx(),
+        triggerPx: this.triggerPx(),
+      }),
+  );
+
   isFormInvalid = computed(() => {
     if (blocksPlacement(this.marketData())) return true;
     const order = this.buildOrderDetails();
     if (!order.assetName || !order.sz) return true;
     if (!this.pricesReady()) return true;
     if (parseFloat(order.sz) <= 0) return true;
-    return this.isPriceInvalid() || this.isSizeInvalid();
+    return this.isPriceInvalid() || this.isLimitSideInvalid() || this.isSizeInvalid();
   });
 
   isSpot = computed(() => this.selectedCoin()?.includes('/') || this.selectedCoin()?.includes('-'));
@@ -782,6 +798,13 @@ export class OrderFormComponent implements OnInit {
 
     if (!order.assetName || !order.sz || !this.pricesReady()) {
       this.error.set('Please fill in all required fields.');
+      return;
+    }
+
+    if (this.isLimitSideInvalid()) {
+      this.error.set(
+        `The limit price must be ${this.isBuy() ? 'at or above' : 'at or below'} the trigger price.`,
+      );
       return;
     }
 

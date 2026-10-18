@@ -2,6 +2,7 @@ import {
   LIMIT_SPREAD_MARKET,
   LIMIT_SPREAD_SL,
   LIMIT_SPREAD_TP,
+  isLimitOnWrongSide,
   limitFromTrigger,
   limitSpread,
   isPositivePrice,
@@ -153,4 +154,35 @@ describe('isPositivePrice', () => {
   it.each(['', '0', '-3', 'abc', 'NaN', 'Infinity'])('refuses "%s"', (text) => {
     expect(isPositivePrice(text)).toBe(false);
   });
+});
+
+describe('isLimitOnWrongSide', () => {
+  it('flags a buy whose limit is below its trigger', () => {
+    expect(isLimitOnWrongSide({ isBuy: true, limitPx: '80000', triggerPx: '81000' })).toBe(true);
+  });
+
+  it('flags a sell whose limit is above its trigger', () => {
+    expect(isLimitOnWrongSide({ isBuy: false, limitPx: '82000', triggerPx: '81000' })).toBe(true);
+  });
+
+  it('accepts the worst price on the accepting side', () => {
+    expect(isLimitOnWrongSide({ isBuy: true, limitPx: '82000', triggerPx: '81000' })).toBe(false);
+    expect(isLimitOnWrongSide({ isBuy: false, limitPx: '80000', triggerPx: '81000' })).toBe(false);
+  });
+
+  it('accepts a limit equal to the trigger', () => {
+    expect(isLimitOnWrongSide({ isBuy: true, limitPx: '81000', triggerPx: '81000' })).toBe(false);
+    expect(isLimitOnWrongSide({ isBuy: false, limitPx: '81000', triggerPx: '81000' })).toBe(false);
+  });
+
+  it.each([
+    ['limit empty', '', '81000'],
+    ['trigger empty', '80000', ''],
+    ['limit unreadable', 'abc', '81000'],
+  ])(
+    'says nothing when a price is missing (%s): the missing price blocks on its own',
+    (_l, limitPx, triggerPx) => {
+      expect(isLimitOnWrongSide({ isBuy: true, limitPx, triggerPx })).toBe(false);
+    },
+  );
 });

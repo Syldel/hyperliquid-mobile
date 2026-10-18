@@ -110,3 +110,23 @@ export function orderPricesReady(input: {
   if (!isPositivePrice(input.limitPx)) return false;
   return input.orderKind !== 'trigger' || isPositivePrice(input.triggerPx);
 }
+
+/**
+ * Le prix limite d'un ordre déclencheur est du MAUVAIS côté du déclencheur : sous lui pour un
+ * achat, au-dessus pour une vente. Le limite est le pire prix accepté, donc il se trouve
+ * toujours du côté où l'on accepte de payer plus (achat) ou de recevoir moins (vente) que le
+ * déclencheur. Un limite inversé est un ordre qui se déclenche sans pouvoir s'exécuter, et rien
+ * ne le dit : c'est ce que permet un limite saisi à la main, qui survit à un changement de sens
+ * (mesuré le 2026-10-16). Égal au déclencheur est permis — c'est un choix, pas une erreur.
+ * `false` quand un des deux prix manque : `orderPricesReady` s'en charge.
+ */
+export function isLimitOnWrongSide(input: {
+  isBuy: boolean;
+  limitPx: string;
+  triggerPx: string;
+}): boolean {
+  if (!isPositivePrice(input.limitPx) || !isPositivePrice(input.triggerPx)) return false;
+  const limit = parseFloat(input.limitPx);
+  const trigger = parseFloat(input.triggerPx);
+  return input.isBuy ? limit < trigger : limit > trigger;
+}

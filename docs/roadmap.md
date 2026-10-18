@@ -554,7 +554,11 @@ marché sont arrivés. Mesuré sur BTC, ETH, `xyz:BRENTOIL` et kPEPE.
 ⚠️ **Non couvert par un test automatique : le câblage du composant** (effets, drapeau « saisi »,
 signaux). Seule la décision pure l'est ; le reste a été mesuré dans le navigateur. ⚠️ Un limite
 saisi à la main **reste** quand on change le sens : il peut alors se trouver du mauvais côté du
-déclencheur (limite sous le déclencheur pour un achat) sans qu'aucun contrôle ne le dise.
+déclencheur (limite sous le déclencheur pour un achat). Refermé le 2026-10-18 : `isLimitOnWrongSide`
+bloque l'envoi (bouton et `submit()`), et la ligne « % from trigger » passe en rouge. Mesuré sur un
+stop vendeur BTC, déclencheur 81000 : limite à 82000 → rouge (6,20:1 en clair, 6,11:1 en sombre,
+360 px sans débordement), bouton désactivé ; limite à 80000 → plus de rouge, bouton actif. Égal au
+déclencheur reste permis.
 
 ## À éprouver en réel : ce qu'aucun double ne peut établir
 

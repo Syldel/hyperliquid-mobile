@@ -86,7 +86,7 @@
                  courtes : sur une seule, la colonne (150 px à 360) la tronquait. -->
             @if (limitOrigin(); as origin) {
               <div class="limit-origin">
-                <div class="current-price-hint">
+                <div class="current-price-hint" [class.diff--danger]="isLimitSideInvalid()">
                   {{ origin.pct >= 0 ? '+' : '' }}{{ origin.pct | number: '1.2-2' }}% from trigger
                 </div>
                 <div class="current-price-hint">({{ origin.label }})</div>
