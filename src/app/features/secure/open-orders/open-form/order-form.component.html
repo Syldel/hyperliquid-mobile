@@ -206,6 +206,13 @@
           <ion-label>Market trigger</ion-label>
           <ion-toggle [checked]="isMarket()" (ionChange)="isMarket.set($event.detail.checked)" />
         </ion-item>
+        <!-- Un stop dont le limite est trop serré se déclenche sans s'exécuter et laisse la
+             position ouverte, sans protection (mesuré). Dit, pas bloqué. -->
+        @if (stopLimitWarning(); as warning) {
+          <ion-item lines="none" class="stop-limit-warning">
+            <ion-label class="ion-text-wrap" role="alert">{{ warning }}</ion-label>
+          </ion-item>
+        }
       }
     </ion-list>
   </div>

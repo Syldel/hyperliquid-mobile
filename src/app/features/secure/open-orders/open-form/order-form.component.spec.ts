@@ -170,6 +170,59 @@ describe('OrderFormComponent — price wiring', () => {
     });
   });
 
+  describe('the warning for a stop loss limit that is too tight', () => {
+    // Mesuré le 2026-10-18 (ETH) : un Stop Limit au limite égal au déclencheur est resté au carnet
+    // 826 secondes, la position ouverte et sans protection. Le formulaire le DIT, il ne le bloque pas.
+    it('says nothing for the default limit, 5 % from the trigger', () => {
+      startSellStop();
+
+      expect(form.limitPx()).toBe('76950');
+      expect(form.stopLimitWarning()).toBeNull();
+    });
+
+    it('warns when the limit typed is equal to the trigger, and says how far it is', () => {
+      startSellStop();
+      form.onLimitInput('81000');
+      settle();
+
+      expect(form.stopLimitWarning()).toBe(
+        'Limit is only 0.00% from the trigger: this stop may trigger without filling and leave the position open.',
+      );
+    });
+
+    it('does not block placing: the case is legitimate to test', () => {
+      startSellStop();
+      form.sz.set('0.001');
+      form.onLimitInput('81000');
+      settle();
+
+      expect(form.stopLimitWarning()).not.toBeNull();
+      expect(form.isFormInvalid()).toBe(false);
+    });
+
+    it('says nothing for a take profit, a market trigger or a limit order', () => {
+      startSellStop();
+      form.onLimitInput('81000');
+      form.tpsl.set('tp');
+      settle();
+      expect(form.stopLimitWarning()).toBeNull();
+
+      form.tpsl.set('sl');
+      form.isMarket.set(true);
+      settle();
+      expect(form.stopLimitWarning()).toBeNull();
+    });
+
+    it('leaves a limit on the wrong side to the existing block, not to this warning', () => {
+      startSellStop();
+      form.onLimitInput('82000'); // un stop vendeur dont le limite est AU-DESSUS du déclencheur
+      settle();
+
+      expect(form.isLimitSideInvalid()).toBe(true);
+      expect(form.stopLimitWarning()).toBeNull();
+    });
+  });
+
   it('never rewrites the trigger when the direction changes: the limit follows it, not the reverse', () => {
     startSellStop();
 

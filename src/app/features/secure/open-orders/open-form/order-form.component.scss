@@ -136,3 +136,11 @@
     margin: 0 16px;
   }
 }
+
+/* Le texte d'un avertissement prend la variante `shade` du jaune, pas le jaune lui-même : seul
+   le shade tient 4,5:1 sur le fond (voir docs/theming.md, « warning »). */
+.stop-limit-warning ion-label {
+  color: var(--ion-color-warning-shade);
+  font-size: 0.85rem;
+  font-weight: 500;
+}

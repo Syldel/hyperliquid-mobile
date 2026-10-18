@@ -74,8 +74,10 @@ import {
 } from './active-asset.util';
 import {
   isLimitOnWrongSide,
+  isStopLimitTight,
   limitFromTrigger,
   orderPricesReady,
+  stopLimitSpread,
   type OriginalTriggerOrder,
   type TriggerOrderState,
 } from './order-limit.util';
@@ -217,6 +219,28 @@ export class OrderFormComponent implements OnInit {
         triggerPx: this.triggerPx(),
       }),
   );
+
+  /**
+   * Un Stop Loss LIMITE dont le limite est si proche du déclencheur qu'il peut se déclencher sans
+   * s'exécuter. Un AVERTISSEMENT, pas un blocage : le cas est légitime à tester, et le seuil est un
+   * choix (voir `STOP_LIMIT_TIGHT_BELOW`). Mesuré le 2026-10-18 : limite égal au déclencheur, ordre
+   * resté au carnet 826 secondes, position ouverte et sans protection. Un limite du mauvais côté
+   * n'est pas dit ici : `isLimitSideInvalid` le bloque déjà.
+   */
+  stopLimitWarning = computed(() => {
+    const input = {
+      orderKind: this.orderKind(),
+      tpsl: this.tpsl(),
+      isMarket: this.isMarket(),
+      isBuy: this.isBuy(),
+      limitPx: this.limitPx(),
+      triggerPx: this.triggerPx(),
+    };
+    if (!isStopLimitTight(input)) return null;
+    const spread = stopLimitSpread(input);
+    if (spread === null || spread < 0) return null;
+    return `Limit is only ${(spread * 100).toFixed(2)}% from the trigger: this stop may trigger without filling and leave the position open.`;
+  });
 
   isFormInvalid = computed(() => {
     if (blocksPlacement(this.marketData())) return true;

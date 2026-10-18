@@ -562,6 +562,22 @@ navigateur ni sur l'exchange** : la modale n'affiche pas le limite, l'ordre n'es
 l'envoi, et les ordres réels du 2026-10-18 ont tous été posés par le formulaire principal, pas par
 cette modale.
 
+**Le formulaire avertit d'un Stop Loss limite au limite trop serré** (`isStopLimitTight`,
+`stopLimitWarning`) : sous **1 %** du déclencheur, le texte « Limit is only 0.00% from the trigger:
+this stop may trigger without filling and leave the position open » apparaît sous « Market trigger ».
+Un **avertissement, pas un blocage** : le cas est légitime à tester, et c'est ainsi qu'il a été
+mesuré. Décidé le 2026-10-18 après le Stop Limit ETH resté 826 s au carnet (point 1 de « À éprouver
+en réel »). Le seuil de 1 % est un **choix large**, pas une mesure : un cas, un seul. Pas de
+message pour un Take Profit limite (un plancher serré garde le prix visé et ne laisse pas la
+position sans protection), ni pour un déclencheur au marché (l'exchange ignore `p`), ni pour un
+limite du mauvais côté (déjà bloqué). Couvert par des tests et des mutations, et **mesuré dans le
+navigateur le 2026-10-18** sur ETH, à 360 px : le texte s'affiche sur deux lignes dans la colonne
+(304 px, de 28 à 332), sans défilement horizontal ; contraste **8,68:1 en sombre**
+(`rgb(224, 181, 43)` sur `rgb(29, 29, 29)`) et **5,43:1 en clair** (`#856500` sur `rgb(254, 255, 255)`),
+la couleur étant `--ion-color-warning-shade`, la variante prévue pour du texte (`docs/theming.md`).
+Absent avec le limite par défaut (« -5.00% from trigger »), absent avec « Market trigger »
+(où le libellé lit « -10.00% from trigger (exchange bound) »).
+
 **Changer d'actif repart du marché du nouvel actif.** Prix limite, déclencheur et taille saisis
 concernaient l'actif précédent : un stop vendeur à 80080 survivait sur un ETH à 2414 (mesuré le
 2026-10-16). En création, ils sont remis à zéro puis pré-remplis selon la règle ci-dessus — limite
@@ -634,6 +650,39 @@ jour où l'argent réel entre en jeu, et non pour être supposés connus.
      faites à 1 $ et 28 $ du déclencheur, bien en deçà de la borne de 10 % : elle n'a pas été mise à
      l'épreuve. Elle est celle de la doc de l'exchange.
 
+   _Déclencheurs LIMITES, mesurés le 2026-10-18_ (formulaire du mobile ; `xyz:BRENTOIL`, `io:ANTH` et
+   ETH, positions de 10 à 15 $) :
+   - **`p` est appliqué.** À chaque déclenchement la ligne `filled` garde le `p` posé — Take Profit
+     Limit 105.13, Stop Limit 1807.9, Stop Limit ETH 2377.0 (deux fois), `tif: "Gtc"` — au lieu de la
+     borne de l'exchange. Quatre cas, contre 26 pour le marché, où `p` est ignoré : l'ordre posé au
+     déclenchement est un ordre limite GTC à ce prix, comme la doc officielle le décrit.
+   - **Un limite trop serré reste au carnet.** Stop Limit ETH, limite **égal** au déclencheur (2377.0) :
+     posé à 15:36:04, déclenché à 15:36:06, exécuté à 15:49:52, soit **826 secondes plus tard**, en
+     maker, à 2377.0, quand le prix est remonté. Pendant ces 13 min 46 s la position était **ouverte et
+     sans protection**. Dans l'historique, `triggered` et `filled` n'ont plus le même horodatage : le
+     `timestamp` de la ligne `filled` est la création de l'ordre limite, son `statusTimestamp` est
+     l'exécution ; partout ailleurs ils étaient identiques. Un cas, pas un temps d'attente typique.
+   - **Un limite à 5 % s'exécute tout de suite**, au meilleur acheteur : Stop Limit `io:ANTH`
+     (limite 1807.9, fill **1906.0** pour un déclencheur à 1904.0, en taker, au-dessus de l'entrée) ;
+     Stop Limit ETH (limite 2377.0 sous un carnet à 2377.5 : fill 2377.5).
+   - **Un Take Profit limite** s'exécute en taker au prix du carnet (106.73 pour un déclencheur à
+     106.73) : son plancher à 1,5 % n'a pas joué.
+
+   _Le déclencheur se compare au mark price_, pas au carnet. Sur `io:ANTH` : mark 1904.2, milieu du
+   carnet 1904.65, oracle 1902.4. Un stop remonté à 1904.0 (par le chart de l'interface officielle) a
+   été **déclenché 1,2 s après sa pose**, alors que le carnet affichait un acheteur à 1906 : le mark
+   était sous le déclencheur. Sur ETH, mark et carnet ne diffèrent que de 0,1 $. C'est le seul cas
+   net pour le **point 5** : un déclencheur du mauvais côté du mark, posé par modification, est
+   **accepté et déclenché dans la seconde**, pas refusé. Notre formulaire, lui, le bloque (il compare
+   au `markPx` lu à l'ouverture, qu'il ne rafraîchit pas : un prix qui bouge pendant la saisie
+   bloque le bouton, comme sur ETH le 2026-10-18).
+
+   _HIP-3_ (`xyz`, `io`) : mêmes mécanismes que BTC — reduce-only accepté sans position, retiré à la
+   fermeture avec `reduceOnlyCanceled`, modification = annulation + nouvel `oid`. `io:ANTH` est
+   `onlyIsolated` (`strictIsolated`, levier max 6) : la position est isolated 6x, avec un
+   `rawUsd` négatif. Une entrée ALO y a été exécutée en **deux fills** (0,001 puis 0,007, à 15 s
+   d'écart) ; un ALO au prix de l'ask est refusé avec le statut **`badAloPxRejected`**.
+
    _Sources lues le 2026-10-18, et ce qu'elles valent_ (lues par un outil qui en rend un résumé,
    pas ligne à ligne ; **elles ne tranchaient rien**, c'est l'historique du compte qui a tranché) :
    - **SDK Python officiel, `examples/basic_tpsl.py`** : le TP part avec `p = triggerPx`, le SL
@@ -674,7 +723,9 @@ Profit Limit"`, `triggerCondition: "Price above 81959"`.
      `reduceOnlyCanceled`).
 
 4. **Les écarts de limite d'un déclencheur LIMITE (5 % SL, 1,5 % TP).** Des choix argumentés (doc
-   officielle, Freqtrade), aucun éprouvé sur un déclenchement : le bon écart d'un SL se lit sur des
+   officielle, Freqtrade). Le 2026-10-18 a donné **un contre-exemple chiffré** : un limite à 0 %
+   est resté 826 s au carnet (point 1), et un limite à 5 % s'est exécuté tout de suite, deux fois.
+   Pour le reste : le bon écart d'un SL se lit sur des
    sorties réelles en marché agité, pas dans une doc. Le 10 % d'un déclencheur au marché n'est
    plus de ce point : c'est la borne de l'exchange (point 1).
 5. **Déclencheur du mauvais côté du marché.** Le prix de déclenchement est le **mark price** ; un

@@ -1,5 +1,8 @@
 import {
   isLimitOnWrongSide,
+  isStopLimitTight,
+  stopLimitSpread,
+  STOP_LIMIT_TIGHT_BELOW,
   limitFromTrigger,
   isPositivePrice,
   orderPricesReady,
@@ -162,4 +165,76 @@ describe('isLimitOnWrongSide', () => {
       expect(isLimitOnWrongSide({ isBuy: true, limitPx, triggerPx })).toBe(false);
     },
   );
+});
+
+/**
+ * Un Stop Loss limite au limite trop serré se déclenche sans s'exécuter : mesuré le 2026-10-18 sur
+ * ETH, limite égal au déclencheur, ordre resté au carnet 826 secondes avec la position ouverte.
+ */
+describe('stopLimitSpread', () => {
+  it('measures the limit from the trigger, on the side where the limit is worse', () => {
+    // Une vente accepte de recevoir moins : le limite est SOUS le déclencheur.
+    expect(stopLimitSpread({ isBuy: false, limitPx: '95', triggerPx: '100' })).toBeCloseTo(0.05);
+    // Un achat accepte de payer plus : le limite est AU-DESSUS.
+    expect(stopLimitSpread({ isBuy: true, limitPx: '105', triggerPx: '100' })).toBeCloseTo(0.05);
+  });
+
+  it('is zero when the limit equals the trigger, and negative on the wrong side', () => {
+    expect(stopLimitSpread({ isBuy: false, limitPx: '100', triggerPx: '100' })).toBe(0);
+    expect(stopLimitSpread({ isBuy: false, limitPx: '101', triggerPx: '100' })).toBeLessThan(0);
+  });
+
+  it.each([
+    ['limit empty', '', '100'],
+    ['trigger empty', '95', ''],
+    ['unreadable', 'abc', '100'],
+  ])('has no spread when a price is unusable (%s)', (_label, limitPx, triggerPx) => {
+    expect(stopLimitSpread({ isBuy: false, limitPx, triggerPx })).toBeNull();
+  });
+});
+
+describe('isStopLimitTight', () => {
+  const tight = {
+    orderKind: 'trigger' as const,
+    tpsl: 'sl' as const,
+    isMarket: false,
+    isBuy: false,
+    limitPx: '2377.0',
+    triggerPx: '2377.0',
+  };
+
+  it('flags a stop loss limit whose limit equals its trigger: the measured case', () => {
+    expect(isStopLimitTight(tight)).toBe(true);
+  });
+
+  it('flags a limit a few tenths of a percent from the trigger', () => {
+    expect(isStopLimitTight({ ...tight, limitPx: '2371.0' })).toBe(true); // 0,25 %
+  });
+
+  it('accepts the default 5 % spread, and anything from 1 % up', () => {
+    expect(isStopLimitTight({ ...tight, limitPx: '2258.15' })).toBe(false); // 5 %
+    expect(isStopLimitTight({ ...tight, triggerPx: '100', limitPx: '99' })).toBe(false);
+    expect(STOP_LIMIT_TIGHT_BELOW).toBe(0.01);
+  });
+
+  it('does the same for a buy that closes a short', () => {
+    expect(isStopLimitTight({ ...tight, isBuy: true })).toBe(true);
+    expect(isStopLimitTight({ ...tight, isBuy: true, triggerPx: '100', limitPx: '105' })).toBe(
+      false,
+    );
+  });
+
+  it('says nothing for a take profit: a tight limit keeps the target price, and protects nothing', () => {
+    expect(isStopLimitTight({ ...tight, tpsl: 'tp' })).toBe(false);
+  });
+
+  it('says nothing for a market trigger: the exchange ignores p and applies its own 10 % bound', () => {
+    expect(isStopLimitTight({ ...tight, isMarket: true })).toBe(false);
+  });
+
+  it('says nothing for a limit order, and nothing while a price is missing', () => {
+    expect(isStopLimitTight({ ...tight, orderKind: 'limit' })).toBe(false);
+    expect(isStopLimitTight({ ...tight, limitPx: '' })).toBe(false);
+    expect(isStopLimitTight({ ...tight, triggerPx: '' })).toBe(false);
+  });
 });

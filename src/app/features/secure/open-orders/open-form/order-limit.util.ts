@@ -113,3 +113,54 @@ export function isLimitOnWrongSide(input: {
   const trigger = parseFloat(input.triggerPx);
   return input.isBuy ? limit < trigger : limit > trigger;
 }
+
+/**
+ * Sous cet écart, le limite d'un Stop Loss LIMITE est jugé trop serré : 1 %. Un CHOIX, large
+ * à dessein — la mesure ne donne pas de seuil, seulement un cas.
+ *
+ * La mesure (ETH, 2026-10-18) : un Stop Limit au limite **égal** au déclencheur (2377.0 pour
+ * 2377.0) s'est déclenché, puis son ordre limite de vente est **resté au carnet 826 secondes**,
+ * au-dessus du meilleur acheteur, avant d'être exécuté en maker quand le prix est remonté. Pendant
+ * ces 13 minutes 46 secondes la position est restée ouverte, **sans protection** : c'est le cas
+ * que la doc officielle décrit. L'écart entre le mark, qui déclenche, et le carnet, qui exécute,
+ * est petit sur ETH (au déclenchement d'un stop à 2378.0, le meilleur acheteur était à 2377.5,
+ * 0,02 % plus bas) et plus grand sur un marché HIP-3 mince (`io:ANTH` : mark 0,45 sous le milieu
+ * du carnet, oracle 2,3 plus bas). Le défaut du formulaire, 5 %, est loin de ce seuil.
+ */
+export const STOP_LIMIT_TIGHT_BELOW = 0.01;
+
+/**
+ * L'écart entre le limite et le déclencheur, en fraction du déclencheur, du côté où le limite est
+ * PIRE que lui : sous le déclencheur pour une vente, au-dessus pour un achat. Négatif quand le
+ * limite est du mauvais côté (`isLimitOnWrongSide` le bloque alors). `null` quand un des deux prix
+ * n'est pas exploitable.
+ */
+export function stopLimitSpread(input: {
+  isBuy: boolean;
+  limitPx: string;
+  triggerPx: string;
+}): number | null {
+  if (!isPositivePrice(input.limitPx) || !isPositivePrice(input.triggerPx)) return null;
+  const limit = parseFloat(input.limitPx);
+  const trigger = parseFloat(input.triggerPx);
+  return input.isBuy ? (limit - trigger) / trigger : (trigger - limit) / trigger;
+}
+
+/**
+ * Un Stop Loss LIMITE dont le limite est si proche du déclencheur qu'il peut se déclencher sans
+ * s'exécuter (voir `STOP_LIMIT_TIGHT_BELOW`). Un Take Profit limite serré n'en est pas un : il
+ * garde le prix visé, et le laisser en attente ne laisse pas une position sans protection. Un
+ * déclencheur au marché non plus : l'exchange applique sa propre borne de 10 % et ignore `p`.
+ */
+export function isStopLimitTight(input: {
+  orderKind: 'limit' | 'trigger';
+  tpsl: TriggerKind;
+  isMarket: boolean;
+  isBuy: boolean;
+  limitPx: string;
+  triggerPx: string;
+}): boolean {
+  if (input.orderKind !== 'trigger' || input.isMarket || input.tpsl !== 'sl') return false;
+  const spread = stopLimitSpread(input);
+  return spread !== null && spread < STOP_LIMIT_TIGHT_BELOW;
+}
