@@ -81,13 +81,25 @@
                 }
               </span>
             }
+            <!-- D'où vient ce prix et à combien du déclencheur : une valeur dérivée qui ne se
+                 dit pas est une valeur dont on ne sait pas qui l'a choisie. Deux lignes
+                 courtes : sur une seule, la colonne (150 px à 360) la tronquait. -->
+            @if (limitOrigin(); as origin) {
+              <div class="limit-origin">
+                <div class="current-price-hint">
+                  {{ origin.pct >= 0 ? '+' : '' }}{{ origin.pct | number: '1.2-2' }}% from trigger
+                </div>
+                <div class="current-price-hint">({{ origin.label }})</div>
+              </div>
+            }
           </ion-label>
           <ion-input
             type="number"
             inputmode="decimal"
             placeholder="{{ currentPrice() ?? '0.00' }}"
             [value]="limitPx()"
-            (ionInput)="limitPx.set($event.detail.value ?? '')"
+            [disabled]="limitLocked()"
+            (ionInput)="onLimitInput($event.detail.value ?? '')"
           />
         </ion-item>
         <ion-item lines="full">

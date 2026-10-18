@@ -501,37 +501,88 @@ trois ordres factices (rien n'a été envoyé) : un _Stop Limit_ et un _Stop Mar
 l'utilisateur ; un ordre limite simple restait intact. Un « Update order » aurait donc envoyé un
 autre prix limite que celui de l'ordre, sans avertissement.
 
-**Ce qui est fait.** La décision est une fonction pure testée, `limitFromTrigger`
-(`open-orders/open-form/order-limit.util.ts`). En modification, elle ne propose rien **tant que
-le déclencheur est celui de l'ordre** ; dès que l'utilisateur le change, le limite suit de
-nouveau, comme à la création. Elle ne propose rien non plus pour un ordre limite, ni sans
-déclencheur valable. Mesuré sur les mêmes trois ordres factices : à l'ouverture les limites
-restent à 80000 ; après avoir modifié le déclencheur à 82000, le limite des deux ordres
-déclencheurs passe à 82082 ; et pour un **nouvel** ordre le limite est toujours dérivé du
-déclencheur (80919 pour un déclencheur à 81000, côté vente). 14 tests, huit mutations tuées.
+**Ce qui est fait.** Le **déclencheur est l'ancre** : c'est la décision (« à ce prix, j'agis »),
+le limite n'est que le pire prix accepté. La décision est une fonction pure testée,
+`limitFromTrigger` (`open-orders/open-form/order-limit.util.ts`) :
 
-**Une régression attrapée avant de committer.** Le premier garde coupait _tout_ recalcul en
-modification, y compris le suivi du limite quand l'utilisateur change le déclencheur — un
-comportement qui existait et que l'ancien effet assurait. Mesuré (le limite restait à 80000
-après un déclencheur à 82000), puis corrigé en comparant le déclencheur à celui de l'ordre
-ouvert. Un test et une mutation (« le garde coupe tout en modification ») l'épinglent.
+| Ordre déclencheur  | Écart du limite avec le déclencheur | Pourquoi                                              |
+| ------------------ | ----------------------------------- | ----------------------------------------------------- |
+| au marché          | **10 %**                            | la tolérance par défaut de l'interface officielle     |
+| Stop Loss limite   | **5 %**                             | doit sortir ; en deçà de la liquidation à fort levier |
+| Take Profit limite | **1,5 %**                           | garde le prix visé ; exemples officiels 1,7 et 2,2 %  |
+
+Sous le déclencheur pour une vente, au-dessus pour un achat, dans tous les cas. Ces trois valeurs
+sont des **choix** (validés le 2026-10-16), sources et raisonnement dans l'en-tête de
+`order-limit.util.ts` ; l'ancien écart unique de 0,1 % était dix fois plus serré que
+l'exemple de Freqtrade et exposait un SL à se déclencher sans s'exécuter dans un gap. Le formulaire **dit**, sous le champ limite et sur deux lignes (« −5,00 % from trigger » puis
+« default for Stop Loss », « edited », « slippage bound, unverified » ou « as placed »), d'où vient le
+limite. Sur une seule ligne le texte était tronqué à 360 px ; une marge de 10 px sous la dernière
+ligne l'empêche de toucher la valeur (le libellé empilé d'Ionic est réduit à 75 %).
+
+Règles de cohérence, toutes mesurées dans le navigateur le 2026-10-16 :
+
+- **Une valeur saisie fait autorité.** Un limite saisi à la main n'est plus réécrit ni par le sens,
+  ni par TP/SL, ni par le déclencheur ; vider le champ rend la main au prix dérivé. Au marché
+  il n'y a pas de saisie : le champ est désactivé et le limite est la borne de glissement
+  (c'est ce qui tranche l'ancienne question de la bascule « Market trigger »).
+- **Le déclencheur n'est jamais réécrit** par un changement de sens (il l'était depuis le limite :
+  81000 devenait 80838) ; c'est le limite qui se recalcule.
+- **On ne pré-remplit que ce qui a une valeur sûre.** Un ordre limite reçoit le prix du marché
+  (une fois par actif). Un ordre déclencheur ne reçoit **rien** : son côté du marché dépend de
+  TP/SL et du sens, un pourcentage de départ serait inventé, et un déclencheur au prix exact du
+  marché se déclenche tout de suite ou est refusé. Le marché reste affiché en repère. Passer de
+  limite à déclencheur (ou l'inverse) **vide les deux champs** : le prix saisi pour l'un n'a pas de
+  sens pour l'autre.
+- **En modification**, l'ordre est montré tel qu'il est : son limite réel tant que le déclencheur,
+  le type et TP/SL sont ceux de l'ordre — y compris quand on **remet** le déclencheur à sa valeur
+  d'origine après l'avoir changé. Dès qu'ils changent, le limite suit.
+- **Un prix manquant bloque l'envoi.** Avec une taille valable, un limite ou un déclencheur vide
+  laissait le bouton actif et partait avec `limitPx: "NaN"` (`roundPrice(NaN)` rend la chaîne
+  `"NaN"`, truthy) ; c'est le serveur qui refusait. `orderPricesReady` le bloque avant.
+
+**Deux régressions attrapées avant de committer.** Le premier garde de modification coupait _tout_
+recalcul, y compris le suivi du limite quand on change le déclencheur (mesuré : il restait à 80000
+après un déclencheur à 82000). Le deuxième ne rendait pas le limite d'origine quand le
+déclencheur revenait à sa valeur (2327,5 au lieu de 2300). Chacune a son test et sa mutation.
 
 **Changer d'actif repart du marché du nouvel actif.** Prix limite, déclencheur et taille saisis
 concernaient l'actif précédent : un stop vendeur à 80080 survivait sur un ETH à 2414 (mesuré le
-2026-10-16). En création, ils sont remis à zéro puis pré-remplis une fois — limite au prix du
-marché, déclencheur dérivé, taille de 10 $ — dès que le prix **et** les décimales du marché sont
-arrivés. Mesuré sur BTC, ETH, `xyz:BRENTOIL` et kPEPE, en mode limite comme en mode
-déclencheur ; la modification d'un ordre existant n'est pas touchée. ⚠️ Non couvert par un test
-automatique (câblage du composant) ; un déclencheur pré-rempli au marché peut être refusé par la
-validation de prix tant que l'utilisateur ne l'a pas écarté.
+2026-10-16). En création, ils sont remis à zéro puis pré-remplis selon la règle ci-dessus — limite
+au prix du marché pour un ordre limite, taille de 10 $ — dès que le prix **et** les décimales du
+marché sont arrivés. Mesuré sur BTC, ETH, `xyz:BRENTOIL` et kPEPE.
 
-**⚠️ Ouvert, à trancher : la bascule « Market trigger » réécrit le prix limite.** En création,
-basculer le toggle recalcule le limite depuis le déclencheur, **même s'il avait été saisi à la
-main** (12345 redevenait 49950 ; mesuré). Activer Market s'y prête : le limite n'est alors qu'une
-borne de glissement. Désactiver Market (un _stop-limit_, où le limite est ce que l'utilisateur
-veut contrôler) est la direction suspecte. Rien ne dit que c'était voulu ; l'option envisagée est
-de recalculer à l'activation et de laisser le limite tel quel à la désactivation. Le commentaire
-de `order-form.component.ts`, au-dessus des deux lectures `void`, le dit au même endroit.
+⚠️ **Non couvert par un test automatique : le câblage du composant** (effets, drapeau « saisi »,
+signaux). Seule la décision pure l'est ; le reste a été mesuré dans le navigateur. ⚠️ Un limite
+saisi à la main **reste** quand on change le sens : il peut alors se trouver du mauvais côté du
+déclencheur (limite sous le déclencheur pour un achat) sans qu'aucun contrôle ne le dise.
+
+## À éprouver en réel : ce qu'aucun double ne peut établir
+
+Ces points ne se tranchent ni par la lecture du code ni dans le navigateur : il faut un
+ordre réel (ou testnet), de petite taille. Ils sont écrits ici pour ne pas être oubliés le
+jour où l'argent réel entre en jeu, et non pour être supposés connus.
+
+1. **⚠️ `p` d'un ordre déclencheur « au marché ».** Le champ est obligatoire dans le format
+   d'ordre (le gateway le refuse absent) et la doc officielle ne dit pas s'il est appliqué ou
+   ignoré. Elle dit que les TP/SL au marché ont une tolérance de glissement de **10 %** par
+   défaut. Le gateway envoie `p = triggerPx` pour les ordres protecteurs
+   (`SmartOrderService.toHLOrderDetails`) : si `p` est une borne, un SL vendeur au marché
+   ne s'exécute pas dans un gap sous son déclencheur. À mesurer : un SL au marché, `p` égal
+   au déclencheur, puis `p` à 10 %, et comparer ce qui est exécuté.
+2. **⚠️ TP/SL enfants d'un ordre parent partiellement rempli.** La doc dit que les enfants
+   ne sont placés que lorsque le parent est entièrement rempli ; annuler un parent partiel
+   annule les enfants. Une position peut donc rester sans protection. À éprouver sur la
+   section « protective » du formulaire.
+3. **Le `limitPx` renvoyé par Hyperliquid pour un ordre déclencheur existant.** La
+   modification (garde de `limitFromTrigger`) a été mesurée sur des ordres factices de forme
+   devinée ; la sémantique réelle de `limitPx` pour un Stop Limit / Take Limit n'a pas été lue.
+4. **Les écarts de limite par défaut (10 % au marché, 5 % SL, 1,5 % TP).** Des choix argumentés
+   (doc officielle, Freqtrade), aucun éprouvé sur des fills : le bon écart d'un SL se lit sur des
+   sorties réelles en marché agité, pas dans une doc.
+5. **Déclencheur du mauvais côté du marché.** Le prix de déclenchement est le **mark price** ; un
+   déclencheur du mauvais côté est déclenché tout de suite ou refusé — le comportement exact
+   n'a pas été observé. Le formulaire ne pré-remplit plus de déclencheur, mais `isPriceInvalid`
+   ne bloque que selon sa propre règle.
 
 ## Précédent
 

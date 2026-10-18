@@ -1,43 +1,112 @@
 import { roundPrice } from '@utils/hl-rounding.utils';
 
-/** L'écart entre le déclencheur et le prix limite d'un ordre déclencheur : 0,1 %. */
-export const TRIGGER_OFFSET = 0.001;
+/**
+ * Les écarts entre le déclencheur et le prix limite d'un ordre déclencheur. Le déclencheur est
+ * la décision (« à ce prix, j'agis ») ; le limite est une protection (« pas pire que ça »).
+ * Ces trois valeurs sont des CHOIX, validés par l'utilisateur le 2026-10-16 — aucune n'a été
+ * éprouvée sur des fills réels (voir `docs/roadmap.md`, « À éprouver en réel »).
+ *
+ * - **Au marché : 10 %.** La tolérance de glissement par défaut de l'interface officielle
+ *   (doc TP/SL d'Hyperliquid : « slippage tolerance of 10% »). `p` est obligatoire dans le
+ *   format d'ordre ; ce qu'Hyperliquid en fait pour un déclencheur au marché n'est pas écrit.
+ * - **Stop Loss limite : 5 %.** Un SL doit sortir : un limite trop serré se déclenche sans
+ *   s'exécuter dans un gap (Freqtrade recommande le stop-market pour cette raison). Pas les
+ *   ~20 % de l'exemple officiel : avec un levier de 5x ou plus, la liquidation est plus
+ *   proche que ça, et un limite au-delà d'elle ne protège de rien.
+ * - **Take Profit limite : 1,5 %.** Un TP garde le prix visé : entre les exemples officiels
+ *   (1,7 % et 2,2 %) et le 1 % de Freqtrade.
+ *
+ * Le sens est le même pour SL et TP : sous le déclencheur pour une vente, au-dessus pour un
+ * achat — c'est le pire prix qu'on accepte pour sortir.
+ */
+export const LIMIT_SPREAD_MARKET = 0.1;
+export const LIMIT_SPREAD_SL = 0.05;
+export const LIMIT_SPREAD_TP = 0.015;
 
-export interface LimitFromTriggerInput {
-  /** Le formulaire montre un ordre EXISTANT, pas un ordre en cours de création. */
-  isModify: boolean;
-  /**
-   * Le déclencheur que l'ordre existant portait à l'ouverture, ou `null` en création. En
-   * modification, un déclencheur **identique** n'est pas une saisie de l'utilisateur : c'est
-   * l'ordre tel qu'il est.
-   */
-  originalTriggerPx: string | null;
-  orderKind: 'limit' | 'trigger';
+export type TriggerKind = 'sl' | 'tp';
+
+export function limitSpread(tpsl: TriggerKind, isMarket: boolean): number {
+  if (isMarket) return LIMIT_SPREAD_MARKET;
+  return tpsl === 'sl' ? LIMIT_SPREAD_SL : LIMIT_SPREAD_TP;
+}
+
+/** Ce qui, dans un ordre déclencheur, détermine le prix limite proposé. */
+export interface TriggerOrderState {
   triggerPx: string;
+  isMarket: boolean;
+  tpsl: TriggerKind;
+}
+
+/** L'ordre EXISTANT à l'ouverture : son état, et le prix limite qu'il porte réellement. */
+export interface OriginalTriggerOrder extends TriggerOrderState {
+  limitPx: string;
+}
+
+export interface LimitFromTriggerInput extends TriggerOrderState {
+  /**
+   * L'ordre existant tel qu'à l'ouverture, ou `null` en création. En modification, un état
+   * **identique** n'est pas une saisie de l'utilisateur : c'est l'ordre tel qu'il est, et
+   * son limite est celui qu'il porte.
+   */
+  original: OriginalTriggerOrder | null;
+  orderKind: 'limit' | 'trigger';
   isBuy: boolean;
   szDecimals: number;
   isSpot: boolean;
 }
 
 /**
- * Le prix limite à proposer pour un ordre déclencheur : le déclencheur ± 0,1 % (au-dessus
- * pour un achat, en dessous pour une vente), arrondi comme l'exchange l'exige. `null` quand il
- * n'y a **rien à proposer**.
+ * Le prix limite à proposer pour un ordre déclencheur : le déclencheur écarté de
+ * `limitSpread(tpsl, isMarket)`, arrondi comme l'exchange l'exige.
  *
- * En modification, il n'y a rien à proposer **tant que le déclencheur est celui de l'ordre** :
- * sans ce garde, ouvrir un ordre déclencheur existant remplaçait son vrai prix limite par celui-ci
- * avant tout geste de l'utilisateur (80000 devenait 81081, mesuré le 2026-10-16). Dès que
- * l'utilisateur CHANGE le déclencheur, le limite suit de nouveau, comme à la création : un
- * premier garde coupait aussi ce comportement, qui existait avant (mesuré, puis corrigé).
+ * - `null` : **rien à proposer** (ce n'est pas un ordre déclencheur).
+ * - `''` : un déclencheur absent ou illisible — le limite proposé est vide, pas celui d'un
+ *   déclencheur précédent.
+ *
+ * En modification, tant que l'ordre est tel qu'à l'ouverture, le limite proposé est **celui
+ * de l'ordre** : sans ce garde, ouvrir un ordre existant remplaçait son vrai prix limite
+ * (80000 devenait 81081, mesuré le 2026-10-16) ; et sans le retour à la valeur d'origine,
+ * remettre le déclencheur à sa valeur laissait le limite dérivé de la saisie intermédiaire
+ * (mesuré le même jour). Dès que le déclencheur, le type ou le TP/SL change, le limite suit
+ * de nouveau — un premier garde coupait aussi ce suivi, qui existait avant.
  */
 export function limitFromTrigger(input: LimitFromTriggerInput): string | null {
   if (input.orderKind !== 'trigger') return null;
-  // En modification, tant que le déclencheur est celui de l'ordre, rien à proposer.
-  if (input.isModify && input.triggerPx === input.originalTriggerPx) return null;
+  const o = input.original;
+  if (
+    o &&
+    o.triggerPx === input.triggerPx &&
+    o.isMarket === input.isMarket &&
+    o.tpsl === input.tpsl
+  ) {
+    return o.limitPx;
+  }
 
   const trigger = parseFloat(input.triggerPx);
-  if (!trigger) return null;
+  if (!trigger || trigger < 0) return '';
 
-  const factor = input.isBuy ? 1 + TRIGGER_OFFSET : 1 - TRIGGER_OFFSET;
+  const spread = limitSpread(input.tpsl, input.isMarket);
+  const factor = input.isBuy ? 1 + spread : 1 - spread;
   return String(parseFloat(roundPrice(trigger * factor, input.szDecimals, input.isSpot)));
+}
+
+/** Un prix saisi est exploitable : un nombre strictement positif. */
+export function isPositivePrice(text: string): boolean {
+  const n = parseFloat(text);
+  return Number.isFinite(n) && n > 0;
+}
+
+/**
+ * Les prix dont l'ordre a besoin sont là. Sans ce contrôle, `roundPrice(parseFloat(''))`
+ * rend la chaîne `"NaN"` — qui est truthy : le bouton restait actif et l'ordre partait avec
+ * `limitPx: "NaN"` (mesuré le 2026-10-16), c'est le serveur qui le refusait. Un ordre
+ * déclencheur a besoin des DEUX : le déclencheur, et le limite qui en est dérivé ou saisi.
+ */
+export function orderPricesReady(input: {
+  orderKind: 'limit' | 'trigger';
+  limitPx: string;
+  triggerPx: string;
+}): boolean {
+  if (!isPositivePrice(input.limitPx)) return false;
+  return input.orderKind !== 'trigger' || isPositivePrice(input.triggerPx);
 }

@@ -74,6 +74,13 @@
   }
 }
 
+/* Le libellé empilé d'Ionic est réduit à 75 % : sa boîte de mise en page est plus petite que ce
+   qui est peint, et la dernière ligne venait toucher la valeur saisie (mesuré à 360 px, mode
+   déclencheur, quatre lignes sous « Limit price »). Cette marge rend la place. */
+.limit-origin {
+  margin-bottom: 10px;
+}
+
 .current-price-hint {
   font-size: 0.85rem;
   font-weight: 400;

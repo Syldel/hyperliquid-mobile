@@ -72,7 +72,12 @@ import {
   type ActiveAssetPayload,
   type MarketDataState,
 } from './active-asset.util';
-import { limitFromTrigger, TRIGGER_OFFSET as TRIGGER_OFFSET_FRACTION } from './order-limit.util';
+import {
+  limitFromTrigger,
+  orderPricesReady,
+  type OriginalTriggerOrder,
+  type TriggerOrderState,
+} from './order-limit.util';
 
 export type OrderFormMode = 'place' | 'modify';
 
@@ -188,10 +193,20 @@ export class OrderFormComponent implements OnInit {
   });
   sizeUsdClass = computed(() => (this.isSizeInvalid() ? 'diff--danger' : ''));
 
+  /** Les prix que l'ordre exige sont des nombres : sinon `"NaN"` partirait au serveur. */
+  private pricesReady = computed(() =>
+    orderPricesReady({
+      orderKind: this.orderKind(),
+      limitPx: this.limitPx(),
+      triggerPx: this.triggerPx(),
+    }),
+  );
+
   isFormInvalid = computed(() => {
     if (blocksPlacement(this.marketData())) return true;
     const order = this.buildOrderDetails();
-    if (!order.assetName || !order.limitPx || !order.sz) return true;
+    if (!order.assetName || !order.sz) return true;
+    if (!this.pricesReady()) return true;
     if (parseFloat(order.sz) <= 0) return true;
     return this.isPriceInvalid() || this.isSizeInvalid();
   });
@@ -230,21 +245,73 @@ export class OrderFormComponent implements OnInit {
   fetchFn = signal(this.buildFetchFn());
 
   previousKind = signal<'limit' | 'trigger'>(this.orderKind());
-  readonly TRIGGER_OFFSET = TRIGGER_OFFSET_FRACTION; // 0.1%
 
   private defaultSizeApplied = false;
-  private defaultPriceApplied = false;
+  /**
+   * Le prix du marché pré-remplit le prix limite, une fois par actif et par type d'ordre. Un
+   * signal : le remettre à `false` doit relancer l'effet qui pré-remplit.
+   */
+  private priceDefaulted = signal(false);
   /** Les décimales de `szDecimals` sont celles de l'actif choisi, pas du précédent. */
   private szDecimalsKnown = signal(false);
 
-  private getTriggerFactor(): number {
-    return this.isBuy() ? 1 + this.TRIGGER_OFFSET : 1 - this.TRIGGER_OFFSET;
+  /**
+   * L'utilisateur a saisi le prix limite d'un ordre déclencheur : il fait alors autorité sur
+   * le prix dérivé du déclencheur, que ni le sens, ni le TP/SL, ni le déclencheur ne réécrivent
+   * plus. Un déclencheur au marché le remet à zéro : son limite est la borne de glissement,
+   * toujours dérivée.
+   */
+  limitEdited = signal(false);
+
+  /** Le limite d'un déclencheur au marché n'est pas un choix : c'est la borne de glissement. */
+  limitLocked = computed(() => this.orderKind() === 'trigger' && this.isMarket());
+
+  /** D'où vient le prix limite affiché en mode déclencheur, et à combien du déclencheur. */
+  limitOrigin = computed(() => {
+    if (this.orderKind() !== 'trigger') return null;
+    const trigger = parseFloat(this.triggerPx());
+    const limit = parseFloat(this.limitPx());
+    if (!trigger || !limit) return null;
+    const pct = ((limit - trigger) / trigger) * 100;
+    const original = this.originalTrigger();
+    const asOpened =
+      original !== null &&
+      original.triggerPx === this.triggerPx() &&
+      original.isMarket === this.isMarket() &&
+      original.tpsl === this.tpsl();
+    const label = this.limitEdited()
+      ? 'edited'
+      : asOpened
+        ? 'as placed'
+        : this.isMarket()
+          ? 'slippage bound, unverified'
+          : `default for ${this.tpsl() === 'sl' ? 'Stop Loss' : 'Take Profit'}`;
+    return { pct, label };
+  });
+
+  /** L'état d'un ordre déclencheur existant, tel que `ngOnInit` l'affiche. */
+  private static triggerStateOf(order: {
+    triggerPx?: string | null;
+    orderType: string;
+  }): TriggerOrderState {
+    const type = order.orderType.toLowerCase();
+    return {
+      triggerPx: order.triggerPx ?? '',
+      isMarket: type.includes('market'),
+      tpsl: type.includes('stop') ? 'sl' : 'tp',
+    };
   }
 
-  private applyReverseTrigger(limitPx: number): number {
-    return parseFloat(
-      roundPrice(limitPx / this.getTriggerFactor(), this.szDecimals(), this.isSpot()),
-    );
+  private originalTrigger(): OriginalTriggerOrder | null {
+    const order = this.existingOrder;
+    if (!this.isModify() || !order?.isTrigger) return null;
+    return { ...OrderFormComponent.triggerStateOf(order), limitPx: order.limitPx };
+  }
+
+  /** Saisie manuelle du prix limite. Vider le champ rend la main au prix dérivé. */
+  onLimitInput(value: string): void {
+    this.limitPx.set(value);
+    if (this.orderKind() === 'trigger') this.limitEdited.set(value !== '');
   }
 
   constructor() {
@@ -261,18 +328,20 @@ export class OrderFormComponent implements OnInit {
       });
     });
 
-    // Le prix du marché pré-remplit le prix de l'ordre, UNE fois par actif. Il attend les
-    // décimales du marché : arrondir avec celles de l'actif précédent donnerait un prix
-    // que l'exchange refuse ou tronque.
+    // Le prix du marché pré-remplit le prix limite d'un ordre LIMITE, une fois par actif. Il
+    // attend les décimales du marché : arrondir avec celles de l'actif précédent donnerait un
+    // prix que l'exchange refuse ou tronque. Un ordre déclencheur ne reçoit RIEN : son côté du
+    // marché dépend de TP/SL et du sens, un pourcentage de départ serait inventé, et le prix
+    // limite se dérive du déclencheur que l'utilisateur choisit (le marché reste affiché en
+    // repère).
     effect(() => {
       const price = this.currentPrice();
-      if (!price || !this.szDecimalsKnown() || this.isModify() || this.defaultPriceApplied) return;
+      const kind = this.orderKind();
+      if (!price || !this.szDecimalsKnown() || this.isModify() || this.priceDefaulted()) return;
       untracked(() => {
-        this.defaultPriceApplied = true;
-        const px = roundPrice(price, this.szDecimals(), !!this.isSpot());
-        this.limitPx.set(px);
-        if (this.orderKind() === 'trigger') {
-          this.triggerPx.set(String(this.applyReverseTrigger(parseFloat(px))));
+        this.priceDefaulted.set(true);
+        if (kind === 'limit') {
+          this.limitPx.set(roundPrice(price, this.szDecimals(), !!this.isSpot()));
         }
       });
     });
@@ -282,8 +351,9 @@ export class OrderFormComponent implements OnInit {
       untracked(() => {
         this.fetchFn.set(this.buildFetchFn());
         this.defaultSizeApplied = false;
-        this.defaultPriceApplied = false;
+        this.priceDefaulted.set(false);
         this.szDecimalsKnown.set(false);
+        this.limitEdited.set(false);
         // Prix et taille saisis concernaient l'actif PRÉCÉDENT : un stop vendeur à 80080
         // survivait sur un ETH à 2414 (mesuré le 2026-10-16). On repart du marché du
         // nouvel actif. En modification, l'ordre existant garde ses valeurs.
@@ -336,51 +406,48 @@ export class OrderFormComponent implements OnInit {
         if (kindChanged) {
           this.isBuy.set(!isBuy);
           this.loadActivePosition();
+          // Un limite et un déclencheur sont deux ordres de nature différente : le prix saisi
+          // pour l'un n'a pas de sens pour l'autre (un déclencheur dérivé d'un prix d'entrée
+          // limite à ±0,1 % ne voulait rien dire). Les deux champs repartent vides ; un ordre
+          // limite reçoit à nouveau le prix du marché.
+          this.limitPx.set('');
+          this.triggerPx.set('');
+          this.limitEdited.set(false);
+          this.priceDefaulted.set(false);
         }
         if (kind !== 'trigger') {
           this.activePosition.set(null);
         }
-        if (kind === 'trigger') {
-          const limit = parseFloat(this.limitPx());
-          if (limit) this.triggerPx.set(String(this.applyReverseTrigger(limit)));
-        }
       });
     });
 
+    // Le prix limite d'un ordre déclencheur se dérive du déclencheur (la décision) : voir
+    // `order-limit.util.ts` pour les écarts. Tout ce qui le détermine est lu ICI pour être
+    // suivi ; le bloc `untracked` ne suit rien.
     effect(() => {
       const triggerPx = this.triggerPx();
-      // Lus pour être SUIVIS, pas pour leur valeur : le bloc `untracked` ci-dessous
-      // ne suit rien, donc ces deux lectures sont tout ce qui relance l'effet
-      // quand le type d'ordre ou le sens change.
-      //
-      // ⚠️ Mesuré dans le navigateur le 2026-10-16, en les retirant puis en
-      // rejouant le même scénario :
-      // - `isMarket` : basculer Market/Limit RÉÉCRIT le prix limite depuis le prix
-      //   de déclenchement, **même si l'utilisateur l'avait saisi à la main**
-      //   (12345 devenait 49950 ; sans la lecture, il restait 12345). C'est le
-      //   comportement d'avant la règle de lint, conservé tel quel. Personne n'a
-      //   décidé que c'était voulu — à trancher, pas à supprimer en passant. Cela ne
-      //   vaut que pour la CRÉATION : en modification, `limitFromTrigger` ne recalcule
-      //   plus rien tant que le déclencheur est celui de l'ordre (voir `order-limit.util.ts`) ;
-      // - `isBuy` : aucun effet observable. L'effet ci-dessus recalcule `triggerPx`
-      //   depuis le prix limite quand le sens change, ce qui relance celui-ci de
-      //   toute façon. Gardé par prudence, pas par nécessité démontrée.
-      void this.isMarket();
-      void this.isBuy();
+      const isBuy = this.isBuy();
+      const tpsl = this.tpsl();
+      const isMarket = this.isMarket();
+      const orderKind = this.orderKind();
       untracked(() => {
-        // Une aide à la CRÉATION : en modification, `limitFromTrigger` rend `null` et le prix
-        // limite de l'ordre reste ce qu'il est. Sans ce garde, ouvrir un ordre déclencheur
-        // existant remplaçait son vrai limite par déclencheur × 1,001 (mesuré le 2026-10-16).
+        // Au marché, le limite est la borne de glissement : jamais une saisie.
+        if (isMarket && this.limitEdited()) this.limitEdited.set(false);
         const limit = limitFromTrigger({
-          isModify: this.isModify(),
-          originalTriggerPx: this.isModify() ? (this.existingOrder?.triggerPx ?? '') : null,
-          orderKind: this.orderKind(),
+          original: this.originalTrigger(),
+          orderKind,
           triggerPx,
-          isBuy: this.isBuy(),
+          isMarket,
+          tpsl,
+          isBuy,
           szDecimals: this.szDecimals(),
           isSpot: !!this.isSpot(),
         });
-        if (limit !== null) this.limitPx.set(limit);
+        if (limit === null) return;
+        // Un limite saisi à la main fait autorité (ni le sens, ni TP/SL, ni le déclencheur ne
+        // le réécrivent) — sauf au marché, où il n'y a pas de saisie.
+        if (this.limitEdited() && !isMarket) return;
+        this.limitPx.set(limit);
       });
     });
   }
@@ -399,8 +466,9 @@ export class OrderFormComponent implements OnInit {
       if (existing.isTrigger) {
         this.orderKind.set('trigger');
         this.triggerPx.set(existing.triggerPx ?? '');
-        this.tpsl.set(existing.orderType.toLowerCase().includes('stop') ? 'sl' : 'tp');
-        this.isMarket.set(existing.orderType.toLowerCase().includes('market'));
+        const state = OrderFormComponent.triggerStateOf(existing);
+        this.tpsl.set(state.tpsl);
+        this.isMarket.set(state.isMarket);
       } else {
         this.orderKind.set('limit');
         if (existing.tif && ['Alo', 'Ioc', 'Gtc'].includes(existing.tif)) {
@@ -712,7 +780,7 @@ export class OrderFormComponent implements OnInit {
 
     const order = this.buildOrderDetails();
 
-    if (!order.assetName || !order.limitPx || !order.sz) {
+    if (!order.assetName || !order.sz || !this.pricesReady()) {
       this.error.set('Please fill in all required fields.');
       return;
     }
