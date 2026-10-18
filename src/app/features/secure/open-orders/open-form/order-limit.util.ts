@@ -1,6 +1,5 @@
 import { roundPrice } from '@utils/hl-rounding.utils';
-
-import { limitSpread, type TriggerKind } from '@utils/limit-spread.util';
+import { limitSpread, marketTriggerBound, type TriggerKind } from '@utils/limit-spread.util';
 
 /** Ce qui, dans un ordre déclencheur, détermine le prix limite proposé. */
 export interface TriggerOrderState {
@@ -29,7 +28,8 @@ export interface LimitFromTriggerInput extends TriggerOrderState {
 
 /**
  * Le prix limite à proposer pour un ordre déclencheur : le déclencheur écarté de
- * `limitSpread(tpsl, isMarket)`, arrondi comme l'exchange l'exige.
+ * `limitSpread(tpsl)` pour un déclencheur limite, ou la borne de l'exchange (`marketTriggerBound`)
+ * pour un déclencheur au marché ; arrondi comme l'exchange l'exige.
  *
  * - `null` : **rien à proposer** (ce n'est pas un ordre déclencheur).
  * - `''` : un déclencheur absent ou illisible — le limite proposé est vide, pas celui d'un
@@ -57,7 +57,18 @@ export function limitFromTrigger(input: LimitFromTriggerInput): string | null {
   const trigger = parseFloat(input.triggerPx);
   if (!trigger || trigger < 0) return '';
 
-  const spread = limitSpread(input.tpsl, input.isMarket);
+  // Au marché, l'exchange recalcule sa propre borne et ignore ce limite : on affiche la sienne
+  // (voir `limit-spread.util.ts`). Un déclencheur LIMITE garde un écart choisi, qui est réel.
+  if (input.isMarket) {
+    return marketTriggerBound({
+      triggerPx: input.triggerPx,
+      isBuy: input.isBuy,
+      szDecimals: input.szDecimals,
+      isSpot: input.isSpot,
+    });
+  }
+
+  const spread = limitSpread(input.tpsl);
   const factor = input.isBuy ? 1 + spread : 1 - spread;
   return String(parseFloat(roundPrice(trigger * factor, input.szDecimals, input.isSpot)));
 }

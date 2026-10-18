@@ -1,6 +1,6 @@
 import { HLOrderDetails } from '@syldel/hl-shared-types';
 import { roundPrice, roundSize } from './hl-rounding.utils';
-import { limitSpread } from './limit-spread.util';
+import { limitSpread, marketTriggerBound } from './limit-spread.util';
 
 export type ProtectiveOrderKind = 'tp' | 'sl';
 
@@ -50,19 +50,31 @@ export function buildProtectiveOrderDetails(
   const triggerPx = computeProtectiveTriggerPx(main, protective);
   const triggerPxNum = parseFloat(triggerPx);
 
-  // Le prix limite est le pire prix accepté pour sortir : l'écart dépend du type d'ordre et de
-  // l'exécution (voir `limit-spread.util.ts`). Avant le 2026-10-18 il valait 0,1 % quoi qu'on
-  // choisisse, « Market execution » comprise.
-  const spread = limitSpread(protective.kind, protective.isMarket);
-  const execFactor = closingIsBuy ? 1 + spread : 1 - spread;
-  const limitPxNum = triggerPxNum * execFactor;
+  // Le prix limite de l'ordre de clôture. Au marché, l'exchange recalcule sa propre borne de 10 %
+  // et ignore `p` (mesuré le 2026-10-18, voir `limit-spread.util.ts`) : on envoie cette borne. Un
+  // déclencheur LIMITE a un vrai plancher, écarté de 5 % (SL) ou 1,5 % (TP). Avant le
+  // 2026-10-18 l'écart valait 0,1 % quoi qu'on choisisse : sans effet au marché, mais un plancher
+  // trop serré pour une exécution limite.
+  const spread = limitSpread(protective.kind);
+  const limitPx = protective.isMarket
+    ? marketTriggerBound({
+        triggerPx,
+        isBuy: closingIsBuy,
+        szDecimals: main.szDecimals,
+        isSpot: main.isSpot,
+      })
+    : roundPrice(
+        triggerPxNum * (closingIsBuy ? 1 + spread : 1 - spread),
+        main.szDecimals,
+        main.isSpot,
+      );
 
   const szNum = (mainSz * protective.sizePercent) / 100;
 
   return {
     assetName: main.assetName,
     isBuy: closingIsBuy,
-    limitPx: roundPrice(limitPxNum, main.szDecimals, main.isSpot),
+    limitPx,
     sz: roundSize(szNum, main.szDecimals),
     reduceOnly: true,
     orderType: {

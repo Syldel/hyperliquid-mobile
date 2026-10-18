@@ -507,16 +507,18 @@ le limite n'est que le pire prix accepté. La décision est une fonction pure te
 
 | Ordre déclencheur  | Écart du limite avec le déclencheur | Pourquoi                                              |
 | ------------------ | ----------------------------------- | ----------------------------------------------------- |
-| au marché          | **10 %**                            | la tolérance par défaut de l'interface officielle     |
+| au marché          | **10 %**                            | la borne que l'exchange applique lui-même (mesuré)    |
 | Stop Loss limite   | **5 %**                             | doit sortir ; en deçà de la liquidation à fort levier |
 | Take Profit limite | **1,5 %**                           | garde le prix visé ; exemples officiels 1,7 et 2,2 %  |
 
 Sous le déclencheur pour une vente, au-dessus pour un achat, dans tous les cas. Ces trois valeurs
-sont des **choix** (validés le 2026-10-16), sources et raisonnement dans l'en-tête de
-`order-limit.util.ts` ; l'ancien écart unique de 0,1 % était dix fois plus serré que
-l'exemple de Freqtrade et exposait un SL à se déclencher sans s'exécuter dans un gap. Le formulaire **dit**, sous le champ limite et sur deux lignes (« −5,00 % from trigger » puis
-« default for Stop Loss », « edited », « slippage bound, unverified » ou « as placed »), d'où vient le
-limite. Sur une seule ligne le texte était tronqué à 360 px ; une marge de 10 px sous la dernière
+sont, pour un déclencheur **limite**, des **choix** (validés le 2026-10-16), sources et
+raisonnement dans l'en-tête de `limit-spread.util.ts` ; l'ancien écart unique de 0,1 % était dix
+fois plus serré que l'exemple de Freqtrade. **Pour un déclencheur au marché, le 10 % n'est pas un
+choix** : c'est la borne que l'exchange recalcule lui-même et dont il ignore le `p` envoyé (mesuré le
+2026-10-18, voir « À éprouver en réel », point 1), arrondie comme lui par `marketTriggerBound`. Le
+formulaire **dit**, sous le champ limite et sur deux lignes (« −5,00 % from trigger » puis
+« default for Stop Loss », « edited », « exchange bound » ou « as placed »), d'où vient le limite. Sur une seule ligne le texte était tronqué à 360 px ; une marge de 10 px sous la dernière
 ligne l'empêche de toucher la valeur (le libellé empilé d'Ionic est réduit à 75 %).
 
 Règles de cohérence, toutes mesurées dans le navigateur le 2026-10-16 :
@@ -547,14 +549,18 @@ déclencheur revenait à sa valeur (2327,5 au lieu de 2300). Chacune a son test 
 
 **La modale « Add protective order » avait un écart fixe de 0,1 %** entre le déclencheur et le
 limite de l'ordre de clôture, quel que soit le type et même avec « Market execution » coché
-(`buildProtectiveOrderDetails`, `TRIGGER_EXEC_OFFSET`) : l'écart que le formulaire principal
-avait abandonné, et celui qui expose un SL à se déclencher sans s'exécuter dans un gap. Relevé
-le 2026-10-18 en relisant ce que j'avais affirmé du mobile : l'affirmation « le formulaire envoie
-déjà 10 % au marché » n'était vraie que du formulaire principal. Les écarts vivent maintenant
-dans `core/utils/limit-spread.util.ts`, partagés par les deux chemins : 10 % au marché, 5 % pour
-un SL limite, 1,5 % pour un TP limite. Mesuré par les tests (`protective-order.utils.spec.ts`,
-quatre mutations tuées), **pas dans le navigateur** : la modale n'affiche pas le limite, et
-l'ordre n'est construit qu'à l'envoi — il n'y a rien à voir sans placer un ordre réel.
+(`buildProtectiveOrderDetails`, `TRIGGER_EXEC_OFFSET`). Relevé le 2026-10-18 en relisant ce que
+j'avais affirmé du mobile : « le formulaire envoie déjà 10 % au marché » n'était vrai que du
+formulaire principal. **Ce que cela coûtait dépend du type** : au marché, rien — l'exchange ignore
+`p` (point 1) ; en exécution **limite**, un plancher trop serré, le cas que la doc officielle donne
+pour rester en attente dans un gap. La première version de cette note disait que 0,1 % exposait un
+SL au marché à ne pas s'exécuter : **c'était faux**, l'historique du compte le réfutait déjà.
+Corrigé : au marché la modale envoie la borne de l'exchange (`marketTriggerBound`), en exécution
+limite 5 % (SL) ou 1,5 % (TP). Les écarts vivent dans `core/utils/limit-spread.util.ts`, partagés
+par les deux chemins. Mesuré par les tests (`protective-order.utils.spec.ts`), **pas dans le
+navigateur ni sur l'exchange** : la modale n'affiche pas le limite, l'ordre n'est construit qu'à
+l'envoi, et les ordres réels du 2026-10-18 ont tous été posés par le formulaire principal, pas par
+cette modale.
 
 **Changer d'actif repart du marché du nouvel actif.** Prix limite, déclencheur et taille saisis
 concernaient l'actif précédent : un stop vendeur à 80080 survivait sur un ETH à 2414 (mesuré le
@@ -581,83 +587,96 @@ Ces points ne se tranchent ni par la lecture du code ni dans le navigateur : il 
 ordre réel (ou testnet), de petite taille. Ils sont écrits ici pour ne pas être oubliés le
 jour où l'argent réel entre en jeu, et non pour être supposés connus.
 
-1. **⚠️ `p` d'un ordre déclencheur « au marché ».** Le champ est obligatoire dans le format
-   d'ordre (le gateway le refuse absent) et la doc officielle ne dit pas s'il est appliqué ou
-   ignoré. Elle dit que les TP/SL au marché ont une tolérance de glissement de **10 %** par
-   défaut. Le gateway envoyait `p = triggerPx` pour les ordres protecteurs
-   (`SmartOrderService.toHLOrderDetails`) : si `p` est une borne, un SL vendeur au marché
-   ne s'exécute pas dans un gap sous son déclencheur. **Depuis le 2026-10-18 il envoie un `p`
-   à 10 % du déclencheur** pour un déclencheur au marché : sûr que `p` soit ignoré ou appliqué, donc la question n'a plus d'effet sur la
-   protection. Elle reste ouverte comme **mesure** (ce que fait `p`, et ce que l'exchange
-   rend dans `limitPx`), et un seul ordre réel suffit désormais à vérifier qu'un SL au marché
-   ainsi posé est **accepté**.
+1. **✅ `p` d'un ordre déclencheur « au marché » : ignoré par l'exchange.** Le champ est
+   obligatoire dans le format d'ordre, et la doc officielle ne dit pas s'il est appliqué ; elle dit
+   que les TP/SL au marché ont une tolérance de glissement de **10 %** par défaut. Le gateway
+   envoyait `p = triggerPx`, et on craignait qu'un SL vendeur ainsi posé reste en attente dans un
+   gap. **Mesuré le 2026-10-18 : `p` est ignoré.** À son déclenchement, l'exchange recrée l'ordre
+   avec sa propre borne, **déclencheur × 0,9 pour une vente, × 1,1 pour un achat**, quel que soit
+   le `p` posé.
+
+   _La mesure_ : `historicalOrders` du compte de test (une requête publique, 1616 ordres) donne,
+   pour chaque ordre déclenché, deux lignes de même `oid` — `triggered` (tel que posé) et `filled`
+   (l'ordre exécuté). Sur les **26 ordres au marché déclenchés** du compte (stops et take-profits,
+   BTC et SOL, achats et ventes, avril à octobre 2026), `p` valait le déclencheur pour 23, +8 %
+   pour un, 10 % pour les deux du jour ; la ligne `filled` porte **toujours** la borne de 10 %. Les
+   `73744` du jour, d'abord pris pour un écart inexpliqué, s'expliquent ainsi : ce n'est pas notre
+   `p` + 1, c'est la borne de l'exchange.
+
+   _L'arrondi_ de cette borne, déduit de ces 26 ordres : un achat **tronqué**, une vente
+   **tronquée puis relevée d'un tick**, y compris quand le produit tombe juste (78130 × 0,9 =
+   70317 exactement, il écrit 70318 ; 79960 × 1,1 = 87956 exactement, il écrit 87956).
+   `marketTriggerBound` le reproduit sur les 26. ⚠️ **Déduit, pas documenté** : la raison du tick
+   de plus pour une vente est inconnue, les deux produits exacts sont des entiers BTC, et une
+   première explication (de l'arithmétique flottante) était fausse. Sans conséquence aujourd'hui,
+   `p` étant ignoré.
+
+   _Ce que cela change_ : le `p = triggerPx` du gateway n'avait **pas** le défaut craint, pour un
+   déclencheur au marché. Le gateway envoie désormais la borne de l'exchange (changement sans effet
+   sur l'exécution : il aligne ce qu'on pose sur ce qui sera exécuté). Ce que j'avais présenté
+   comme un défaut possible, puis comme une correction, n'en était pas un.
+
+   _Un ordre réel, le 2026-10-18_ (mainnet, 0,00014 puis 0,00015 BTC ≈ 11,5 $, levier cross 1x,
+   coût total ≈ 0,035 $ ; lu par `frontendOpenOrders`, `historicalOrders` et `userFills`, requêtes
+   publiques), posé **depuis le formulaire d'ordre du mobile** (pas par le gateway ni par la modale
+   de protection) :
+   - **Accepté**, avec un limite à 10 % du déclencheur : 81561 → 73405, 81764 → 73588, 81937 →
+     73743, 81838 → 73654, 81867 → 73680.
+   - **Posé sans position ouverte, il est accepté** (reduce-only), puis **actif** quand l'entrée a
+     été exécutée : même `oid`, même déclencheur, même limite. Ce que cela donne pour la
+     protection d'un ordre parent partiel (point 2) n'est pas établi.
+   - **Déclenché et exécuté au marché**, deux fois : 81936.0 pour un déclencheur à 81937 (1 $),
+     puis **81810.0 pour 81838 (28 $, 0,034 %)** — premier cas où un stop s'exécute plus bas que
+     son déclencheur —, taker, 0,0055 $ de frais, PnL −0,0159 $.
+   - **L'exchange retire le reduce-only restant** quand la position se ferme, avec le statut
+     `reduceOnlyCanceled`, à la milliseconde du fill.
+   - **Ce que cela ne dit pas** : le comportement dans un **gap**. Les deux exécutions se sont
+     faites à 1 $ et 28 $ du déclencheur, bien en deçà de la borne de 10 % : elle n'a pas été mise à
+     l'épreuve. Elle est celle de la doc de l'exchange.
 
    _Sources lues le 2026-10-18, et ce qu'elles valent_ (lues par un outil qui en rend un résumé,
-   pas ligne à ligne ; à reconfirmer sur le dépôt avant d'en faire une règle) :
-   - **SDK Python officiel, `examples/basic_tpsl.py`** : le TP part avec `p = triggerPx` (comme
-     notre gateway), le SL avec un `p` **écarté** du déclencheur (2500 sous 2600 pour clore un
-     long). Aucun commentaire ne dit pourquoi. Un exemple n'est pas une spécification.
+   pas ligne à ligne ; **elles ne tranchaient rien**, c'est l'historique du compte qui a tranché) :
+   - **SDK Python officiel, `examples/basic_tpsl.py`** : le TP part avec `p = triggerPx`, le SL
+     avec un `p` écarté du déclencheur (2500 sous 2600 pour clore un long). Aucun commentaire ne
+     dit pourquoi.
    - **SDK Python, `signing.py`** : `p` est écrit pareil pour tous les ordres, `isMarket` vrai ou
-     faux. Le SDK ne décide donc rien : l'effet de `p` est celui de l'exchange, que ni le SDK
-     ni le SDK Rust communautaire (hypersdk, qui ne place aucun ordre déclencheur dans ses
-     exemples) ne documentent.
-   - **Issue `hyperliquid-python-sdk#97`**, un indice et rien de plus : un Take Profit Market
-     **exécuté** (AAVE) a un `limitPx` de 320,91 à l'API et de 356,56 dans l'interface, soit
-     90,0 % à l'arrondi près. Compatible avec « l'exchange travaille avec un `p` à 10 % pour un
-     déclencheur au marché », ce que la doc officielle laisse entendre sans l'écrire. Mais c'est
-     un seul cas, rapporté par un tiers, sans explication d'un mainteneur lisible, et il ne dit
-     pas ce que `p` fait **pendant un gap**.
-   - **Conclusion tenue** : aucune source ne dit si `p` est appliqué ou ignoré. Le point reste
-     ouvert. Ce qui est établi, c'est qu'un `p` écarté est la pratique de l'exemple officiel pour
-     un SL, et que `p = triggerPx` est le cas que la doc officielle cite comme risqué.
-
-   _Mesuré le 2026-10-18, un ordre réel_ (mainnet, 0,00014 BTC ≈ 11,5 $, levier cross 1x, coût
-   total ≈ 0,012 $ ; lu par `frontendOpenOrders`, `historicalOrders` et `userFills`, requêtes
-   publiques) : long ouvert à 81971 (ALO, maker), puis un Stop Market reduce-only posé **depuis le
-   formulaire d'ordre du mobile** (pas par le gateway : le formulaire envoie son propre limite),
-   déclencheur au marché avec un limite à 10 % sous le déclencheur.
-   - **Accepté**, avec un `p` à 10 % du déclencheur : 81561 → 73405, 81764 → 73588, 81937 → 73743
-     (déclencheur × 0,9, arrondi à 5 chiffres significatifs, comme le formulaire le calcule).
-   - **Posé sans position ouverte, il est accepté** (reduce-only), puis **actif** quand l'entrée a
-     été exécutée : même `oid`, même déclencheur, même limite. Un SL posé avant son entrée reste
-     donc au carnet ; ce que cela donne pour la protection d'un ordre parent partiel (point 2) n'est
-     pas établi.
-   - **Déclenché et exécuté au marché** : vente de 0,00014 à **81936.0** pour un déclencheur à
-     81937 (1 $ d'écart), `crossed: true` (taker), 0,005161 $ de frais, PnL −0,0049 $. Un `p` à
-     10 % **n'a donc pas empêché** une exécution normale au marché.
-   - **Ce que cela ne dit pas** : le comportement dans un **gap**. L'exécution s'est faite à 1 $ du
-     déclencheur, donc `p` n'a pas été mis à l'épreuve : on ne sait toujours pas s'il borne
-     l'exécution. Le point reste ouvert comme **mesure**, et sans effet sur la protection depuis le
-     `p` à 10 %.
+     faux. Le SDK ne décide rien ; ni lui ni le SDK Rust communautaire (hypersdk, qui ne place
+     aucun ordre déclencheur dans ses exemples) ne documentent l'effet de `p`.
+   - **Issue `hyperliquid-python-sdk#97`** : un Take Profit Market exécuté (AAVE) a un `limitPx` de
+     320,91 à l'API et de 356,56 dans l'interface, soit 90,0 %. Lue avec la mesure ci-dessus, elle
+     s'explique : 320,91 est la borne de l'exchange.
 
 2. **⚠️ TP/SL enfants d'un ordre parent partiellement rempli.** La doc dit que les enfants
    ne sont placés que lorsque le parent est entièrement rempli ; annuler un parent partiel
    annule les enfants. Une position peut donc rester sans protection. À éprouver sur la
    section « protective » du formulaire.
-3. **Le `limitPx` renvoyé par Hyperliquid pour un ordre déclencheur existant.** La
-   modification (garde de `limitFromTrigger`) a été mesurée sur des ordres factices de forme
-   devinée ; la sémantique réelle de `limitPx` pour un Stop Limit / Take Limit n'a pas été lue.
-   ⚠️ Un indice qu'elle peut surprendre : l'issue `hyperliquid-python-sdk#97` rapporte, pour un
-   Take Profit Market exécuté, un `limitPx` renvoyé par l'API à 90 % de celui que montre
-   l'interface (320,91 contre 356,56). Un seul cas, d'un tiers.
+3. **Le `limitPx` renvoyé par Hyperliquid pour un ordre déclencheur existant.** La modification
+   (garde de `limitFromTrigger`) avait été mesurée sur des ordres factices de forme devinée.
 
-   _Mesuré le 2026-10-18_ (même ordre réel que le point 1, Stop Market BTC) :
+   _Mesuré le 2026-10-18_ (Stop Market BTC et Take Profit Limit réels) :
    - **Au repos, l'exchange rend le `p` envoyé**, avec « .0 » en plus (`73405.0`, `73588.0`,
-     `73743.0`), y compris après une modification.
+     `73743.0`, `73654.0`), y compris après une modification. Idem pour un Take Profit **limite**
+     posé avec un limite à 1,5 % (81959 → `80730.0`), sa forme réelle étant `orderType: "Take
+Profit Limit"`, `triggerCondition: "Price above 81959"`.
    - **Une modification est une annulation suivie d'un nouvel ordre** : l'ancien `oid` passe
-     `canceled` à l'instant où le nouveau est créé (deux fois mesuré).
-   - **Au déclenchement, l'historique garde deux lignes** pour l'`oid` : `triggered` (l'ordre tel
-     que posé, `limitPx` 73743.0) et `filled` (l'ordre exécuté, `triggerCondition: "Triggered"`,
-     `sz: 0.0`, `tif: "Gtc"`), dont le `limitPx` vaut **73744.0**. ⚠️ **Un écart d'une unité avec
-     ce qu'on avait envoyé, inexpliqué** ; il reste à 90 % du déclencheur, donc compatible avec
-     l'issue #97 lue comme « le 90 % est le `p` lui-même », ce qui n'est pas démontré.
-   - **L'interface officielle n'affiche pas ce `p`** : pour un Stop Market, « Price » et « Order
-     Value » valent « Market ». Seule l'API le montre.
-   - **Reste à lire** : un Stop Limit / Take Limit (`isMarket: false`), jamais posé.
+     `canceled` à l'instant où le nouveau est créé (quatre fois mesuré, dont une fois depuis le
+     chart de l'interface officielle, qui déplace le déclencheur **sans recalculer le limite** :
+     81959 → 81973, limite resté à 80730 ; le formulaire du mobile, lui, le recalcule tant qu'il
+     n'a pas été saisi).
+   - **Au déclenchement, l'historique garde deux lignes** pour l'`oid` : `triggered` (tel que posé)
+     et `filled` (`triggerCondition: "Triggered"`, `sz: 0.0`, `tif: "Gtc"`), dont le `limitPx` est
+     **la borne de l'exchange**, pas le `p` posé (point 1). Le `limitPx` d'un ordre **déclenché**
+     n'est donc pas celui qu'on a envoyé : le bot lit le déclencheur, pas la limite.
+   - **L'interface officielle** affiche « Market » pour le prix d'un Stop Market, et le `p` pour un
+     Take Profit Limit (80 730, valeur d'ordre 12,11 USDC = 0,00015 × 80 730).
+   - **Reste à lire** : un Stop Limit / Take Limit **au déclenchement** — le TP limite posé n'a
+     pas été déclenché (la position a été fermée par le stop, qui a retiré le TP avec
+     `reduceOnlyCanceled`).
 
-4. **Les écarts de limite par défaut (10 % au marché, 5 % SL, 1,5 % TP).** Des choix argumentés
-   (doc officielle, Freqtrade), aucun éprouvé sur des fills : le bon écart d'un SL se lit sur des
-   sorties réelles en marché agité, pas dans une doc.
+4. **Les écarts de limite d'un déclencheur LIMITE (5 % SL, 1,5 % TP).** Des choix argumentés (doc
+   officielle, Freqtrade), aucun éprouvé sur un déclenchement : le bon écart d'un SL se lit sur des
+   sorties réelles en marché agité, pas dans une doc. Le 10 % d'un déclencheur au marché n'est
+   plus de ce point : c'est la borne de l'exchange (point 1).
 5. **Déclencheur du mauvais côté du marché.** Le prix de déclenchement est le **mark price** ; un
    déclencheur du mauvais côté est déclenché tout de suite ou refusé — le comportement exact
    n'a pas été observé. Le formulaire ne pré-remplit plus de déclencheur, et `isPriceInvalid`

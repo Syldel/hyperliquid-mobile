@@ -10,11 +10,12 @@ import {
  * déclencheur se compte en % du prix d'entrée.
  *
  * Ce que ces tests épinglent, c'est le PRIX LIMITE de l'ordre de clôture. Il valait 0,1 % du
- * déclencheur quel que soit le type, « Market execution » comprise (relevé le 2026-10-18) : un
- * écart que le formulaire principal avait déjà abandonné, et qui expose un SL à se déclencher
- * sans s'exécuter dans un gap. Il suit désormais les écarts de `limit-spread.util.ts` : 10 %
- * au marché, 5 % pour un SL limite, 1,5 % pour un TP limite — sous le déclencheur pour une
- * vente, au-dessus pour un achat. Les attendus sont calculés à la main, pas relus des constantes.
+ * déclencheur quel que soit le type, « Market execution » comprise (relevé le 2026-10-18) — sans
+ * effet au marché, où l'exchange ignore `p`, mais un plancher trop serré pour une exécution
+ * limite. Il suit désormais `limit-spread.util.ts` : au marché, la borne que l'exchange calcule
+ * lui-même (déclencheur × 0,9 / × 1,1, arrondi comme lui) ; en exécution limite, 5 % pour un SL
+ * et 1,5 % pour un TP — sous le déclencheur pour une vente, au-dessus pour un achat. Les attendus
+ * sont calculés à la main, pas relus des constantes.
  */
 const LONG: MainOrderContext = {
   assetName: 'BTC',
@@ -66,8 +67,8 @@ describe('buildProtectiveOrderDetails — the limit price of the closing order',
   it('sits 10 % over the trigger of a market stop that closes a short', () => {
     const order = buildProtectiveOrderDetails(SHORT, protective({ kind: 'sl', isMarket: true }));
 
-    // 82120 × 1,05 = 86226 ; × 1,1 = 94848,6.
-    expect(order.limitPx).toBe('94849');
+    // 82120 × 1,05 = 86226 ; × 1,1 = 94848,6 ; un achat est tronqué.
+    expect(order.limitPx).toBe('94848');
     expect(order.isBuy).toBe(true);
   });
 
@@ -99,7 +100,7 @@ describe('buildProtectiveOrderDetails — the limit price of the closing order',
   });
 
   it('never leaves the limit equal to, or 0.1 % from, the trigger of a market order', () => {
-    // Le défaut d'avant le 2026-10-18 : un SL « au marché » avec un limite à 0,1 % du déclencheur.
+    // L'écart d'avant le 2026-10-18 : un SL « au marché » avec un limite à 0,1 % du déclencheur.
     const order = buildProtectiveOrderDetails(LONG, protective({ kind: 'sl', isMarket: true }));
     const trigger = Number(computeProtectiveTriggerPx(LONG, protective({ kind: 'sl' })));
 

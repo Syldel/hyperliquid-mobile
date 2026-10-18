@@ -34,7 +34,8 @@ describe('limitFromTrigger', () => {
     });
 
     it('uses 10 % for a market trigger, the slippage bound', () => {
-      expect(limitFromTrigger(create({ isMarket: true, isBuy: false }))).toBe('72900');
+      // 81000 × 0,9 = 72900 exactement ; une vente est relevée d'un tick (voir `marketTriggerBound`).
+      expect(limitFromTrigger(create({ isMarket: true, isBuy: false }))).toBe('72901');
       expect(limitFromTrigger(create({ isMarket: true, isBuy: true }))).toBe('89100');
     });
 
@@ -66,7 +67,7 @@ describe('limitFromTrigger', () => {
     });
 
     it('follows when the user switches to a market trigger', () => {
-      expect(limitFromTrigger(create({ original, isMarket: true }))).toBe('72900');
+      expect(limitFromTrigger(create({ original, isMarket: true }))).toBe('72901');
     });
 
     it('follows when the user switches between stop loss and take profit', () => {

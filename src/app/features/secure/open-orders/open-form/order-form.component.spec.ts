@@ -150,8 +150,8 @@ describe('OrderFormComponent — price wiring', () => {
       settle();
 
       expect(form.limitEdited()).toBe(false);
-      // 10 % under 81000: the bound, not the typed price.
-      expect(form.limitPx()).toBe('72900');
+      // 10 % under 81000: the exchange's bound (72900, raised one tick for a sell), not the typed price.
+      expect(form.limitPx()).toBe('72901');
     });
 
     it('is flagged, and blocks placing, when a direction change leaves it on the wrong side of the trigger', () => {

@@ -300,7 +300,7 @@ export class OrderFormComponent implements OnInit {
       : asOpened
         ? 'as placed'
         : this.isMarket()
-          ? 'slippage bound, unverified'
+          ? 'exchange bound'
           : `default for ${this.tpsl() === 'sl' ? 'Stop Loss' : 'Take Profit'}`;
     return { pct, label };
   });
