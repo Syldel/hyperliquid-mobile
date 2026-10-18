@@ -573,10 +573,34 @@ jour où l'argent réel entre en jeu, et non pour être supposés connus.
 1. **⚠️ `p` d'un ordre déclencheur « au marché ».** Le champ est obligatoire dans le format
    d'ordre (le gateway le refuse absent) et la doc officielle ne dit pas s'il est appliqué ou
    ignoré. Elle dit que les TP/SL au marché ont une tolérance de glissement de **10 %** par
-   défaut. Le gateway envoie `p = triggerPx` pour les ordres protecteurs
+   défaut. Le gateway envoyait `p = triggerPx` pour les ordres protecteurs
    (`SmartOrderService.toHLOrderDetails`) : si `p` est une borne, un SL vendeur au marché
-   ne s'exécute pas dans un gap sous son déclencheur. À mesurer : un SL au marché, `p` égal
-   au déclencheur, puis `p` à 10 %, et comparer ce qui est exécuté.
+   ne s'exécute pas dans un gap sous son déclencheur. **Depuis le 2026-10-18 il envoie un `p`
+   à 10 % du déclencheur** pour un déclencheur au marché (préparé, non committé à la date de
+   cette note) : sûr que `p` soit ignoré ou appliqué, donc la question n'a plus d'effet sur la
+   protection. Elle reste ouverte comme **mesure** (ce que fait `p`, et ce que l'exchange
+   rend dans `limitPx`), et un seul ordre réel suffit désormais à vérifier qu'un SL au marché
+   ainsi posé est **accepté**.
+
+   _Sources lues le 2026-10-18, et ce qu'elles valent_ (lues par un outil qui en rend un résumé,
+   pas ligne à ligne ; à reconfirmer sur le dépôt avant d'en faire une règle) :
+   - **SDK Python officiel, `examples/basic_tpsl.py`** : le TP part avec `p = triggerPx` (comme
+     notre gateway), le SL avec un `p` **écarté** du déclencheur (2500 sous 2600 pour clore un
+     long). Aucun commentaire ne dit pourquoi. Un exemple n'est pas une spécification.
+   - **SDK Python, `signing.py`** : `p` est écrit pareil pour tous les ordres, `isMarket` vrai ou
+     faux. Le SDK ne décide donc rien : l'effet de `p` est celui de l'exchange, que ni le SDK
+     ni le SDK Rust communautaire (hypersdk, qui ne place aucun ordre déclencheur dans ses
+     exemples) ne documentent.
+   - **Issue `hyperliquid-python-sdk#97`**, un indice et rien de plus : un Take Profit Market
+     **exécuté** (AAVE) a un `limitPx` de 320,91 à l'API et de 356,56 dans l'interface, soit
+     90,0 % à l'arrondi près. Compatible avec « l'exchange travaille avec un `p` à 10 % pour un
+     déclencheur au marché », ce que la doc officielle laisse entendre sans l'écrire. Mais c'est
+     un seul cas, rapporté par un tiers, sans explication d'un mainteneur lisible, et il ne dit
+     pas ce que `p` fait **pendant un gap**.
+   - **Conclusion tenue** : aucune source ne dit si `p` est appliqué ou ignoré. Le point reste
+     ouvert. Ce qui est établi, c'est qu'un `p` écarté est la pratique de l'exemple officiel pour
+     un SL, et que `p = triggerPx` est le cas que la doc officielle cite comme risqué.
+
 2. **⚠️ TP/SL enfants d'un ordre parent partiellement rempli.** La doc dit que les enfants
    ne sont placés que lorsque le parent est entièrement rempli ; annuler un parent partiel
    annule les enfants. Une position peut donc rester sans protection. À éprouver sur la
@@ -584,6 +608,11 @@ jour où l'argent réel entre en jeu, et non pour être supposés connus.
 3. **Le `limitPx` renvoyé par Hyperliquid pour un ordre déclencheur existant.** La
    modification (garde de `limitFromTrigger`) a été mesurée sur des ordres factices de forme
    devinée ; la sémantique réelle de `limitPx` pour un Stop Limit / Take Limit n'a pas été lue.
+   ⚠️ Un indice qu'elle peut surprendre : l'issue `hyperliquid-python-sdk#97` rapporte, pour un
+   Take Profit Market exécuté, un `limitPx` renvoyé par l'API à 90 % de celui que montre
+   l'interface (320,91 contre 356,56). Un seul cas, d'un tiers : à lire comme « le `limitPx`
+   renvoyé n'est peut-être pas celui qu'on a envoyé », pas comme un fait établi. En modification,
+   c'est ce qu'il faudrait vérifier en premier.
 4. **Les écarts de limite par défaut (10 % au marché, 5 % SL, 1,5 % TP).** Des choix argumentés
    (doc officielle, Freqtrade), aucun éprouvé sur des fills : le bon écart d'un SL se lit sur des
    sorties réelles en marché agité, pas dans une doc.
