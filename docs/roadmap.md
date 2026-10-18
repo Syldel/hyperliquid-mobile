@@ -545,6 +545,17 @@ recalcul, y compris le suivi du limite quand on change le déclencheur (mesuré 
 après un déclencheur à 82000). Le deuxième ne rendait pas le limite d'origine quand le
 déclencheur revenait à sa valeur (2327,5 au lieu de 2300). Chacune a son test et sa mutation.
 
+**La modale « Add protective order » avait un écart fixe de 0,1 %** entre le déclencheur et le
+limite de l'ordre de clôture, quel que soit le type et même avec « Market execution » coché
+(`buildProtectiveOrderDetails`, `TRIGGER_EXEC_OFFSET`) : l'écart que le formulaire principal
+avait abandonné, et celui qui expose un SL à se déclencher sans s'exécuter dans un gap. Relevé
+le 2026-10-18 en relisant ce que j'avais affirmé du mobile : l'affirmation « le formulaire envoie
+déjà 10 % au marché » n'était vraie que du formulaire principal. Les écarts vivent maintenant
+dans `core/utils/limit-spread.util.ts`, partagés par les deux chemins : 10 % au marché, 5 % pour
+un SL limite, 1,5 % pour un TP limite. Mesuré par les tests (`protective-order.utils.spec.ts`,
+quatre mutations tuées), **pas dans le navigateur** : la modale n'affiche pas le limite, et
+l'ordre n'est construit qu'à l'envoi — il n'y a rien à voir sans placer un ordre réel.
+
 **Changer d'actif repart du marché du nouvel actif.** Prix limite, déclencheur et taille saisis
 concernaient l'actif précédent : un stop vendeur à 80080 survivait sur un ETH à 2414 (mesuré le
 2026-10-16). En création, ils sont remis à zéro puis pré-remplis selon la règle ci-dessus — limite

@@ -1,5 +1,6 @@
 import { HLOrderDetails } from '@syldel/hl-shared-types';
 import { roundPrice, roundSize } from './hl-rounding.utils';
+import { limitSpread } from './limit-spread.util';
 
 export type ProtectiveOrderKind = 'tp' | 'sl';
 
@@ -18,8 +19,6 @@ export interface ProtectiveOrderParams {
   priceOffsetPercent: number;
   isMarket: boolean;
 }
-
-const TRIGGER_EXEC_OFFSET = 0.001; // 0.1% de marge d'exécution sur l'ordre de clôture
 
 /**
  * Calcule le trigger price absolu à partir du % d'offset et du contexte live de l'ordre principal.
@@ -51,7 +50,11 @@ export function buildProtectiveOrderDetails(
   const triggerPx = computeProtectiveTriggerPx(main, protective);
   const triggerPxNum = parseFloat(triggerPx);
 
-  const execFactor = closingIsBuy ? 1 + TRIGGER_EXEC_OFFSET : 1 - TRIGGER_EXEC_OFFSET;
+  // Le prix limite est le pire prix accepté pour sortir : l'écart dépend du type d'ordre et de
+  // l'exécution (voir `limit-spread.util.ts`). Avant le 2026-10-18 il valait 0,1 % quoi qu'on
+  // choisisse, « Market execution » comprise.
+  const spread = limitSpread(protective.kind, protective.isMarket);
+  const execFactor = closingIsBuy ? 1 + spread : 1 - spread;
   const limitPxNum = triggerPxNum * execFactor;
 
   const szNum = (mainSz * protective.sizePercent) / 100;
