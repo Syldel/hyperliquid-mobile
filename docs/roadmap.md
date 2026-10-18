@@ -662,6 +662,12 @@ jour où l'argent réel entre en jeu, et non pour être supposés connus.
      sans protection**. Dans l'historique, `triggered` et `filled` n'ont plus le même horodatage : le
      `timestamp` de la ligne `filled` est la création de l'ordre limite, son `statusTimestamp` est
      l'exécution ; partout ailleurs ils étaient identiques. Un cas, pas un temps d'attente typique.
+   - **Deuxième cas, même jour** : Stop Limit ETH, limite égal au déclencheur (2365.5), posé à
+     16:54:04, déclenché 8,1 s plus tard, **resté au carnet 163,5 s**, exécuté en maker à 2365.5
+     (PnL −0,00396 $). Lu dans `frontendOpenOrders` 70 s après le déclenchement : `orderType:
+"Stop Limit"`, **`isTrigger: false`**, **`triggerPx: "0.0"`**, `triggerCondition: "Triggered"`,
+     `limitPx` 2365.5, `tif: "Gtc"`, `reduceOnly: true` ; le marché était alors 0,7 sous le limite.
+     Deux cas sur deux où un limite égal au déclencheur est resté au carnet (826 s et 163,5 s).
    - **Un limite à 5 % s'exécute tout de suite**, au meilleur acheteur : Stop Limit `io:ANTH`
      (limite 1807.9, fill **1906.0** pour un déclencheur à 1904.0, en taker, au-dessus de l'entrée) ;
      Stop Limit ETH (limite 2377.0 sous un carnet à 2377.5 : fill 2377.5).
