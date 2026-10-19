@@ -20,7 +20,7 @@ import {
   IonToolbar,
 } from '@ionic/angular/standalone';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
-import { HLPerpDex, HLPerpMeta } from '@syldel/hl-shared-types';
+import { hlMarketKind, HLPerpDex, HLPerpMeta } from '@syldel/hl-shared-types';
 import { addIcons } from 'ionicons';
 import { alertCircleOutline, checkmarkCircle, closeOutline, searchOutline } from 'ionicons/icons';
 import { marketSource, refusalMessage } from './market-source.util';
@@ -131,9 +131,11 @@ export class MarketPickerModalComponent implements OnInit {
 
     const initial = this.initialValue();
     if (initial) {
-      if (initial.includes('/')) {
+      // `hlMarketKind` : un nom brut `@107` est un spot comme `PURR/USDC` — `includes('/')` ne le voyait pas.
+      const kind = hlMarketKind(initial);
+      if (kind === 'spot') {
         this.marketType.set('spot');
-      } else if (initial.includes(':')) {
+      } else if (kind === 'builderPerp') {
         this.marketType.set('hip3');
       }
     }

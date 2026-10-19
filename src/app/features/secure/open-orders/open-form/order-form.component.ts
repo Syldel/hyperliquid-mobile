@@ -30,6 +30,7 @@ import { describeCapitalGap, type AvailableCapital } from '@utils/available-capi
 import { HyperliquidGatewayService } from '@services/hyperliquid-gateway.service';
 import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
+import { isSpotMarket } from '@utils/market-kind.util';
 import { MarketPickerModalComponent } from '@shared/components/market-picker-modal/market-picker-modal.component';
 import { LISTABLE_EXCHANGE } from '@shared/components/market-picker-modal/market-source.util';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
@@ -42,6 +43,7 @@ import {
   HLPlaceOrderStatus,
   HLSuccessResponse,
   HLTif,
+  hlPerpDexOf,
 } from '@syldel/hl-shared-types';
 import { extractErrorMessage } from '@utils/hl-error.utils';
 import { roundPrice, roundSize } from '@utils/hl-rounding.utils';
@@ -271,7 +273,7 @@ export class OrderFormComponent implements OnInit {
     return this.isPriceInvalid() || this.isLimitSideInvalid() || this.isSizeInvalid();
   });
 
-  isSpot = computed(() => this.selectedCoin()?.includes('/') || this.selectedCoin()?.includes('-'));
+  isSpot = computed(() => isSpotMarket(this.selectedCoin() ?? ''));
 
   // Champs du formulaire
   selectedCoin = signal('');
@@ -668,7 +670,13 @@ export class OrderFormComponent implements OnInit {
       return;
     }
 
-    const dex = this.hlMarket.extractDex(coin);
+    // Un non-perp (spot, nom douteux) n'a pas de position à lire : `hlPerpDexOf` rend `null`, et le dex
+    // principal n'est pas un repli — c'est lui qu'`extractDex` rendait pour un spot.
+    const dex = hlPerpDexOf(coin);
+    if (dex === null) {
+      this.activePosition.set(null);
+      return;
+    }
     this.hlInfo.getClearinghouseState(dex).subscribe({
       next: (state) => {
         const position = state.assetPositions.find((ap) => ap.position?.coin === coin)?.position;

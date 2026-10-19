@@ -23,8 +23,7 @@ import { OrderFormComponent } from './order-form.component';
  * Le gabarit est vidé : il n'est pas ce qui est testé, et il appellerait le réseau
  * (`RefreshableLayout` charge le marché). Les services sont des doubles qui ne
  * rendent que ce que les vrais rendent : la forme de `getPerpMeta` est celle que le
- * composant lit (`universe[].name / szDecimals / maxLeverage`), et `extractDex` est
- * recopié du vrai service.
+ * composant lit (`universe[].name / szDecimals / maxLeverage`).
  * ============================================================================
  */
 describe('OrderFormComponent — price wiring', () => {
@@ -45,10 +44,6 @@ describe('OrderFormComponent — price wiring', () => {
     getMarketMeta: (coin: string) => metaFor(coin),
     getPerpMeta: () => of(BTC_META),
     getSpotMeta: () => of({ tokens: [] }),
-    extractDex: (pairName: string) => {
-      const parts = pairName.split(':');
-      return parts.length > 1 ? parts[0] : '';
-    },
     resolveCoin: (name: string) => of(name),
   };
   const infoDouble = {
@@ -307,6 +302,34 @@ describe('OrderFormComponent — price wiring', () => {
    * taille saisie à 12,5 partait à 13 sur MAVIA, une limite à 0,52345 partait à 0,52 sur ETHFI. Un échec
    * de lecture ne disait rien : `szDecimals` gardait le défaut 3 ou la valeur de l'actif précédent.
    */
+  /**
+   * « Spot » se décide par `hlMarketKind` : le formulaire le décidait par `includes('/') || includes('-')`.
+   * Cela change les libellés (Buy/Sell), l'arrondi du prix et le `isSpotAsset` de l'ordre protecteur.
+   */
+  describe('the spot predicate', () => {
+    it.each([
+      ['PURR/USDC', true],
+      ['HYPE/USDC', true],
+      ['@107', true],
+      ['BTC', false],
+      ['xyz:MU', false],
+      // L'ancien `includes('-')` : un nom avec un tiret n'est pas un spot.
+      ['xyz:TSLA-USDT', false],
+    ])('reads %s as a spot: %s', (coin, spot) => {
+      create();
+      form.selectedCoin.set(coin);
+      settle();
+
+      expect(form.isSpot()).toBe(spot);
+    });
+
+    it('is false, and not undefined, when no market is selected', () => {
+      create();
+
+      expect(form.isSpot()).toBe(false);
+    });
+  });
+
   describe('the market grid', () => {
     // Les valeurs de l'API (2026-10-19) ; ETH est listé AVANT ETHFI, comme dans l'univers réel.
     const UNIVERSE = {

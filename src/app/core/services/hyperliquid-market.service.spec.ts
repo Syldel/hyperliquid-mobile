@@ -165,4 +165,200 @@ describe('HyperliquidMarketService.getMarketMeta', () => {
       expect((result.error as MarketMetaError).code).toBe('not-found');
     });
   });
+
+  /**
+   * L'IDENTIFIANT D'ACTIF QUE PORTENT `order` ET `cancel`.
+   *
+   * Source : doc « Asset IDs », relue le 2026-10-19 : spot `10000 + spotInfo["index"]` (PURR/USDC → 10000),
+   * perp de builder `100000 + perp_dex_index * 10000 + index_in_meta` (exemple de la doc : `test:ABC`, dex 1,
+   * index 0 → 110000), perp natif son index dans `meta`.
+   *
+   * Défaut corrigé : la branche spot se décidait par `includes('/')`. Sous leur nom BRUT (`@N`, ce que
+   * l'exchange renvoie dans les ordres), 333 des 334 paires spot tombaient dans la branche perp.
+   */
+  describe('getAssetIndex', () => {
+    const PERP_DEXS = [null, { name: 'test' }, { name: 'xyz' }];
+
+    function indexOf(coin: string): { value?: number; error?: unknown } {
+      const result: { value?: number; error?: unknown } = {};
+      service.getAssetIndex(coin).subscribe({
+        next: (value) => (result.value = value),
+        error: (error) => (result.error = error),
+      });
+      return result;
+    }
+
+    describe('a spot pair', () => {
+      it.each([
+        ['PURR/USDC', 10000],
+        ['@1', 10001],
+        ['@142', 10142],
+      ])('gives %s the asset id %i', (name, id) => {
+        const result = indexOf(name);
+        http.expectOne('http://hl.test/info').flush(SPOT_META);
+
+        expect(result.value).toBe(id);
+      });
+
+      // Le défaut : `@1` n'est pas une paire « avec barre oblique » et partait dans la branche perp, qui
+      // répondait « Perp asset not found ». On n'interroge JAMAIS la méta perp pour un spot.
+      it('reads a raw @N name as a spot and never asks the perp meta', () => {
+        const result = indexOf('@1');
+
+        const request = http.expectOne('http://hl.test/info');
+        expect(request.request.body).toEqual({ type: 'spotMeta' });
+        request.flush(SPOT_META);
+
+        expect(result.value).toBe(10001);
+        expect(result.error).toBeUndefined();
+      });
+
+      it.each([
+        // Le nom officiel d'une paire non canonique, et le nom d'affichage hyperunit (`UBTC` → `BTC`).
+        ['HFUN/USDC', 10001],
+        ['BTC/USDC', 10142],
+      ])('also resolves the display name %s', (name, id) => {
+        const result = indexOf(name);
+        http.expectOne('http://hl.test/info').flush(SPOT_META);
+
+        expect(result.value).toBe(id);
+      });
+
+      it('refuses a spot pair that does not exist, with the coin in the message', () => {
+        const result = indexOf('@999');
+        http.expectOne('http://hl.test/info').flush(SPOT_META);
+
+        expect(result.value).toBeUndefined();
+        expect((result.error as Error).message).toBe('Spot asset not found for coin: @999');
+      });
+    });
+
+    describe('a builder-deployed perp', () => {
+      it('gives test:ABC 110000, the example of the documentation', () => {
+        const result = indexOf('test:ABC');
+
+        http.expectOne((r) => r.body.type === 'perpDexs').flush(PERP_DEXS);
+        http
+          .expectOne((r) => r.body.type === 'meta' && r.body.dex === 'test')
+          .flush({ universe: [{ name: 'test:ABC' }] });
+
+        expect(result.value).toBe(110000);
+      });
+
+      it('adds the market index to the dex slot: xyz:MU is the second of the third dex', () => {
+        const result = indexOf('xyz:MU');
+
+        http.expectOne((r) => r.body.type === 'perpDexs').flush(PERP_DEXS);
+        http
+          .expectOne((r) => r.body.type === 'meta' && r.body.dex === 'xyz')
+          .flush({ universe: [{ name: 'xyz:AAA' }, { name: 'xyz:MU' }] });
+
+        // 100000 + 2 * 10000 + 1
+        expect(result.value).toBe(120001);
+      });
+
+      it('refuses a dex that is not deployed', () => {
+        const result = indexOf('nope:ABC');
+        http.expectOne((r) => r.body.type === 'perpDexs').flush(PERP_DEXS);
+
+        expect((result.error as Error).message).toBe('PerpDex not found for dex: nope');
+      });
+
+      it('refuses a market that is not in its dex meta', () => {
+        const result = indexOf('xyz:ZZZ');
+        http.expectOne((r) => r.body.type === 'perpDexs').flush(PERP_DEXS);
+        http
+          .expectOne((r) => r.body.type === 'meta' && r.body.dex === 'xyz')
+          .flush({ universe: [{ name: 'xyz:MU' }] });
+
+        expect((result.error as Error).message).toBe(
+          'Asset not found in perpDex meta for coin: xyz:ZZZ',
+        );
+      });
+    });
+
+    describe('a main-dex perp', () => {
+      it('gives its index in the meta', () => {
+        const result = indexOf('ETHFI');
+        http.expectOne((r) => r.body.type === 'meta').flush(MAIN_META);
+
+        expect(result.value).toBe(1);
+      });
+
+      it('refuses a perp that is not in the meta', () => {
+        const result = indexOf('ETHX');
+        http.expectOne((r) => r.body.type === 'meta').flush(MAIN_META);
+
+        expect((result.error as Error).message).toBe('Perp asset not found for coin: ETHX');
+      });
+    });
+
+    // Le doute n'est pas une réponse : ni deviné perp du dex principal, ni lu.
+    it.each([':BTC', 'xyz:', ''])('refuses "%s" without asking the network', (name) => {
+      const result = indexOf(name);
+
+      http.expectNone('http://hl.test/info');
+      expect((result.error as Error).message).toContain('not a market name this app can classify');
+    });
+  });
+
+  describe('the spot names', () => {
+    function names(): string[] {
+      let value: string[] = [];
+      service.getSpotNames().subscribe((v) => (value = v));
+      http.expectOne('http://hl.test/info').flush(SPOT_META);
+      return value;
+    }
+
+    // Les noms de protocole sont les valeurs de `protocolMap`, dans l'ordre de `spotMeta` : un nom par
+    // paire, jamais deux (le nom officiel d'une paire n'est qu'une clé de plus de la même paire).
+    it('lists one display name per pair, in the order of spotMeta', () => {
+      expect(names()).toEqual(['PURR/USDC', 'HFUN/USDC', 'BTC/USDC']);
+    });
+
+    it('resolves a raw name to its display name, and leaves anything else alone', () => {
+      const resolved: Record<string, string> = {};
+      // La première résolution charge `spotMeta` ; les suivantes la lisent en cache. (Le service ne regroupe
+      // pas les requêtes en vol : des résolutions simultanées en feraient autant que de noms.)
+      service.resolveCoinName('@1').subscribe((name) => (resolved['@1'] = name));
+      http.expectOne('http://hl.test/info').flush(SPOT_META);
+      for (const coin of ['@142', 'PURR/USDC', 'BTC', 'xyz:MU']) {
+        service.resolveCoinName(coin).subscribe((name) => (resolved[coin] = name));
+      }
+
+      expect(resolved).toEqual({
+        '@1': 'HFUN/USDC',
+        '@142': 'BTC/USDC',
+        'PURR/USDC': 'PURR/USDC',
+        BTC: 'BTC',
+        'xyz:MU': 'xyz:MU',
+      });
+    });
+
+    it('resolves a display name to its protocol name, and leaves anything else alone', () => {
+      const resolved: Record<string, string> = {};
+      service
+        .resolveToProtocolName('HFUN/USDC')
+        .subscribe((name) => (resolved['HFUN/USDC'] = name));
+      http.expectOne('http://hl.test/info').flush(SPOT_META);
+      for (const coin of ['BTC/USDC', '@1', 'BTC', 'xyz:MU']) {
+        service.resolveToProtocolName(coin).subscribe((name) => (resolved[coin] = name));
+      }
+
+      expect(resolved).toEqual({
+        'HFUN/USDC': '@1',
+        'BTC/USDC': '@142',
+        '@1': '@1',
+        BTC: 'BTC',
+        'xyz:MU': 'xyz:MU',
+      });
+    });
+
+    it('does not ask the network at all for a name that is not a spot pair', () => {
+      service.resolveCoinName('BTC').subscribe();
+      service.resolveToProtocolName('xyz:MU').subscribe();
+
+      http.expectNone('http://hl.test/info');
+    });
+  });
 });

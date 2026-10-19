@@ -8,6 +8,7 @@ import {
   HLPerpMeta,
   HLSpotMeta,
 } from '@syldel/hl-shared-types';
+import { isSpotMarket } from '@utils/market-kind.util';
 import {
   MarketMetaError,
   readPerpMarketMeta,
@@ -125,23 +126,28 @@ export class HyperliquidMarketService {
     );
   }
 
+  /**
+   * Le nom d'affichage de chaque paire spot, dans l'ordre de `spotMeta`. Les noms de protocole sont les
+   * valeurs de `protocolMap` (`@N`, et `PURR/USDC` pour la première) : on les lit là, plutôt que de les
+   * reconnaître à leur forme dans les clés de `nameMap`, qui porte aussi les noms officiels.
+   */
   getSpotNames(): Observable<string[]> {
     return this.getSpotMaps().pipe(
-      map(({ nameMap }) =>
-        [...nameMap.entries()]
-          .filter(([key]) => key.startsWith('@') || key === 'PURR/USDC')
-          .map(([, displayName]) => displayName),
+      map(({ nameMap, protocolMap }) =>
+        [...new Set(protocolMap.values())].map(
+          (protocolName) => nameMap.get(protocolName) ?? protocolName,
+        ),
       ),
     );
   }
 
   resolveCoinName(coin: string): Observable<string> {
-    if (!coin.startsWith('@') && !coin.includes('/')) return of(coin);
+    if (!isSpotMarket(coin)) return of(coin);
     return this.getSpotMaps().pipe(map(({ nameMap }) => nameMap.get(coin) ?? coin));
   }
 
   resolveToProtocolName(coin: string): Observable<string> {
-    if (!coin.includes('/')) return of(coin);
+    if (!isSpotMarket(coin)) return of(coin);
     return this.getSpotMaps().pipe(map(({ protocolMap }) => protocolMap.get(coin) ?? coin));
   }
 
@@ -220,17 +226,30 @@ export class HyperliquidMarketService {
   //  Asset Index
   // ------------------------------------------------------------------ //
 
+  /**
+   * L'identifiant d'actif que portent `order` et `cancel`, selon ce que `hlMarketKind` dit du nom :
+   *
+   * - **spot** — `PURR/USDC`, un nom d'affichage, ou `@N` — : `10000 + spotInfo["index"]` ;
+   * - **perp de builder** (`dex:coin`) : `100000 + perp_dex_index * 10000 + index_in_meta` ;
+   * - **perp natif** : son index dans `meta` ;
+   * - **tout le reste** : une erreur, jamais une branche par défaut.
+   *
+   * Source : doc « Asset IDs », relue le 2026-10-19. Avant, la branche spot se décidait par `includes('/')` :
+   * sous leur nom brut, 333 des 334 paires spot (`@N`) tombaient dans la branche perp (« Perp asset not found »)
+   * et leur ordre ne s'annulait pas depuis l'app (lu dans le code, jamais exécuté).
+   */
   getAssetIndex(coin: string): Observable<number> {
-    // ── Spot : "TOKEN/USDC" ──────────────────────────────────────────────
-    if (coin.includes('/')) {
+    const kind = hlMarketKind(coin);
+
+    // ── Spot : "TOKEN/USDC" ou "@N" ──────────────────────────────────────
+    if (kind === 'spot') {
       return this.getSpotMaps().pipe(
         switchMap(({ protocolMap }) => {
           const protocolName = protocolMap.get(coin) ?? coin;
           return this.getSpotMeta().pipe(
             map((meta) => {
-              const pair = meta.universe.find((p) =>
-                p.index === 0 ? protocolName === 'PURR/USDC' : protocolName === `@${p.index}`,
-              );
+              // `universe[].name` est le nom de protocole : `@N`, ou `PURR/USDC` pour l'index 0.
+              const pair = meta.universe.find((p) => p.name === protocolName);
               if (!pair) throw new Error(`Spot asset not found for coin: ${coin}`);
               return 10000 + pair.index;
             }),
@@ -240,13 +259,13 @@ export class HyperliquidMarketService {
     }
 
     // ── HIP-3 / builder-deployed perp : "dex:COIN" ──────────────────────
-    if (coin.includes(':')) {
-      const dex = this.extractDex(coin); // "vntl", "test", etc.
+    if (kind === 'builderPerp') {
+      const dex = hlPerpDexOf(coin); // "vntl", "test", etc.
       return this.getPerpDexs().pipe(
         switchMap((dexs) => {
           const perpDexIndex = dexs.findIndex((d) => d?.name === dex);
           if (perpDexIndex === -1) throw new Error(`PerpDex not found for dex: ${dex}`);
-          return this.getPerpMeta(dex).pipe(
+          return this.getPerpMeta(dex ?? '').pipe(
             map((meta) => {
               const indexInMeta = meta.universe.findIndex((a) => a.name === coin);
               if (indexInMeta === -1)
@@ -260,18 +279,28 @@ export class HyperliquidMarketService {
     }
 
     // ── Perp natif HL : "BTC", "ETH", etc. ──────────────────────────────
-    const entry = this.perpCache.get('');
-    const universe = entry?.data?.universe;
-    if (universe) {
-      const idx = universe.findIndex((a) => a.name === coin);
-      if (idx !== -1) return of(idx);
+    if (kind === 'perp') {
+      const entry = this.perpCache.get('');
+      const universe = entry?.data?.universe;
+      if (universe) {
+        const idx = universe.findIndex((a) => a.name === coin);
+        if (idx !== -1) return of(idx);
+      }
+      return this.getPerpMeta('').pipe(
+        map((meta) => {
+          const idx = meta.universe.findIndex((a) => a.name === coin);
+          if (idx === -1) throw new Error(`Perp asset not found for coin: ${coin}`);
+          return idx;
+        }),
+      );
     }
-    return this.getPerpMeta('').pipe(
-      map((meta) => {
-        const idx = meta.universe.findIndex((a) => a.name === coin);
-        if (idx === -1) throw new Error(`Perp asset not found for coin: ${coin}`);
-        return idx;
-      }),
+
+    // Un nom que la règle ne classe pas : ni deviné perp du dex principal, ni lu.
+    return throwError(
+      () =>
+        new Error(
+          `Cannot resolve the asset index of "${coin}": it is not a market name this app can classify.`,
+        ),
     );
   }
 
@@ -312,10 +341,5 @@ export class HyperliquidMarketService {
       );
     }
     return this.getPerpMeta(dex).pipe(map((meta) => readPerpMarketMeta(meta, coin)));
-  }
-
-  extractDex(pairName: string): string {
-    const parts = pairName.split(':');
-    return parts.length > 1 ? parts[0] : '';
   }
 }

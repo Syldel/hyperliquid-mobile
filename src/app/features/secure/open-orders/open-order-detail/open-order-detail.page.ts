@@ -32,6 +32,7 @@ import {
   Timestamp,
 } from '@syldel/hl-shared-types';
 import { extractErrorMessage } from '@utils/hl-error.utils';
+import { isSpotMarket } from '@utils/market-kind.util';
 import { addIcons } from 'ionicons';
 import { closeOutline, createOutline, trashOutline } from 'ionicons/icons';
 import { of, switchMap } from 'rxjs';
@@ -83,10 +84,7 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
 
   fetchFn = signal(this.buildFetchFn());
 
-  isSpot = computed(() => {
-    const coin = this.coin();
-    return coin.includes('/') || coin.includes('-');
-  });
+  isSpot = computed(() => isSpotMarket(this.coin()));
 
   statusColor = computed(() => {
     switch (this.orderStatus()) {

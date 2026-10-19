@@ -687,15 +687,56 @@ exacte, ces sept marchés en minuscules (`kPEPE`, `kBONK`, `kFLOKI`, `kSHIB`, `k
 seraient maintenant **refusés bruyamment** par ce chemin, au lieu d'être rattachés en silence à un voisin.
 Aucune normalisation n'a été ajoutée ; reste à vérifier si ce chemin peut réellement les fournir.
 
-Voisin, de même nature — **« spot » est décidé par quatre prédicats différents** : `includes('/')` (liste
+Le voisin de même nature — « spot » décidé par cinq règles différentes — est traité dans la section suivante.
+
+## « Spot » et le dex d'un marché : une seule règle, celle des types partagés — corrigé (2026-10-19)
+
+« Est-ce un spot ? » et « de quel dex ? » étaient écrits **cinq fois, différemment** : `includes('/')` (liste
 des ordres, `getAssetIndex`), `includes('/') || includes('-')` (formulaire, détail), `startsWith('@') ||
-includes('/')` (résolution des noms). La liste décide sur le nom **brut** d'Hyperliquid, où presque
-toutes les paires spot sont `@N` : un ordre spot sur `@107` s'y afficherait « Long/Short » au lieu de
-« Buy/Sell ». Le `'-'` est mort aujourd'hui (aucun des 544 perps n'en porte, mesuré), mais un futur perp
-qui en porterait partirait avec `isSpotAsset: true`. `hlMarketKind` et `hlPerpDexOf`
-(`@syldel/hl-shared-types`) sont la règle unique ; `parseCoin` (`hyperliquid-cache.service.ts`) et
-`extractDex` (`hyperliquid-market.service.ts`) la refont à la main pour le dex. Le bot a fait ce
-chantier côté bot le 2026-10-19 (`nest-trading-bot/docs/known-gaps.md`).
+includes('/')` (résolution des noms), et deux découpes sur `:` (`parseCoin` du cache, `extractDex` du service de
+marché). `hlMarketKind` et `hlPerpDexOf` (`@syldel/hl-shared-types`) sont la règle unique ; le bot l'a adoptée le
+même jour (`nest-trading-bot/docs/known-gaps.md`).
+
+**Mesuré** (lectures publiques du 2026-10-19 : 544 perps, 334 paires spot) : sous leur nom **brut** — celui que
+l'exchange renvoie dans les ordres et les fills —, `includes('/')` ne reconnaît que **1 paire spot sur 334**
+(`PURR/USDC`) ; les 333 autres s'appellent `@N`. Sous leur nom d'affichage (`BASE/QUOTE`) les règles s'accordaient,
+ce qui masquait le défaut. Conséquences, par lecture du code : la liste affichait « Long/Short » pour un ordre
+spot, `getAssetIndex` envoyait un `@N` dans la branche perp (« Perp asset not found ») donc **l'ordre ne s'annulait
+pas depuis l'app**, et le sélecteur de marché s'ouvrait sur l'onglet perp. Les découpes sur `:` concordaient avec
+`hlPerpDexOf` sur les 878 noms : pour elles, c'est une consolidation. Aucun perp ni paire spot ne porte de `-` :
+l'ancien `includes('-')` était mort, mais un futur perp avec un tiret serait parti avec `isSpotAsset: true`.
+
+**Corrigé.** `core/utils/market-kind.util.ts` : `isSpotMarket(nom)` (= `hlMarketKind === 'spot'`) et
+`openOrdersDexOf(nom)` (le dex d'un perp, `''` pour un spot, `null` pour un nom que la règle ne classe pas).
+`getAssetIndex` se dispatche sur `hlMarketKind` (spot → `10000 + index`, builder → `100000 + dex × 10000 + index`,
+perp natif → son index, **le reste → une erreur**) et résout aussi un `@N`. `parseCoin` et `extractDex` sont
+supprimés : le cache **refuse** (console.error) de sélectionner un nom douteux au lieu de le lire sur le dex
+principal, la position active du formulaire n'est lue que pour un perp, la liste signale un nom douteux. Pour un
+spot, `''` est **documenté** : « Spot open orders are only included with the first perp dex » (doc « Info
+endpoint », relue le 2026-10-19). Garde-fou `shared/testing/no-handmade-market-rules.spec.ts` : il lit les sources
+et refuse `includes`, `indexOf`, `split` et `startsWith` sur `/`, `-`, `:` ou `@`, avec deux dérogations **à la
+ligne** (les deux `normalizeCoin`) et un test qui échoue si une dérogation devient périmée.
+
+Éprouvé : les noms réels (bruts et d'affichage), `getAssetIndex` sur ses trois branches et ses refus (dont
+`test:ABC` → 110000, l'exemple de la doc), les noms de paires et leur résolution, le cache, le sélecteur, le
+formulaire, et seize mutations, toutes attrapées.
+
+**Vu dans le navigateur le 2026-10-19, session authentifiée, avec des ordres de test interceptés dans la page
+(rien n'a été envoyé ni annulé).** Liste : l'ordre brut `@107` s'affiche « HYPE/USDC » avec **Buy** (la doc donne
+HYPE = paire 107), `PURR/USDC` Sell, `ETH` Long, `xyz:MU` Short. Détail de l'ordre `@107` : « HYPE/USDC », **BUY**.
+`getAssetIndex` sur les vraies méta, comparé à un calcul indépendant fait depuis `allPerpMetas` et `spotMeta` :
+onze cas concordent — `@107` et `HYPE/USDC` → 10107, `PURR/USDC` → 10000, `@1` → 10001, `BTC` → 0, `ETH` → 1,
+`ETHFI` → 121, `xyz:XYZ100` → 110000 — et `:BTC`, le nom vide et `@99999` échouent avec leur raison.
+
+⚠️ **Ce qui n'est pas établi.** L'**annulation** d'un ordre spot `@N` n'a pas été exécutée : ce qui est vu est
+l'identifiant d'actif qu'elle enverrait, pas la réponse du gateway. ⚠️ Les deux `normalizeCoin` (majuscules, coupe après
+`-` ou `:`) restent, dérogés dans le garde-fou : ils écrasent la casse de `kPEPE`, à reprendre à part en résolvant
+le nom contre la méta. ⚠️ Les **outcomes** (`#<encodage>`, `+<encodage>`) sont lus comme des perps du dex principal
+tant que `hl-shared-types` ne les distingue pas : un `#10` échoue alors bruyamment (introuvable) dans le
+formulaire et `getAssetIndex`, mais sans nom clair ; le genre `outcome` est préparé dans `hl-shared-types`, à
+brancher après sa publication. ⚠️ Des résolutions de noms simultanées (`resolveCoins` sur une liste) lancent
+autant de requêtes `spotMeta` identiques que de noms avant la première réponse : le service ne regroupe pas les
+requêtes en vol (existant, non corrigé, poids non chiffré).
 
 ## À éprouver en réel : ce qu'aucun double ne peut établir
 

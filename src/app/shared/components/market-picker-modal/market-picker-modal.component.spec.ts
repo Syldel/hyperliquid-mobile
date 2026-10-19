@@ -76,6 +76,37 @@ describe('MarketPickerModalComponent exchange scoping', () => {
     expect(component.refusal()).not.toBeNull();
   });
 
+  /**
+   * L'onglet de départ suit ce que `hlMarketKind` dit du marché déjà choisi. `includes('/')` ne voyait pas
+   * `@107`, la forme de presque toutes les paires spot (333 sur 334, mesuré le 2026-10-19) : la modale
+   * s'ouvrait alors sur les perps, loin du marché affiché.
+   */
+  describe('the tab it opens on, for a market already chosen', () => {
+    function mountOn(initial: string): MarketPickerModalComponent {
+      fixture = TestBed.createComponent(MarketPickerModalComponent);
+      fixture.componentRef.setInput('exchangeKey', 'hyperliquid');
+      fixture.componentRef.setInput('initialValue', initial);
+      fixture.detectChanges();
+      return fixture.componentInstance;
+    }
+
+    it.each(['@107', '@1', 'PURR/USDC', 'HYPE/USDC'])('opens %s on the spot tab', (initial) => {
+      expect(mountOn(initial).marketType()).toBe('spot');
+    });
+
+    it.each(['xyz:MU', 'vntl:ROBOT'])('opens the builder perp %s on the HIP-3 tab', (initial) => {
+      expect(mountOn(initial).marketType()).toBe('hip3');
+    });
+
+    it.each(['BTC', 'ETH', 'kPEPE'])('keeps the perp tab for %s', (initial) => {
+      expect(mountOn(initial).marketType()).toBe('perp');
+    });
+
+    it('keeps the default tab for a name no rule classifies, rather than guessing one', () => {
+      expect(mountOn(':BTC').marketType()).toBe('perp');
+    });
+  });
+
   it('refuses to return a market it never should have listed', () => {
     // Défense en profondeur : même si un template laissait passer un clic, un
     // marché Hyperliquid ne doit pas être écrit sur une paire d'un autre

@@ -7,6 +7,7 @@ import {
   HLUserFill,
   HLUserFillsByTimeRequest,
 } from '@syldel/hl-shared-types';
+import { openOrdersDexOf } from '@utils/market-kind.util';
 import { HyperliquidInfoService } from './hyperliquid-info.service';
 
 // ─── Types publics ────────────────────────────────────────────────────────────
@@ -124,7 +125,8 @@ export class HyperliquidCacheService {
   // ── API publique ──────────────────────────────────────────────────────────
 
   selectCoin(coin: string): void {
-    const { dex } = parseCoin(coin);
+    const dex = dexToSelect(coin);
+    if (dex === null) return;
     this.selectedCoin.set(coin);
     this.config.update((c) => (c.dex === dex ? c : { ...c, dex }));
   }
@@ -134,7 +136,8 @@ export class HyperliquidCacheService {
   }
 
   selectCoinWithConfig(coin: string, partial: Partial<HLCacheConfig>): void {
-    const { dex } = parseCoin(coin);
+    const dex = dexToSelect(coin);
+    if (dex === null) return;
     this.selectedCoin.set(coin);
     this.config.update((c) => ({ ...c, ...partial, dex })); // écriture unique, dex + lookback ensemble
   }
@@ -192,12 +195,19 @@ function normalizeCoin(coin: string): string {
   return coin.toUpperCase().split('-')[0];
 }
 
-/** Extrait le dex et le coin name depuis une string "dex:COIN" ou "COIN". */
-function parseCoin(coin: string): { dex: string; coinName: string } {
-  const idx = coin.indexOf(':');
-  if (idx === -1) return { dex: '', coinName: coin };
-  return {
-    dex: coin.slice(0, idx),
-    coinName: coin,
-  };
+/**
+ * Le dex où lire les ordres du coin sélectionné (`openOrdersDexOf` : le sien pour un perp, le dex principal
+ * pour un spot), ou `null` pour un nom que la règle ne sait pas classer.
+ *
+ * Dans ce cas la sélection est **refusée**, bruyamment : le dex principal n'est pas un repli. La découpe sur
+ * `:` qui était là rendait `''` pour tout ce qui n'avait pas de préfixe, un nom douteux compris.
+ */
+function dexToSelect(coin: string): string | null {
+  const dex = openOrdersDexOf(coin);
+  if (dex === null) {
+    console.error(
+      `[HyperliquidCacheService] "${coin}" is not a market name this app can classify: not selected.`,
+    );
+  }
+  return dex;
 }
