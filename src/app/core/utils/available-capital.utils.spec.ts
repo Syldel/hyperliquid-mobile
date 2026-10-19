@@ -83,7 +83,6 @@ describe('readAvailableCapital', () => {
     const balance: CollateralBalance = {
       status: 'unsupported-mode',
       mode: 'portfolioMargin',
-      asset: 'BTC',
     };
 
     expect(readAvailableCapital(balance)).toEqual({
@@ -96,7 +95,6 @@ describe('readAvailableCapital', () => {
     const balance: CollateralBalance = {
       status: 'unknown-collateral',
       mode: 'default',
-      asset: 'NOPE',
     };
 
     expect(readAvailableCapital(balance)).toEqual({ status: 'unknown-collateral' });

@@ -3,7 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { ConfigService } from '@services/config.service';
 import { withWalletToken } from '../interceptors/auth.interceptor';
 import {
-  CollateralBalance,
+  CollateralBalanceResponse,
   HLCancelOrderResponse,
   HLOid,
   HLOrderDetails,
@@ -44,8 +44,8 @@ export class HyperliquidGatewayService {
    * `0.01079182` USDC — l'app affichait donc comme capital perp un argent qui
    * n'en est pas. Le mode se lit, il ne se suppose pas.
    */
-  getCollateralBalance(asset: string): Observable<CollateralBalance> {
-    return this.http.get<CollateralBalance>(
+  getCollateralBalance(asset: string): Observable<CollateralBalanceResponse> {
+    return this.http.get<CollateralBalanceResponse>(
       `${this.config.hyperliquidGatewayUrl}/hyperliquid/info/collateral-balance`,
       { ...withWalletToken(), params: { asset } },
     );
