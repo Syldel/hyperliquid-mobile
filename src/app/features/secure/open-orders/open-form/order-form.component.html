@@ -20,6 +20,15 @@
     </div>
   }
 
+  @if (marketMetaMessage(); as metaNotice) {
+    <div class="market-data-notice">
+      <p class="error-message error-message--small error-message--padded">{{ metaNotice }}</p>
+      @if (canRetryMarketMeta()) {
+        <ion-button size="small" fill="outline" (click)="retryMarketMeta()">Retry</ion-button>
+      }
+    </div>
+  }
+
   <div class="form-section asset-side-row">
     <div>
       <p class="section-label">Asset</p>

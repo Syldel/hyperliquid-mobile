@@ -73,6 +73,13 @@ import {
   type MarketDataState,
 } from './active-asset.util';
 import {
+  blocksOnMarketMeta,
+  marketMetaDetailOf,
+  marketMetaNotice,
+  marketMetaStateOf,
+  type MarketMetaState,
+} from './market-meta-state.util';
+import {
   isLimitOnWrongSide,
   isStopLimitTight,
   limitFromTrigger,
@@ -133,6 +140,18 @@ export class OrderFormComponent implements OnInit {
   marketNotice = computed(() => marketDataNotice(this.marketData()));
   canRetryMarketData = computed(() => this.marketData() === 'unavailable');
   maxLeverage = signal<number | null>(null);
+  /**
+   * La grille (`szDecimals`, levier maximal) lue dans la méta du marché choisi, par égalité exacte.
+   * Tant qu'elle ne l'est pas — en cours, introuvable, méta indisponible —, l'envoi est **bloqué** :
+   * `roundSize` et `roundPrice` arrondissent sur cette grille, et celle d'un autre marché déplace la
+   * taille ou le prix qui partent. Voir `market-meta-state.util.ts`.
+   */
+  marketMeta = signal<MarketMetaState>('none');
+  private marketMetaDetail = signal<string | null>(null);
+  marketMetaMessage = computed(() =>
+    marketMetaNotice(this.marketMeta(), this.selectedCoin(), this.marketMetaDetail()),
+  );
+  canRetryMarketMeta = computed(() => this.marketMeta() === 'unavailable');
   activePosition = signal<{ isBuy: boolean; sz: string; entryPx: string } | null>(null);
 
   protectiveOrders = signal<ProtectiveOrderResult[]>([]);
@@ -244,6 +263,7 @@ export class OrderFormComponent implements OnInit {
 
   isFormInvalid = computed(() => {
     if (blocksPlacement(this.marketData())) return true;
+    if (blocksOnMarketMeta(this.marketMeta())) return true;
     const order = this.buildOrderDetails();
     if (!order.assetName || !order.sz) return true;
     if (!this.pricesReady()) return true;
@@ -409,26 +429,14 @@ export class OrderFormComponent implements OnInit {
         this.currentPrice.set(null);
         this.leverage.set(null);
         this.marketData.set('none');
-        if (!coin) return;
-        if (this.isSpot()) {
-          this.hlMarket.getSpotMeta().subscribe((meta) => {
-            const market = meta.tokens.find((m) => m.name === coin || coin.includes(m.name));
-            if (market) {
-              this.szDecimals.set(market.szDecimals);
-              this.szDecimalsKnown.set(true);
-            }
-          });
-        } else {
-          const dex = this.hlMarket.extractDex(coin);
-          this.hlMarket.getPerpMeta(dex).subscribe((meta) => {
-            const market = meta.universe.find((m) => m.name === coin || coin.includes(m.name));
-            if (market) {
-              this.szDecimals.set(market.szDecimals);
-              this.maxLeverage.set(market.maxLeverage);
-              this.szDecimalsKnown.set(true);
-            }
-          });
+        // La levée du levier de l'actif PRÉCÉDENT : `maxLeverage` n'était pas remis à zéro.
+        this.maxLeverage.set(null);
+        if (!coin) {
+          this.marketMeta.set('none');
+          this.marketMetaDetail.set(null);
+          return;
         }
+        this.loadMarketMeta(coin);
         if (this.orderKind() === 'trigger') {
           this.loadActivePosition();
         }
@@ -553,6 +561,42 @@ export class OrderFormComponent implements OnInit {
       this.loadCapital(selectedCoin);
       return this.loadActiveAssetData(selectedCoin);
     };
+  }
+
+  /**
+   * Lit la grille du marché choisi. Une réponse qui arrive après un changement d'actif est ignorée : sans
+   * cette garde, la grille du marché PRÉCÉDENT écrasait celle du nouveau (même défaut que `szDecimals`
+   * resté sur l'actif d'avant, mesuré le 2026-10-16).
+   */
+  private loadMarketMeta(coin: string): void {
+    this.marketMeta.set('loading');
+    this.marketMetaDetail.set(null);
+
+    this.hlMarket.getMarketMeta(coin).subscribe({
+      next: (meta) => {
+        if (this.selectedCoin() !== coin) return;
+        this.szDecimals.set(meta.szDecimals);
+        this.maxLeverage.set(meta.kind === 'perp' ? meta.maxLeverage : null);
+        this.szDecimalsKnown.set(true);
+        this.marketMeta.set('ok');
+      },
+      error: (error: unknown) => {
+        if (this.selectedCoin() !== coin) return;
+        // La grille est celle du marché, ou rien : une lecture qui échoue — même sur le marché dont la
+        // précédente avait réussi — n'en laisse pas le levier ni le « connue » derrière elle (le texte
+        // « 5x / 5x » restait affiché sous un bandeau qui disait la grille illisible).
+        this.maxLeverage.set(null);
+        this.szDecimalsKnown.set(false);
+        this.marketMeta.set(marketMetaStateOf(error));
+        this.marketMetaDetail.set(marketMetaDetailOf(error));
+      },
+    });
+  }
+
+  /** Relance la lecture de la grille : le même appel que le changement d'actif. */
+  retryMarketMeta(): void {
+    const coin = this.selectedCoin();
+    if (coin) this.loadMarketMeta(coin);
   }
 
   /** Relance le chargement du prix : le même appel que le changement d'actif. */
@@ -815,6 +859,14 @@ export class OrderFormComponent implements OnInit {
     // pas dépendre du seul bouton.
     if (blocksPlacement(this.marketData())) {
       this.error.set(marketDataNotice(this.marketData()));
+      return;
+    }
+
+    // Même raison : `submit()` est public, et la grille arrondit ce qui part.
+    if (blocksOnMarketMeta(this.marketMeta())) {
+      this.error.set(
+        this.marketMetaMessage() ?? 'The market grid is still loading: try again in a moment.',
+      );
       return;
     }
 

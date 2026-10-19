@@ -1,8 +1,20 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { ConfigService } from '@services/config.service';
-import { HLPerpDexsResponse, HLPerpMeta, HLSpotMeta } from '@syldel/hl-shared-types';
-import { forkJoin, map, Observable, of, switchMap, tap } from 'rxjs';
+import {
+  hlMarketKind,
+  hlPerpDexOf,
+  HLPerpDexsResponse,
+  HLPerpMeta,
+  HLSpotMeta,
+} from '@syldel/hl-shared-types';
+import {
+  MarketMetaError,
+  readPerpMarketMeta,
+  readSpotMarketMeta,
+  type MarketMeta,
+} from '@utils/market-meta.util';
+import { forkJoin, map, Observable, of, switchMap, tap, throwError } from 'rxjs';
 
 const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24h
 
@@ -261,6 +273,45 @@ export class HyperliquidMarketService {
         return idx;
       }),
     );
+  }
+
+  /**
+   * La grille d'un marché — `szDecimals`, et `maxLeverage` pour un perp —, lue dans SA méta, par égalité
+   * exacte. Voir `market-meta.util.ts` pour ce que la sous-chaîne faisait (38 perps et les 334 paires spot
+   * lisaient les données d'un autre).
+   *
+   * - un **perp** se lit dans la méta de son dex (`hlPerpDexOf`, types partagés) ;
+   * - une paire **spot** — `HYPE/USDC` comme `@107` — se rattache à son nom de protocole, puis au jeton de
+   *   **base** de la paire ;
+   * - un nom que la règle ne sait pas classer est **refusé**, comme un marché absent.
+   *
+   * Échoue par `MarketMetaError` (le marché n'est pas lisible) ou par l'erreur de transport (la méta n'a pas
+   * pu être chargée) : l'appelant distingue les deux, et ne remplace jamais l'une par une valeur par défaut.
+   */
+  getMarketMeta(coin: string): Observable<MarketMeta> {
+    if (hlMarketKind(coin) === 'spot') {
+      return this.getSpotMaps().pipe(
+        switchMap(({ protocolMap }) => {
+          const protocolName = protocolMap.get(coin);
+          if (protocolName === undefined) {
+            return throwError(
+              () => new MarketMetaError('not-found', `"${coin}" is not a known spot pair`),
+            );
+          }
+          return this.getSpotMeta().pipe(map((meta) => readSpotMarketMeta(meta, protocolName)));
+        }),
+      );
+    }
+
+    // `null` pour ce qui n'est pas un perp : un nom que la règle ne sait pas classer n'est ni deviné
+    // perp du dex principal, ni lu.
+    const dex = hlPerpDexOf(coin);
+    if (dex === null) {
+      return throwError(
+        () => new MarketMetaError('invalid-name', `"${coin}" is not a valid market name`),
+      );
+    }
+    return this.getPerpMeta(dex).pipe(map((meta) => readPerpMarketMeta(meta, coin)));
   }
 
   extractDex(pairName: string): string {

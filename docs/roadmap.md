@@ -628,6 +628,75 @@ détail : quatre lignes pour la phrase partielle avec son limite, mêmes contras
 horizontal. Le contraste est celui d'avant, ce qui est attendu : couleur et graisse n'ont pas changé.
 ⚠️ Toujours pas vu sur un vrai ordre resté partiellement exécuté.
 
+## Le formulaire d'ordre lisait la grille d'un autre marché — corrigé (2026-10-19)
+
+`order-form.component.ts` cherchait le marché de la paire par
+`universe.find((m) => m.name === coin || coin.includes(m.name))`, pour en tirer `szDecimals` et
+`maxLeverage`. La correspondance par **sous-chaîne** renvoyait le premier nom contenu dans celui
+cherché : un marché dont le nom en contient un autre, listé avant lui, recevait les données de
+celui-là.
+
+**Mesuré** en rejouant cette règle, telle qu'écrite, sur les 544 perps réels (`allPerpMetas`, 11 dex,
+lecture publique le 2026-10-19) : **38 marchés** reçoivent les données d'un autre, et **36** d'entre
+eux avec un `szDecimals` ou un `maxLeverage` différent. Exemples : `ETHFI` reçoit celles d'`ETH`
+(`szDecimals` 4 au lieu de 1, levier maximal 25 au lieu de 5), `PEOPLE` celles d'`OP` (1 au lieu de 0,
+levier 5 au lieu de 3), `HBAR` celles d'`AR` (2 au lieu de 0), `POPCAT` celles d'`OP`, `NEIROETH` celles
+d'`ETH`. Ce n'était pas qu'un affichage : `buildOrderDetails()` arrondit avec cette grille
+(`roundSize` et `roundPrice` **arrondissent**, ils ne tronquent pas), donc ce qui partait au gateway était
+déplacé. Calculé avec le code exact : `MAVIA` (reçoit `MAV`, 0 décimale au lieu de 1) — une taille saisie à
+12,5 partait à **13** ; `ETHFI` — une limite saisie à 0,52345 partait à **0,52**. Même grille pour les
+tailles des ordres protecteurs liés et pour la clôture d'une position.
+
+**Branche spot, mesurée aussi** (`spotMeta`, 334 paires) : le nom d'affichage `BASE/QUOTE` n'égale jamais
+un nom de jeton, seule la sous-chaîne jouait, sur les jetons dans l'ordre de leur index — **les 334 paires**
+recevaient le mauvais jeton (USDC, `szDecimals` 8, pour 317 d'entre elles). Masqué aujourd'hui : l'envoi
+d'un ordre spot depuis ce formulaire est déjà bloqué (« the price check is not available for spot markets
+yet »).
+
+**Corrigé.** `HyperliquidMarketService.getMarketMeta(coin)` lit la grille par égalité **exacte**
+(`market-meta.util.ts`) : un perp dans la méta de son dex (`hlPerpDexOf`), une paire spot par son nom de
+protocole puis son jeton de **base**, et refuse un nom que `hlMarketKind` ne classe pas. Un seul résultat,
+ou une erreur typée (`invalid-name`, `not-found`, `ambiguous`, `unreadable`) — jamais un voisin ni un repli.
+Le formulaire en tire un état (`market-meta-state.util.ts`) qui **bloque l'envoi**, et `submit()` lui-même,
+tant que la grille n'est pas celle du marché : en cours de lecture (sans bandeau, c'est un état de quelques
+instants), introuvable (« The size and price grid of "X" could not be read (…), so placing an order is
+disabled », sans réessai), ou méta qui ne charge pas (avec **Retry**). Une réponse qui arrive après un
+changement d'actif est ignorée, et le levier de l'actif précédent ne lui survit plus. Les `subscribe` n'avaient
+pas de callback d'erreur : `szDecimals` gardait le défaut `3` ou la valeur de l'actif d'avant, sans rien dire.
+
+Éprouvé : les 12 marchés mesurés (valeurs de l'API recopiées), un extrait de `spotMeta`, le service sur ses
+requêtes, le composant (grille d'ETHFI et de MAVIA, envoi bloqué, réessai, réponse périmée, levier) et vingt
+mutations, toutes attrapées.
+
+**Vu dans le navigateur le 2026-10-19, session authentifiée, à 360 px, dans les deux thèmes, sur le vrai
+formulaire ouvert sur `ETHFI`** (rien n'a été envoyé : le bouton n'a pas été cliqué). Grille réelle : `szDecimals`
+1, levier maximal 5 (« Cross · 5x / 5x », 25x avec l'ancien code), limite pré-remplie à **0,67296** (0,67 avec la
+grille d'`ETH`), et `buildOrderDetails()` donnerait `limitPx` 0,67296 et `sz` **14,9**. Marché introuvable
+(réponse de méta interceptée, sans `ETHFI`) : état `missing`, bandeau avec la raison, bouton désactivé, pas de
+Retry. Méta qui ne charge pas : état `unavailable`, bandeau, **Retry** — qui, cliqué avec la vraie méta, lève le
+blocage. Le texte du bandeau tient en trois lignes à 360 px, rouge 6,11:1 en sombre et 6,20:1 en clair, aucun
+défilement horizontal, bouton compris. **Le navigateur a trouvé un défaut que les tests n'avaient pas** : après
+une lecture réussie, un échec sur le même marché laissait « Cross · 5x / 5x » affiché sous le bandeau qui disait
+la grille illisible. Corrigé (le levier et l'état « connue » sont retirés sur tout échec), avec un test qui
+tombe sans le correctif, puis revu dans le navigateur.
+
+⚠️ **Ce qui n'est pas établi.** Un ordre n'a pas été envoyé : ce qui partirait vient de `buildOrderDetails()`
+lu sur le composant, pas d'une réponse du gateway. ⚠️ `normalizeCoin` met en
+majuscules le nom que la liste des ordres passe au formulaire (`kPEPE` devient `KPEPE`) : l'égalité étant
+exacte, ces sept marchés en minuscules (`kPEPE`, `kBONK`, `kFLOKI`, `kSHIB`, `kLUNC`, `kNEIRO`, `kDOGS`)
+seraient maintenant **refusés bruyamment** par ce chemin, au lieu d'être rattachés en silence à un voisin.
+Aucune normalisation n'a été ajoutée ; reste à vérifier si ce chemin peut réellement les fournir.
+
+Voisin, de même nature — **« spot » est décidé par quatre prédicats différents** : `includes('/')` (liste
+des ordres, `getAssetIndex`), `includes('/') || includes('-')` (formulaire, détail), `startsWith('@') ||
+includes('/')` (résolution des noms). La liste décide sur le nom **brut** d'Hyperliquid, où presque
+toutes les paires spot sont `@N` : un ordre spot sur `@107` s'y afficherait « Long/Short » au lieu de
+« Buy/Sell ». Le `'-'` est mort aujourd'hui (aucun des 544 perps n'en porte, mesuré), mais un futur perp
+qui en porterait partirait avec `isSpotAsset: true`. `hlMarketKind` et `hlPerpDexOf`
+(`@syldel/hl-shared-types`) sont la règle unique ; `parseCoin` (`hyperliquid-cache.service.ts`) et
+`extractDex` (`hyperliquid-market.service.ts`) la refont à la main pour le dex. Le bot a fait ce
+chantier côté bot le 2026-10-19 (`nest-trading-bot/docs/known-gaps.md`).
+
 ## À éprouver en réel : ce qu'aucun double ne peut établir
 
 Ces points ne se tranchent ni par la lecture du code ni dans le navigateur : il faut un
