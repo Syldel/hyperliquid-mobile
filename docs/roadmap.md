@@ -610,6 +610,24 @@ limite. Même prédicat que le bot, strict (reduce-only, `isTrigger: false`, `tr
 6,20:1 en clair, badge 7,61:1 et 6,21:1, aucun défilement horizontal. ⚠️ Pas vu sur un vrai ordre
 resté au carnet.
 
+**Un ordre resté partiellement exécuté ne se dit plus « unfilled »** (2026-10-19). `sz` est la part
+restante et `origSz` la taille posée ; un ordre limite peut être exécuté en partie, et la phrase
+fixe « still resting unfilled » devenait fausse. `describeStuckTriggered` (même fichier) la remplace
+par « Triggered, 0.9 of 1.5 already filled, but 0.6 is still resting: the position is not protected
+by it. » (le détail y ajoute le limite). La soustraction est exacte (chaînes décimales, pas de
+flottant) ; des tailles illisibles ou qui se contredisent (`sz` > `origSz`) ne font rien deviner :
+l'ordre est décrit comme reçu. Le bot écrit la même chose dans son journal (`describeStuckTriggeredOrder`,
+`nest-trading-bot`). ⚠️ **La forme d'un ordre resté _partiellement_ exécuté n'est pas mesurée** : tous
+ceux relevés le 2026-10-18 étaient entiers, `sz` et `origSz` sont lus du type.
+
+Mesuré dans le navigateur le 2026-10-19, à 360 px, **avec des données de test locales** (les réponses
+de `frontendOpenOrders` et de `orders/open/{oid}` interceptées dans la page ; rien n'a été envoyé) : un
+ordre entier, deux partiels (0,9 sur 1,5 ; 0,0014 sur 0,0044) et un ordre limite ordinaire. Liste : trois
+lignes pour les trois phrases, rouge 6,11:1 en sombre et 6,20:1 en clair, aucun défilement horizontal ;
+détail : quatre lignes pour la phrase partielle avec son limite, mêmes contrastes, aucun défilement
+horizontal. Le contraste est celui d'avant, ce qui est attendu : couleur et graisse n'ont pas changé.
+⚠️ Toujours pas vu sur un vrai ordre resté partiellement exécuté.
+
 ## À éprouver en réel : ce qu'aucun double ne peut établir
 
 Ces points ne se tranchent ni par la lecture du code ni dans le navigateur : il faut un

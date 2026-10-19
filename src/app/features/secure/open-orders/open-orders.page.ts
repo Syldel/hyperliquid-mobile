@@ -37,7 +37,7 @@ import { addIcons } from 'ionicons';
 import { addOutline, createOutline } from 'ionicons/icons';
 import { forkJoin, map, Observable, of } from 'rxjs';
 import { OrderFormComponent } from './open-form/order-form.component';
-import { isStuckTriggeredOrder } from './stuck-triggered-order.util';
+import { describeStuckTriggered, isStuckTriggeredOrder } from './stuck-triggered-order.util';
 
 @Component({
   selector: 'app-open-orders',
@@ -75,6 +75,9 @@ export class OpenOrdersPage extends MenuBasePage implements OnInit {
    * `stuck-triggered-order.util.ts`).
    */
   readonly isStuckTriggered = isStuckTriggeredOrder;
+
+  /** Ce qu'on en dit : entier, ou exécuté en partie (voir `describeStuckTriggered`). */
+  readonly stuckTriggeredText = (order: HLFrontendOpenOrder) => describeStuckTriggered(order);
 
   openOrders = signal<HLFrontendOpenOrder[]>([]);
   selectedDexNames = signal<string[] | null>(null);

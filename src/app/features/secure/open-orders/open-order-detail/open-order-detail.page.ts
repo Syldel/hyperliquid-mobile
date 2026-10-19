@@ -36,7 +36,7 @@ import { addIcons } from 'ionicons';
 import { closeOutline, createOutline, trashOutline } from 'ionicons/icons';
 import { of, switchMap } from 'rxjs';
 import { OrderFormComponent } from '../open-form/order-form.component';
-import { isStuckTriggeredOrder } from '../stuck-triggered-order.util';
+import { describeStuckTriggered, isStuckTriggeredOrder } from '../stuck-triggered-order.util';
 
 @Component({
   selector: 'app-open-order-detail',
@@ -59,6 +59,10 @@ import { isStuckTriggeredOrder } from '../stuck-triggered-order.util';
 export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
   /** Un stop déclenché dont l'ordre est resté au carnet (voir `stuck-triggered-order.util.ts`). */
   readonly isStuckTriggered = isStuckTriggeredOrder;
+
+  /** Ce qu'on en dit, avec son limite : entier, ou exécuté en partie. */
+  readonly stuckTriggeredText = (order: HLOrderStatusDetails) =>
+    describeStuckTriggered(order, true);
 
   private readonly route = inject(ActivatedRoute);
   private readonly hlGateway = inject(HyperliquidGatewayService);

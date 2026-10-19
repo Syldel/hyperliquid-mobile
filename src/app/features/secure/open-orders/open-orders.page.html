@@ -51,10 +51,7 @@
           <p>Limit: {{ openOrder.limitPx }} · Sz: {{ openOrder.sz }}/{{ openOrder.origSz }}</p>
           <p>{{ openOrder.timestamp | date:'dd/MM/yy HH:mm' }}</p>
           @if (isStuckTriggered(openOrder)) {
-          <p class="stuck-triggered" role="alert">
-            Triggered, but this order is still resting unfilled: the position is not protected by
-            it.
-          </p>
+          <p class="stuck-triggered" role="alert">{{ stuckTriggeredText(openOrder) }}</p>
           }
         </ion-label>
 
