@@ -1,6 +1,18 @@
 import { HttpErrorResponse } from '@angular/common/http';
 
-export function extractErrorMessage(err: HttpErrorResponse): string {
+/**
+ * Le message d'une erreur, pour un toast ou un bandeau.
+ *
+ * Deux familles arrivent ici : la réponse HTTP d'un service (`HttpErrorResponse`), et une `Error`
+ * ordinaire levée **avant** tout appel — `getAssetIndex` qui ne résout pas un marché, par exemple. Cette
+ * dernière n'a pas de `status` : elle tombait dans le repli final et affichait « Error undefined », sans
+ * rien dire de la cause. `HttpErrorResponse` n'hérite pas d'`Error` (il l'implémente seulement), donc
+ * `instanceof Error` sépare bien les deux.
+ */
+export function extractErrorMessage(err: HttpErrorResponse | Error): string {
+  if (err instanceof Error) {
+    return err.message || `Unexpected ${err.name || 'error'}, with no message.`;
+  }
   if (err.status === 0) {
     return 'Network error (offline, DNS failure, CORS restriction, SSL error, timeout, or server unreachable).';
   }

@@ -136,3 +136,66 @@ describe('no hand-made market naming rule', () => {
     });
   });
 });
+
+/**
+ * Les genres de marché se lisent **un à un**, jamais par exclusion. `hlMarketKind` a gagné `outcome` (HIP-4, types
+ * partagés 0.0.28) : `!isSpotMarket(name)` ou `kind !== 'spot'` rangeaient pourtant tout le reste parmi les perps, et
+ * `Exclude<HLMarketKind, 'spot'>` aurait déclaré un outcome supporté. Aucune de ces formes ne ressent l'ajout : le
+ * compilateur se tait. `=== 'perp' || === 'builderPerp'` (ou `isPerpMarket`) fait échouer la compilation à l'arrivée
+ * d'un nouveau genre.
+ */
+const EXCLUSION_ALLOWED: Record<string, string> = {
+  'core/services/hyperliquid-market.service.ts :: if (!isSpotMarket(coin)) return of(coin);':
+    "Résolution des noms d'affichage : seul un spot a un autre nom que le sien ; tout le reste — perp, " +
+    'outcome, nom douteux — est rendu tel quel, ce qui est la bonne lecture pour chacun. Aucun genre ' +
+    "n'est déduit de ce test.",
+};
+
+describe('no market kind read by exclusion', () => {
+  const BY_EXCLUSION =
+    /!==?\s*(['"`])(?:spot|outcome|builderPerp)\1|Exclude\s*<\s*HLMarketKind|!\s*isSpotMarket\s*\(/;
+
+  const files = sourceFiles(APP);
+
+  const offenders = files.flatMap((path) => {
+    const rel = relative(APP, path).replace(/\\/g, '/');
+    return withoutComments(readFileSync(path, 'utf-8'))
+      .split('\n')
+      .map((line, index) => ({ rel, line: index + 1, text: line.trim() }))
+      .filter(({ text }) => BY_EXCLUSION.test(text))
+      .filter(({ text }) => !(`${rel} :: ${text}` in EXCLUSION_ALLOWED));
+  });
+
+  it('does not read a market kind by exclusion outside the listed lines', () => {
+    expect(offenders.map((o) => `${o.rel}:${o.line}  ${o.text}`)).toEqual([]);
+  });
+
+  it('has no stale exemption: every allowed line still exists in its file', () => {
+    const present = new Set(
+      files.flatMap((path) => {
+        const rel = relative(APP, path).replace(/\\/g, '/');
+        return withoutComments(readFileSync(path, 'utf-8'))
+          .split('\n')
+          .map((line) => `${rel} :: ${line.trim()}`);
+      }),
+    );
+
+    expect(Object.keys(EXCLUSION_ALLOWED).filter((key) => !present.has(key))).toEqual([]);
+  });
+
+  it('catches the forms it is meant to forbid, and lets the positive reading through', () => {
+    expect(BY_EXCLUSION.test("if (kind !== 'spot') {")).toBe(true);
+    expect(BY_EXCLUSION.test('if (kind != "outcome")')).toBe(true);
+    expect(BY_EXCLUSION.test("type T = Exclude<HLMarketKind, 'spot'>;")).toBe(true);
+    expect(BY_EXCLUSION.test('if (!isSpotMarket(coin)) return of(coin);')).toBe(true);
+    expect(BY_EXCLUSION.test("if (kind === 'spot') {")).toBe(false);
+    expect(BY_EXCLUSION.test('if (isSpotMarket(coin)) {')).toBe(false);
+    expect(BY_EXCLUSION.test('return isPerpMarket(name);')).toBe(false);
+  });
+
+  it('ignores what a comment says about it', () => {
+    expect(withoutComments("// kind !== 'spot' lisait tout le reste\nconst a = 1;")).not.toMatch(
+      BY_EXCLUSION,
+    );
+  });
+});

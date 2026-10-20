@@ -30,6 +30,8 @@ export type MarketMeta =
 export type MarketMetaFailure =
   /** Le nom ne désigne aucun marché que la règle des types partagés sait classer. */
   | 'invalid-name'
+  /** Le nom est classé, mais en un genre que cette app ne négocie pas (un outcome, HIP-4). */
+  | 'unsupported'
   /** Aucun marché de ce nom dans la méta consultée. */
   | 'not-found'
   /** Plusieurs marchés portent ce nom : en choisir un serait deviner. */

@@ -59,14 +59,14 @@
             [color]="isBuy() ? 'success' : 'medium'"
             (click)="isBuy.set(true)"
           >
-            {{ isSpot() ? 'Buy' : 'Long' }}
+            {{ usesBuySell() ? 'Buy' : 'Long' }}
           </ion-button>
           <ion-button
             [fill]="!isBuy() ? 'solid' : 'outline'"
             [color]="!isBuy() ? 'danger' : 'medium'"
             (click)="isBuy.set(false)"
           >
-            {{ isSpot() ? 'Sell' : 'Short' }}
+            {{ usesBuySell() ? 'Sell' : 'Short' }}
           </ion-button>
         </div>
       </ion-list>
@@ -132,7 +132,10 @@
             @if (activePosition(); as pos) {
               <div class="current-price-hint">
                 Active position:
-                {{ pos.isBuy ? (isSpot() ? 'Buy' : 'Long') : isSpot() ? 'Sell' : 'Short' }} ·
+                {{
+                  pos.isBuy ? (usesBuySell() ? 'Buy' : 'Long') : usesBuySell() ? 'Sell' : 'Short'
+                }}
+                ·
                 {{ pos.sz }}
               </div>
             }
@@ -308,10 +311,10 @@
           : isModify()
             ? 'Update order'
             : isBuy()
-              ? isSpot()
+              ? usesBuySell()
                 ? 'Place Buy'
                 : 'Place Long'
-              : isSpot()
+              : usesBuySell()
                 ? 'Place Sell'
                 : 'Place Short'
       }}

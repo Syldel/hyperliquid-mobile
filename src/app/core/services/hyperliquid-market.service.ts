@@ -8,7 +8,7 @@ import {
   HLPerpMeta,
   HLSpotMeta,
 } from '@syldel/hl-shared-types';
-import { isSpotMarket } from '@utils/market-kind.util';
+import { isSpotMarket, marketKindLabel } from '@utils/market-kind.util';
 import {
   MarketMetaError,
   readPerpMarketMeta,
@@ -232,7 +232,8 @@ export class HyperliquidMarketService {
    * - **spot** — `PURR/USDC`, un nom d'affichage, ou `@N` — : `10000 + spotInfo["index"]` ;
    * - **perp de builder** (`dex:coin`) : `100000 + perp_dex_index * 10000 + index_in_meta` ;
    * - **perp natif** : son index dans `meta` ;
-   * - **tout le reste** : une erreur, jamais une branche par défaut.
+   * - **tout le reste** — un outcome HIP-4, qui a un identifiant mais que l'app ne négocie pas, ou un nom que
+   *   la règle ne classe pas — : une erreur qui dit lequel, jamais une branche par défaut.
    *
    * Source : doc « Asset IDs », relue le 2026-10-19. Avant, la branche spot se décidait par `includes('/')` :
    * sous leur nom brut, 333 des 334 paires spot (`@N`) tombaient dans la branche perp (« Perp asset not found »)
@@ -295,6 +296,17 @@ export class HyperliquidMarketService {
       );
     }
 
+    // Un outcome (HIP-4) a bien un identifiant (`100_000_000 + encodage`, doc « Asset IDs »), mais cette app
+    // ne le négocie pas : on le refuse pour ce qu'il est, au lieu de le faire passer pour un nom illisible.
+    if (kind === 'outcome') {
+      return throwError(
+        () =>
+          new Error(
+            `Cannot resolve the asset index of "${coin}": it is ${marketKindLabel(coin)}, which this app does not trade or cancel.`,
+          ),
+      );
+    }
+
     // Un nom que la règle ne classe pas : ni deviné perp du dex principal, ni lu.
     return throwError(
       () =>
@@ -312,13 +324,28 @@ export class HyperliquidMarketService {
    * - un **perp** se lit dans la méta de son dex (`hlPerpDexOf`, types partagés) ;
    * - une paire **spot** — `HYPE/USDC` comme `@107` — se rattache à son nom de protocole, puis au jeton de
    *   **base** de la paire ;
-   * - un nom que la règle ne sait pas classer est **refusé**, comme un marché absent.
+   * - un **outcome** (HIP-4) est refusé pour ce qu'il est (`unsupported`) : l'app ne le négocie pas ;
+   * - un nom que la règle ne sait pas classer est **refusé**, comme un marché absent (`invalid-name`).
    *
    * Échoue par `MarketMetaError` (le marché n'est pas lisible) ou par l'erreur de transport (la méta n'a pas
    * pu être chargée) : l'appelant distingue les deux, et ne remplace jamais l'une par une valeur par défaut.
    */
   getMarketMeta(coin: string): Observable<MarketMeta> {
-    if (hlMarketKind(coin) === 'spot') {
+    const kind = hlMarketKind(coin);
+
+    // Les genres se lisent un à un : « tout ce qui n'est pas un spot est un perp » rangeait un outcome parmi
+    // les perps, dont `hlPerpDexOf` ne donne pourtant aucun dex.
+    if (kind === 'outcome') {
+      return throwError(
+        () =>
+          new MarketMetaError(
+            'unsupported',
+            `"${coin}" is ${marketKindLabel(coin)}, which this app does not trade`,
+          ),
+      );
+    }
+
+    if (kind === 'spot') {
       return this.getSpotMaps().pipe(
         switchMap(({ protocolMap }) => {
           const protocolName = protocolMap.get(coin);

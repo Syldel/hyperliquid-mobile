@@ -186,11 +186,14 @@ describe('a failed or unsupported price lookup', () => {
       );
     });
 
-    it('explains the spot case differently, since retrying cannot help', () => {
-      const spot = marketDataNotice('unsupported');
+    // Ce n'est plus « spot » seulement : un outcome (HIP-4) ne reçoit pas non plus de contrôle de prix, et
+    // un message qui dirait « spot » à son propos serait faux.
+    it('explains the non-perp case differently, since retrying cannot help', () => {
+      const notice = marketDataNotice('unsupported');
 
-      expect(spot).toMatch(/spot/i);
-      expect(spot).not.toBe(marketDataNotice('unavailable'));
+      expect(notice).toMatch(/only available for perp markets/i);
+      expect(notice).not.toMatch(/spot/i);
+      expect(notice).not.toBe(marketDataNotice('unavailable'));
     });
 
     // Tout état qui bloque doit avoir un message : un bouton désactivé sans raison dite

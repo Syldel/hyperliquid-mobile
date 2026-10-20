@@ -39,8 +39,7 @@
           <div class="order-header">
             <strong>{{ displayCoin(openOrder.coin) }}</strong>
             <ion-badge [color]="openOrder.side === 'B' ? 'success' : 'danger'">
-              {{ openOrder.isSpot ? openOrder.side === 'B' ? 'Buy' : 'Sell' : openOrder.side === 'B'
-              ? 'Long' : 'Short' }}
+              {{ openOrder.sideLabel }}
             </ion-badge>
             <ion-badge color="medium">{{ openOrder.orderType }}</ion-badge>
             <ion-badge color="medium">{{ openOrder.tif }}</ion-badge>

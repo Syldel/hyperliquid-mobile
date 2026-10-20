@@ -16,6 +16,11 @@ describe('marketMetaStateOf', () => {
     },
   );
 
+  // Un outcome est connu et refusé : réessayer ne le rendra pas négociable, et ce n'est pas « illisible ».
+  it('reads an unsupported market as unsupported, apart from one that is missing', () => {
+    expect(marketMetaStateOf(new MarketMetaError('unsupported', 'why'))).toBe('unsupported');
+  });
+
   it.each([
     ['a transport error', new Error('network down')],
     ['an HTTP failure', { status: 500, statusText: 'Server Error' }],
@@ -41,6 +46,7 @@ describe('blocksOnMarketMeta', () => {
     ['loading', true],
     ['ok', false],
     ['missing', true],
+    ['unsupported', true],
     ['unavailable', true],
   ] as [MarketMetaState, boolean][])('state %s blocks placement: %s', (state, blocks) => {
     expect(blocksOnMarketMeta(state)).toBe(blocks);
@@ -62,6 +68,24 @@ describe('marketMetaNotice', () => {
     );
   });
 
+  // Le détail dit déjà quel marché c'est : le bandeau ne dit pas « could not be read », qui serait faux.
+  it('says an unsupported market is not traded, rather than that its grid could not be read', () => {
+    const notice = marketMetaNotice(
+      'unsupported',
+      '#10',
+      '"#10" is an outcome market (HIP-4), which this app does not trade',
+    );
+
+    expect(notice).toBe(
+      '"#10" is an outcome market (HIP-4), which this app does not trade, so placing an order is disabled.',
+    );
+    expect(notice).not.toContain('could not be read');
+  });
+
+  it('still names the market when an unsupported failure carries no detail', () => {
+    expect(marketMetaNotice('unsupported', '#10', null)).toContain('"#10"');
+  });
+
   it('says the meta could not be loaded, and that placing is disabled until it does', () => {
     expect(marketMetaNotice('unavailable', 'ETH', null)).toContain('could not be loaded');
     expect(marketMetaNotice('unavailable', 'ETH', null)).toContain('disabled until it loads');
@@ -73,7 +97,14 @@ describe('marketMetaNotice', () => {
   });
 
   it('gives a reason for every state that blocks, except the one that lasts a few instants', () => {
-    const states: MarketMetaState[] = ['none', 'loading', 'ok', 'missing', 'unavailable'];
+    const states: MarketMetaState[] = [
+      'none',
+      'loading',
+      'ok',
+      'missing',
+      'unsupported',
+      'unavailable',
+    ];
 
     for (const state of states) {
       if (blocksOnMarketMeta(state) && state !== 'loading') {

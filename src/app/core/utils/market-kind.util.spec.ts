@@ -1,4 +1,10 @@
-import { isSpotMarket, openOrdersDexOf } from './market-kind.util';
+import {
+  isPerpMarket,
+  isSpotMarket,
+  marketKindLabel,
+  openOrdersDexOf,
+  orderSideLabel,
+} from './market-kind.util';
 
 /**
  * Les noms viennent de la lecture publique du 2026-10-19 : 544 perps (`allPerpMetas`, 11 dex), 334 paires
@@ -41,6 +47,11 @@ describe('isSpotMarket', () => {
     },
   );
 
+  // HIP-4 : `#<encodage>` et `+<encodage>` ne sont pas des spots, même si l'outcome se règle comme un jeton.
+  it.each(['#10', '+10', '#142000'])('does not read the outcome market %s as a spot', (name) => {
+    expect(isSpotMarket(name)).toBe(false);
+  });
+
   it.each(['', ':BTC', 'xyz:'])(
     'reads the name "%s", which no rule classifies, as not a spot',
     (name) => {
@@ -71,5 +82,63 @@ describe('openOrdersDexOf', () => {
   // Le doute n'est pas une réponse : un nom non classé n'a pas de dex, et l'appelant refuse.
   it.each(['', ':BTC', 'xyz:'])('has no dex for "%s": the caller must refuse', (name) => {
     expect(openOrdersDexOf(name)).toBeNull();
+  });
+
+  // Où l'exchange renvoie les ordres ouverts d'un outcome n'a pas été mesuré : le dex principal serait une
+  // supposition, donc aucun dex, et l'appelant refuse.
+  it.each(['#10', '+10', '#142000'])('has no dex for the outcome market %s', (name) => {
+    expect(openOrdersDexOf(name)).toBeNull();
+  });
+});
+
+describe('isPerpMarket', () => {
+  it.each(['BTC', 'ETH', 'kPEPE', '1000SHIB', 'xyz:MU', 'vntl:ROBOT'])(
+    'reads %s as a perp',
+    (name) => {
+      expect(isPerpMarket(name)).toBe(true);
+    },
+  );
+
+  // Tout ce qui n'est pas un perp : `!isSpotMarket(name)` rangeait un outcome et un nom douteux parmi eux.
+  it.each(['@107', 'PURR/USDC', '#10', '+10', '', ':BTC', 'xyz:'])(
+    'does not read %s as a perp',
+    (name) => {
+      expect(isPerpMarket(name)).toBe(false);
+    },
+  );
+});
+
+describe('orderSideLabel', () => {
+  it('says Long / Short for a perp, of either kind', () => {
+    expect(orderSideLabel('BTC', true)).toBe('Long');
+    expect(orderSideLabel('BTC', false)).toBe('Short');
+    expect(orderSideLabel('xyz:MU', true)).toBe('Long');
+    expect(orderSideLabel('xyz:MU', false)).toBe('Short');
+  });
+
+  // Un outcome ne se prend ni long ni court : « Buy » décrit le sens de l'ordre sans lui prêter la
+  // sémantique d'un perp (levier, position directionnelle).
+  it.each(['@107', 'PURR/USDC', '#10', '+10'])('says Buy / Sell for %s', (name) => {
+    expect(orderSideLabel(name, true)).toBe('Buy');
+    expect(orderSideLabel(name, false)).toBe('Sell');
+  });
+
+  it('says Buy / Sell, not Long / Short, for a name no rule classifies', () => {
+    expect(orderSideLabel(':BTC', true)).toBe('Buy');
+  });
+});
+
+describe('marketKindLabel', () => {
+  it.each([
+    ['BTC', 'a perp market'],
+    ['xyz:MU', 'a perp market'],
+    ['@107', 'a spot pair'],
+    ['PURR/USDC', 'a spot pair'],
+    ['#10', 'an outcome market (HIP-4)'],
+    ['+10', 'an outcome market (HIP-4)'],
+    [':BTC', 'not a valid market name'],
+    ['', 'not a valid market name'],
+  ])('calls %s "%s"', (name, label) => {
+    expect(marketKindLabel(name)).toBe(label);
   });
 });

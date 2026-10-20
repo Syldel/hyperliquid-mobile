@@ -32,7 +32,7 @@ import {
   Timestamp,
 } from '@syldel/hl-shared-types';
 import { extractErrorMessage } from '@utils/hl-error.utils';
-import { isSpotMarket } from '@utils/market-kind.util';
+import { orderSideLabel } from '@utils/market-kind.util';
 import { addIcons } from 'ionicons';
 import { closeOutline, createOutline, trashOutline } from 'ionicons/icons';
 import { of, switchMap } from 'rxjs';
@@ -83,8 +83,6 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
   coinTitle = signal<string>('—');
 
   fetchFn = signal(this.buildFetchFn());
-
-  isSpot = computed(() => isSpotMarket(this.coin()));
 
   statusColor = computed(() => {
     switch (this.orderStatus()) {
@@ -184,13 +182,8 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
       return '';
     }
 
-    return this.isSpot()
-      ? order.side === 'B'
-        ? 'Buy'
-        : 'Sell'
-      : order.side === 'B'
-        ? 'Long'
-        : 'Short';
+    // Long / Short est le vocabulaire d'un perp ; spot, outcome et nom douteux se disent Buy / Sell.
+    return orderSideLabel(this.coin(), order.side === 'B');
   }
 
   async confirmCancel(): Promise<void> {

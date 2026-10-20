@@ -7,7 +7,7 @@ import {
   HLUserFill,
   HLUserFillsByTimeRequest,
 } from '@syldel/hl-shared-types';
-import { openOrdersDexOf } from '@utils/market-kind.util';
+import { marketKindLabel, openOrdersDexOf } from '@utils/market-kind.util';
 import { HyperliquidInfoService } from './hyperliquid-info.service';
 
 // ─── Types publics ────────────────────────────────────────────────────────────
@@ -197,7 +197,7 @@ function normalizeCoin(coin: string): string {
 
 /**
  * Le dex où lire les ordres du coin sélectionné (`openOrdersDexOf` : le sien pour un perp, le dex principal
- * pour un spot), ou `null` pour un nom que la règle ne sait pas classer.
+ * pour un spot), ou `null` pour un nom que la règle ne sait pas classer ou dont le dex n'est pas connu (outcome).
  *
  * Dans ce cas la sélection est **refusée**, bruyamment : le dex principal n'est pas un repli. La découpe sur
  * `:` qui était là rendait `''` pour tout ce qui n'avait pas de préfixe, un nom douteux compris.
@@ -206,7 +206,7 @@ function dexToSelect(coin: string): string | null {
   const dex = openOrdersDexOf(coin);
   if (dex === null) {
     console.error(
-      `[HyperliquidCacheService] "${coin}" is not a market name this app can classify: not selected.`,
+      `[HyperliquidCacheService] "${coin}" is ${marketKindLabel(coin)}: it has no dex to read the open orders of, so it is not selected.`,
     );
   }
   return dex;

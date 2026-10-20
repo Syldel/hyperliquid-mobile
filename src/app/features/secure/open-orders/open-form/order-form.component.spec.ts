@@ -1,12 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ModalController, ToastController } from '@ionic/angular/standalone';
 import type { HLFrontendOpenOrder } from '@syldel/hl-shared-types';
-import { Subject, of, throwError } from 'rxjs';
+import { Subject, firstValueFrom, of, throwError } from 'rxjs';
 import { MarketMetaError, readPerpMarketMeta, type MarketMeta } from '@utils/market-meta.util';
 import { AvailableCapitalService } from '@services/available-capital.service';
 import { HyperliquidGatewayService } from '@services/hyperliquid-gateway.service';
 import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
+import { PRICE_CHECK_UNSUPPORTED } from './active-asset.util';
 import { OrderFormComponent } from './order-form.component';
 
 /**
@@ -48,7 +49,12 @@ describe('OrderFormComponent — price wiring', () => {
   };
   const infoDouble = {
     getClearinghouseState: () => of({ assetPositions: [] }),
-    getActiveAssetData: () => of(null),
+    getActiveAssetData: vi.fn(() => of(null)),
+  };
+  // Le vrai rend un `Observable` de capital ; `unavailable` est la forme que le formulaire sait lire.
+  const capitalDouble = {
+    invalidate: () => {},
+    getAvailableCapital: () => of({ status: 'unavailable' }),
   };
 
   /** Les effets du composant tournent avec la détection de changement, et s'enchaînent. */
@@ -58,6 +64,7 @@ describe('OrderFormComponent — price wiring', () => {
   }
 
   beforeEach(() => {
+    infoDouble.getActiveAssetData.mockClear();
     metaFor = (coin) => {
       try {
         return of(readPerpMarketMeta(BTC_META as never, coin));
@@ -78,7 +85,7 @@ describe('OrderFormComponent — price wiring', () => {
         { provide: HyperliquidGatewayService, useValue: {} },
         { provide: HyperliquidMarketService, useValue: marketDouble },
         { provide: HyperliquidInfoService, useValue: infoDouble },
-        { provide: AvailableCapitalService, useValue: { invalidate: () => {} } },
+        { provide: AvailableCapitalService, useValue: capitalDouble },
       ],
     });
     TestBed.overrideComponent(OrderFormComponent, {
@@ -328,6 +335,70 @@ describe('OrderFormComponent — price wiring', () => {
 
       expect(form.isSpot()).toBe(false);
     });
+  });
+
+  // Long / Short est le vocabulaire d'un perp : un outcome ne se prend ni long ni court, et `isSpot()` seul le
+  // laissait en Long / Short. Sans actif choisi le libellé par défaut reste Long / Short.
+  describe('the side vocabulary', () => {
+    it.each([
+      ['BTC', false],
+      ['xyz:MU', false],
+      ['PURR/USDC', true],
+      ['@107', true],
+      ['#10', true],
+      ['+10', true],
+      [':BTC', true],
+    ])('uses Buy / Sell for %s: %s', (coin, buySell) => {
+      create();
+      form.selectedCoin.set(coin);
+      settle();
+
+      expect(form.usesBuySell()).toBe(buySell);
+    });
+
+    it('keeps Long / Short while no market is selected', () => {
+      create();
+
+      expect(form.usesBuySell()).toBe(false);
+    });
+  });
+
+  /**
+   * LA REQUÊTE DE PRIX N'EST ENVOYÉE QU'À UN PERP.
+   *
+   * `activeAssetData` est une requête de perps : mesuré le 2026-10-20 dans le navigateur, l'API répond
+   * **500** pour l'outcome `#10` comme pour un spot. Le formulaire l'envoyait pourtant à tout marché qui
+   * n'était pas un spot, puis affichait « Market data could not be loaded » avec un bouton Retry qui ne
+   * pouvait jamais réussir.
+   */
+  describe('the price request', () => {
+    async function readingOf(coin: string): Promise<unknown> {
+      create((component) => (component.defaultCoin = coin));
+      return firstValueFrom(form.fetchFn()());
+    }
+
+    it('asks activeAssetData for a perp, and only for its own name', async () => {
+      await readingOf('BTC');
+
+      expect(infoDouble.getActiveAssetData).toHaveBeenCalledTimes(1);
+      expect(infoDouble.getActiveAssetData).toHaveBeenCalledWith('BTC');
+    });
+
+    it.each(['xyz:MU', 'kPEPE'])('asks it for the perp %s as well', async (coin) => {
+      await readingOf(coin);
+
+      expect(infoDouble.getActiveAssetData).toHaveBeenCalledWith(coin);
+    });
+
+    it.each(['PURR/USDC', 'HYPE/USDC', '@107', '#10', '+10', '#142000', ':BTC'])(
+      'does not ask for %s, which is not a perp: it says the price check does not exist',
+      async (coin) => {
+        const reading = await readingOf(coin);
+
+        expect(infoDouble.getActiveAssetData).not.toHaveBeenCalled();
+        expect(reading).toBe(PRICE_CHECK_UNSUPPORTED);
+      },
+    );
   });
 
   describe('the market grid', () => {

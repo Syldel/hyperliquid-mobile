@@ -130,6 +130,21 @@ describe('HyperliquidMarketService.getMarketMeta', () => {
     });
   });
 
+  // HIP-4 : connu de la règle, mais l'app ne le négocie pas. Un refus qui le dit, pas « nom invalide ».
+  describe('an outcome market', () => {
+    it.each(['#10', '+10', '#142000'])(
+      'refuses %s as unsupported, without asking the network',
+      (name) => {
+        const result = settle(name);
+
+        http.expectNone('http://hl.test/info');
+        expect(result.error).toBeInstanceOf(MarketMetaError);
+        expect((result.error as MarketMetaError).code).toBe('unsupported');
+        expect((result.error as MarketMetaError).message).toContain('is an outcome market (HIP-4)');
+      },
+    );
+  });
+
   describe('a spot pair', () => {
     /** La paire se lit par son nom d'affichage ou de protocole, toujours sur le jeton de BASE. */
     it.each([
@@ -291,6 +306,16 @@ describe('HyperliquidMarketService.getMarketMeta', () => {
 
         expect((result.error as Error).message).toBe('Perp asset not found for coin: ETHX');
       });
+    });
+
+    // Un outcome a un identifiant (`100_000_000 + encodage`), mais l'app ne le négocie ni ne l'annule : le
+    // refus le dit, au lieu de passer pour un nom illisible — c'est ce message qu'affiche le toast d'annulation.
+    it.each(['#10', '+10', '#142000'])('refuses the outcome market %s, and says so', (name) => {
+      const result = indexOf(name);
+
+      http.expectNone('http://hl.test/info');
+      expect((result.error as Error).message).toContain('is an outcome market (HIP-4)');
+      expect((result.error as Error).message).not.toContain('can classify');
     });
 
     // Le doute n'est pas une réponse : ni deviné perp du dex principal, ni lu.

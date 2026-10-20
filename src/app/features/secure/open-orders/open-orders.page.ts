@@ -33,7 +33,7 @@ import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { DexSelectorComponent } from '@shared/components/dex-selector/dex-selector.component';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import { HLFrontendOpenOrder } from '@syldel/hl-shared-types';
-import { isSpotMarket, openOrdersDexOf } from '@utils/market-kind.util';
+import { marketKindLabel, openOrdersDexOf, orderSideLabel } from '@utils/market-kind.util';
 import { addIcons } from 'ionicons';
 import { addOutline, createOutline } from 'ionicons/icons';
 import { forkJoin, map, Observable, of } from 'rxjs';
@@ -102,7 +102,8 @@ export class OpenOrdersPage extends MenuBasePage implements OnInit {
     return (coin ? this.openOrders().filter((o) => o.coin === coin) : this.openOrders()).map(
       (o) => ({
         ...o,
-        isSpot: isSpotMarket(o.coin),
+        // Long / Short est le vocabulaire d'un perp ; tout autre marché se dit Buy / Sell.
+        sideLabel: orderSideLabel(o.coin, o.side === 'B'),
       }),
     );
   });
@@ -133,11 +134,11 @@ export class OpenOrdersPage extends MenuBasePage implements OnInit {
         this.coinFilter.set(coin);
         // Le dex où se lisent les ordres de ce marché : le sien pour un perp, le dex principal pour un spot
         // (« Spot open orders are only included with the first perp dex »). Un nom que la règle ne classe
-        // pas n'en a pas : on le dit, et aucun dex n'est forcé.
+        // pas n'en a pas — un outcome compris, dont le dex n'a pas été mesuré : on le dit, et aucun dex n'est forcé.
         const dex = openOrdersDexOf(coin);
         if (dex === null) {
           console.error(
-            `[OpenOrdersPage] "${coin}" is not a market name this app can classify: no dex is forced.`,
+            `[OpenOrdersPage] "${coin}" is ${marketKindLabel(coin)}: it has no dex to read the open orders of, so none is forced.`,
           );
         }
         this.forcedDex.set(dex);

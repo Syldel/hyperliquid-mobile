@@ -66,15 +66,27 @@ describe('HyperliquidCacheService — selecting a coin', () => {
     );
 
     // Le doute n'est pas une réponse : un nom non classé n'est ni sélectionné ni lu sur le dex principal.
-    it.each([':BTC', 'xyz:', ''])('refuses "%s" loudly, and changes nothing', (coin) => {
-      service.config.update((c) => ({ ...c, dex: 'xyz' }));
+    it.each([':BTC', 'xyz:', '', '#10', '+10'])(
+      'refuses "%s" loudly, and changes nothing',
+      (coin) => {
+        service.config.update((c) => ({ ...c, dex: 'xyz' }));
 
-      select(coin);
+        select(coin);
 
-      expect(service.selectedCoin()).toBeNull();
-      expect(service.config().dex).toBe('xyz');
-      expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('not selected'));
-    });
+        expect(service.selectedCoin()).toBeNull();
+        expect(service.config().dex).toBe('xyz');
+        expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('not selected'));
+      },
+    );
+  });
+
+  // Où l'exchange renvoie les ordres d'un outcome n'a pas été mesuré : ni dex principal par défaut, ni deviné.
+  it('calls an outcome market by its name when it refuses it', () => {
+    service.selectCoin('#10');
+
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('"#10" is an outcome market (HIP-4)'),
+    );
   });
 
   it('keeps the lookback it was given along with the dex, in one write', () => {

@@ -30,7 +30,7 @@ import { describeCapitalGap, type AvailableCapital } from '@utils/available-capi
 import { HyperliquidGatewayService } from '@services/hyperliquid-gateway.service';
 import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
-import { isSpotMarket } from '@utils/market-kind.util';
+import { isPerpMarket, isSpotMarket } from '@utils/market-kind.util';
 import { MarketPickerModalComponent } from '@shared/components/market-picker-modal/market-picker-modal.component';
 import { LISTABLE_EXCHANGE } from '@shared/components/market-picker-modal/market-source.util';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
@@ -274,6 +274,15 @@ export class OrderFormComponent implements OnInit {
   });
 
   isSpot = computed(() => isSpotMarket(this.selectedCoin() ?? ''));
+
+  /**
+   * Long / Short est le vocabulaire d'un perp ; spot, outcome et nom douteux se disent Buy / Sell (voir
+   * `orderSideLabel`). Sans actif choisi, le libellé par défaut reste Long / Short.
+   */
+  usesBuySell = computed(() => {
+    const coin = this.selectedCoin();
+    return !!coin && !isPerpMarket(coin);
+  });
 
   // Champs du formulaire
   selectedCoin = signal('');
@@ -549,10 +558,12 @@ export class OrderFormComponent implements OnInit {
     const selectedCoin = this.selectedCoin();
     if (!selectedCoin) return () => of(NO_ASSET_SELECTED);
 
-    // `activeAssetData` est une requête de perps : l'API répond 500 pour un actif spot
-    // (mesuré sur `PURR/USDC`). On ne l'envoie pas — elle échouerait à coup sûr, pour
-    // rien, et sur le poids d'IP.
-    if (this.isSpot()) {
+    // `activeAssetData` est une requête de perps : l'API répond 500 pour un actif spot (mesuré sur
+    // `PURR/USDC`) et pour un outcome (mesuré sur `#10` le 2026-10-20, HTTP 500). Seul un perp la reçoit ;
+    // tout autre marché — spot, outcome, nom douteux — dit que le contrôle de prix n'existe pas pour lui. On
+    // n'envoie pas une requête qui échoue à coup sûr, pour rien, sur le poids d'IP, et qui ferait afficher un
+    // bouton « Retry » dont la réponse ne changera jamais.
+    if (!isPerpMarket(selectedCoin)) {
       return () => {
         this.loadCapital(selectedCoin);
         return of(PRICE_CHECK_UNSUPPORTED);

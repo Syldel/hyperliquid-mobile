@@ -20,16 +20,18 @@ import { MarketMetaError } from '@utils/market-meta.util';
  * - `loading` : la grille est en cours de lecture (court) ;
  * - `ok` : la grille est celle du marché choisi ;
  * - `missing` : la méta est arrivée, mais ce marché n'y est pas lisible (absent, ambigu, grille illisible) ;
+ * - `unsupported` : le marché est connu, mais d'un genre que l'app ne négocie pas (un outcome, HIP-4) ;
  * - `unavailable` : la méta n'a pas pu être chargée (transport).
  */
-export type MarketMetaState = 'none' | 'loading' | 'ok' | 'missing' | 'unavailable';
+export type MarketMetaState = 'none' | 'loading' | 'ok' | 'missing' | 'unsupported' | 'unavailable';
 
 /**
- * L'état qu'impose l'échec d'une lecture : un marché illisible (`MarketMetaError`) ne se répare pas en
- * réessayant ; une méta qui n'a pas chargé, si.
+ * L'état qu'impose l'échec d'une lecture : un marché illisible ou non négocié (`MarketMetaError`) ne se répare
+ * pas en réessayant ; une méta qui n'a pas chargé, si.
  */
-export function marketMetaStateOf(error: unknown): 'missing' | 'unavailable' {
-  return error instanceof MarketMetaError ? 'missing' : 'unavailable';
+export function marketMetaStateOf(error: unknown): 'missing' | 'unsupported' | 'unavailable' {
+  if (!(error instanceof MarketMetaError)) return 'unavailable';
+  return error.code === 'unsupported' ? 'unsupported' : 'missing';
 }
 
 /** Le détail de l'échec, pour le message : la raison que la lecture a donnée, ou rien. */
@@ -42,7 +44,9 @@ export function marketMetaDetailOf(error: unknown): string | null {
  * sans actif, c'est « aucun actif choisi » qui l'empêche.
  */
 export function blocksOnMarketMeta(state: MarketMetaState): boolean {
-  return state === 'loading' || state === 'missing' || state === 'unavailable';
+  return (
+    state === 'loading' || state === 'missing' || state === 'unsupported' || state === 'unavailable'
+  );
 }
 
 /**
@@ -58,6 +62,10 @@ export function marketMetaNotice(
   switch (state) {
     case 'missing':
       return `The size and price grid of "${coin}" could not be read${detail ? ` (${detail})` : ''}, so placing an order is disabled.`;
+    case 'unsupported':
+      // Le détail dit déjà quel genre de marché c'est (`"#10" is an outcome market (HIP-4), …`) : le répéter
+      // en préfixe serait redire.
+      return `${detail ?? `"${coin}" is a market this app does not trade`}, so placing an order is disabled.`;
     case 'unavailable':
       return 'Market metadata could not be loaded, so the size and price grid are unknown. Placing an order is disabled until it loads.';
     case 'none':

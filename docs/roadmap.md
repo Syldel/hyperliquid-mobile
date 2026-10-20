@@ -731,12 +731,73 @@ onze cas concordent — `@107` et `HYPE/USDC` → 10107, `PURR/USDC` → 10000, 
 ⚠️ **Ce qui n'est pas établi.** L'**annulation** d'un ordre spot `@N` n'a pas été exécutée : ce qui est vu est
 l'identifiant d'actif qu'elle enverrait, pas la réponse du gateway. ⚠️ Les deux `normalizeCoin` (majuscules, coupe après
 `-` ou `:`) restent, dérogés dans le garde-fou : ils écrasent la casse de `kPEPE`, à reprendre à part en résolvant
-le nom contre la méta. ⚠️ Les **outcomes** (`#<encodage>`, `+<encodage>`) sont lus comme des perps du dex principal
-tant que `hl-shared-types` ne les distingue pas : un `#10` échoue alors bruyamment (introuvable) dans le
-formulaire et `getAssetIndex`, mais sans nom clair ; le genre `outcome` est préparé dans `hl-shared-types`, à
-brancher après sa publication. ⚠️ Des résolutions de noms simultanées (`resolveCoins` sur une liste) lancent
+le nom contre la méta. ⚠️ Les **outcomes** (`#<encodage>`, `+<encodage>`) étaient lus comme des
+perps tant que `hl-shared-types` ne les distinguait pas : repris dans la section suivante (types partagés 0.0.28).
+⚠️ Des résolutions de noms simultanées (`resolveCoins` sur une liste) lancent
 autant de requêtes `spotMeta` identiques que de noms avant la première réponse : le service ne regroupe pas les
 requêtes en vol (existant, non corrigé, poids non chiffré).
+
+## Les outcomes (HIP-4) sont nommés pour ce qu'ils sont, et refusés (2026-10-20)
+
+Les types partagés **0.0.28** font rendre `outcome` à `hlMarketKind` pour `#<encodage>` et `+<encodage>` (329
+outcomes vivants sur mainnet, `outcomeMeta`, 2026-10-19). Avant, la règle les rangeait parmi les perps, et l'app,
+par lecture du code, les traitait mal sans le dire : « Long/Short » dans la liste, « not a valid market name » ou
+« not a market name this app can classify » comme motif de refus. L'app **ne négocie pas** les outcomes ; ce qui
+est fait est de les **nommer** et de les refuser avec leur vrai motif.
+
+- `isSpotMarket` reste strictement spot. `isPerpMarket` (perp ou perp de builder) et `orderSideLabel(nom, achat)`
+  portent le vocabulaire : **Long / Short** pour un perp, **Buy / Sell** pour tout le reste — spot, outcome, nom
+  douteux —, dans la liste des ordres et leur détail. Un outcome ne se prend ni long ni court, et `!isSpotMarket`
+  l'aurait rangé parmi les perps.
+- `getMarketMeta` refuse un outcome par `MarketMetaError('unsupported')`, et le formulaire a un état
+  **`unsupported`** : l'envoi est bloqué, avec « "#10" is an outcome market (HIP-4), which this app does not trade,
+  so placing an order is disabled » plutôt que « grid could not be read ».
+- `getAssetIndex` le refuse avec son nom. L'identifiant d'un outcome existe (`100_000_000 + encodage`, doc « Asset
+  IDs ») ; il n'est **pas** calculé, par décision : l'app ne négocie pas ce genre de marché.
+- `openOrdersDexOf` rend `null` : où l'exchange renvoie les ordres ouverts d'un outcome n'a **pas été mesuré**
+  (⚠️), donc ni dex principal par défaut ni dex deviné. Le cache et la liste le disent (`console.error`).
+- **Le formulaire ne demande le prix qu'à un perp.** Trouvé dans le navigateur, pas par les tests : ouvrir le
+  formulaire sur `#10` envoyait `activeAssetData`, requête de perps, à laquelle l'API répond **HTTP 500** (mesuré le
+  2026-10-20, comme pour un spot), puis affichait « Market data could not be loaded » avec un bouton **Retry** qui ne
+  pouvait jamais réussir. Le formulaire écartait seulement le spot ; il écarte maintenant tout non-perp (spot, outcome,
+  nom douteux), et le message du contrôle de prix dit « only available for perp markets » au lieu de « spot ». Les
+  libellés du formulaire suivent `usesBuySell` (Buy / Sell pour tout non-perp, Long / Short sans actif choisi).
+- Un garde-fou source (`no-handmade-market-rules.spec.ts`) interdit de lire un genre par exclusion
+  (`!== 'spot'`, `Exclude<HLMarketKind, …>`, `!isSpotMarket(…)`), avec une dérogation à la ligne (la résolution des
+  noms d'affichage, où « pas un spot » veut seulement dire « nom rendu tel quel »).
+
+**Un défaut voisin, trouvé en câblant ceci : « Error undefined ».** `extractErrorMessage` lisait `err.status` ;
+une `Error` ordinaire — celle que lève `getAssetIndex` avant tout appel — n'en a pas, et le repli rendait
+« Error undefined ». Annuler un ordre dont le nom ne se résout pas affichait donc ce texte, sans la cause (et c'était
+déjà le cas pour un `@N` avant la section précédente). Corrigé : une `Error` donne son message
+(`hl-error.utils.spec.ts`, éprouvé sur le code cassé : il rend bien « Error undefined »).
+
+Éprouvé : tests de chaque branche, mutations (douze attrapées sur treize pour la première série, deux sur deux
+pour le formulaire), et `npm run verify` (build compris).
+
+**Vu dans le navigateur le 2026-10-20, session authentifiée, avec des ordres de test interceptés dans la page (aucune
+écriture n'est partie : le simulateur bloquait tout appel d'ordre ou d'annulation du gateway, et aucun n'a été
+tenté).** Liste : ETH **Long**, `xyz:MU` **Short**, `@107` affiché `HYPE/USDC` **Buy**, `PURR/USDC` **Sell**, `#10`
+**Buy**, `+10` **Sell**. `?coin=#10` : le `console.error` « is an outcome market (HIP-4): it has no dex to read the
+open orders of, so none is forced » et le seul ordre `#10` filtré. Détail de `#10` : BUY / SELL selon le sens, et
+« Cancel Buy order on #10 ? ». **Annulation confirmée : le toast dit « Cannot resolve the asset index of "#10": it is
+an outcome market (HIP-4), which this app does not trade or cancel », aucune requête n'est partie après le clic.**
+Formulaire d'édition de `#10` : les deux bandeaux, le bouton d'envoi désactivé, **Buy / Sell**, et — une fois
+corrigé — plus de requête `activeAssetData` ni de Retry (seule la lecture `collateral-balance` du gateway part, et
+il répond `unknown-collateral`, ce qui est son verdict). Contrôles : ETH garde Long / Short, son prix de marché et son
+levier ; `@107` garde Buy / Sell et le seul bandeau du contrôle de prix. À 360 px, rien ne déborde (scrollWidth = 360) ; seul le texte change, aucune couleur : pas de vérification de thème.
+
+⚠️ **Ce qui n'est pas établi.**
+
+- Le `console.error` de la liste des ordres pour un marché sans dex (`open-orders.page.ts`) n'a **aucun test** : la
+  page n'a pas de spec, et une mutation qui le supprime survit. Il est vu dans le navigateur, pas protégé.
+- Ce que le navigateur a vu était **simulé** : les ordres d'outcome viennent d'un simulateur, pas de l'exchange.
+  La forme réelle d'un ordre ouvert d'outcome (`coin`, `side`) n'est donc pas établie.
+- **Annuler dans l'app un ordre d'outcome posé ailleurs est refusé.** C'est cohérent avec « l'app ne négocie pas
+  les outcomes », mais ce n'est pas innocent : un ordre ouvert qu'on ne peut pas retirer d'ici est un risque. À
+  décider (calculer l'identifiant pour la seule annulation, ou assumer le refus).
+- Les formes de nom et les identifiants viennent des pages « Asset IDs », « Info endpoint », « HIP-4 outcome
+  markets » et de la FAQ « Trade outcome looks incorrect », relues le 2026-10-19.
 
 ## À éprouver en réel : ce qu'aucun double ne peut établir
 

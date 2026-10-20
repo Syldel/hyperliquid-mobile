@@ -43,9 +43,10 @@ export const ACTIVE_ASSET_UNAVAILABLE = Object.freeze({
 export type ActiveAssetUnavailable = typeof ACTIVE_ASSET_UNAVAILABLE;
 
 /**
- * Un actif **spot** : `activeAssetData` est une requête de perps, et l'API répond 500 pour
- * un actif spot (mesuré sur `PURR/USDC`, 1 actif — pas sur tous). Plutôt que d'envoyer une
- * requête qui échoue à coup sûr, on dit que le contrôle de prix n'existe pas pour le spot.
+ * Un marché qui n'est pas un perp — spot, outcome, nom douteux : `activeAssetData` est une requête
+ * de perps, et l'API répond 500 pour un actif spot (mesuré sur `PURR/USDC`, 1 actif — pas sur tous)
+ * comme pour un outcome (mesuré sur `#10`, le 2026-10-20). Plutôt que d'envoyer une requête qui
+ * échoue à coup sûr, on dit que le contrôle de prix n'existe pas pour ce marché.
  */
 export const PRICE_CHECK_UNSUPPORTED = Object.freeze({ kind: 'price-check-unsupported' } as const);
 
@@ -70,7 +71,7 @@ export type ActiveAssetReading =
   | { status: 'unreadable-price'; raw: unknown; leverage: HlActiveAssetLeverage }
   /** L'appel a échoué : le prix n'est pas connu. */
   | { status: 'unavailable' }
-  /** Le contrôle de prix n'existe pas pour ce marché (spot). */
+  /** Le contrôle de prix n'existe pas pour ce marché (spot, outcome, nom douteux). */
   | { status: 'unsupported' };
 
 /**
@@ -158,7 +159,7 @@ export function marketDataNotice(state: MarketDataState): string | null {
     case 'unavailable':
       return 'Market data could not be loaded, so the price check cannot run. Placing an order is disabled until it loads.';
     case 'unsupported':
-      return 'The price check is not available for spot markets yet, so placing an order from this form is disabled.';
+      return 'The price check is only available for perp markets, so placing an order on this market from this form is disabled.';
     case 'none':
     case 'ok':
       return null;
