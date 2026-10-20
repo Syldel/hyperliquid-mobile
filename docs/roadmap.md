@@ -808,6 +808,20 @@ levier ; `@107` garde Buy / Sell et le seul bandeau du contrôle de prix. À 360
   un solde d'outcome (`+1230`) **sans** `token` : deux soldes d'outcome auraient la même clé. Hypothèse tirée d'un
   exemple, non mesurée ; sans effet tant qu'aucun outcome n'est porté.
 
+## Un escalier de take-profit créé dans la modale : le bot le tient (2026-10-20)
+
+Le plan des protections du bot repose le palier exécuté, au même niveau franchi, sur ce qui reste, et
+Hyperliquid l'exécute aussitôt : c'était le défaut mesuré le 2026-10-20. Le bot refusait pour cela, quelques heures,
+toute paire à plusieurs take-profit ; ce refus est **retiré**. Le plan relit désormais ce qui a été pris dans les
+exécutions de l'exchange et ne repose que le reste (`nest-trading-bot/docs/known-gaps.md`, « Le balayage de poussière
+lit le résultat de son IOC », puis « Corrigé le 2026-10-20 »). La modale (`sizePercentSumValidator` : « la somme des
+`sizePercent` d'un type est au plus 100 ») n'a donc **rien à changer** : un escalier de take-profit ou de stops créé ici
+est tenu par le bot.
+
+⚠️ Ce que l'écran ne montre pas, et qui reste du côté du bot : l'état d'un escalier (palier pris, dû, perdu, mode
+dégradé faute d'historique) ne se lit que dans le journal du bot (`[PAIR][ladder]`). Si l'app doit un jour l'afficher, ce
+serait un champ de plus dans ce que le bot expose — pas un calcul de l'app, qui ne calcule rien.
+
 ## À éprouver en réel : ce qu'aucun double ne peut établir
 
 Ces points ne se tranchent ni par la lecture du code ni dans le navigateur : il faut un
