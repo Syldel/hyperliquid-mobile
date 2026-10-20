@@ -793,9 +793,13 @@ levier ; `@107` garde Buy / Sell et le seul bandeau du contrôle de prix. À 360
   page n'a pas de spec, et une mutation qui le supprime survit. Il est vu dans le navigateur, pas protégé.
 - Ce que le navigateur a vu était **simulé** : les ordres d'outcome viennent d'un simulateur, pas de l'exchange.
   La forme réelle d'un ordre ouvert d'outcome (`coin`, `side`) n'est donc pas établie.
-- **Annuler dans l'app un ordre d'outcome posé ailleurs est refusé.** C'est cohérent avec « l'app ne négocie pas
-  les outcomes », mais ce n'est pas innocent : un ordre ouvert qu'on ne peut pas retirer d'ici est un risque. À
-  décider (calculer l'identifiant pour la seule annulation, ou assumer le refus).
+- **Annuler dans l'app un ordre d'outcome posé ailleurs est refusé — décidé le 2026-10-20 : refuser et dire où
+  aller.** Le message ajoute « use the Hyperliquid web app for it » (testé unitairement, non revu dans le navigateur
+  depuis). L'identifiant (`100_000_000 + encodage`) n'est **pas** calculé : le gateway le transmettrait tel quel
+  (`CancelItemDto.asset`, sans borne), mais l'exchange ne l'a jamais reçu de nous, et l'éprouver demande un vrai ordre
+  d'outcome sur mainnet. Si des outcomes se négocient un jour à la main, c'est l'occasion de mesurer l'annulation
+  avec un petit ordre réel, puis de la permettre. Rappel : l'exchange renvoie-t-il un ordre d'outcome dans la liste que
+  l'app interroge ? Non mesuré non plus.
 - Les formes de nom et les identifiants viennent des pages « Asset IDs », « Info endpoint », « HIP-4 outcome
   markets » et de la FAQ « Trade outcome looks incorrect », relues le 2026-10-19.
 

@@ -298,11 +298,13 @@ export class HyperliquidMarketService {
 
     // Un outcome (HIP-4) a bien un identifiant (`100_000_000 + encodage`, doc « Asset IDs »), mais cette app
     // ne le négocie pas : on le refuse pour ce qu'il est, au lieu de le faire passer pour un nom illisible.
+    // L'annulation non plus n'est pas calculée (décidé le 2026-10-20) : l'identifiant n'a jamais été éprouvé
+    // contre l'exchange, et le refus dit où aller (le site d'Hyperliquid) au lieu d'un « impossible » sans issue.
     if (kind === 'outcome') {
       return throwError(
         () =>
           new Error(
-            `Cannot resolve the asset index of "${coin}": it is ${marketKindLabel(coin)}, which this app does not trade or cancel.`,
+            `Cannot resolve the asset index of "${coin}": it is ${marketKindLabel(coin)}, which this app does not trade or cancel: use the Hyperliquid web app for it.`,
           ),
       );
     }

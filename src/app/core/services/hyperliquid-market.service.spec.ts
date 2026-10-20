@@ -316,6 +316,8 @@ describe('HyperliquidMarketService.getMarketMeta', () => {
       http.expectNone('http://hl.test/info');
       expect((result.error as Error).message).toContain('is an outcome market (HIP-4)');
       expect((result.error as Error).message).not.toContain('can classify');
+      // Un refus sans issue laisse un ordre ouvert que l'utilisateur ne sait pas où retirer.
+      expect((result.error as Error).message).toContain('use the Hyperliquid web app');
     });
 
     // Le doute n'est pas une réponse : ni deviné perp du dex principal, ni lu.
