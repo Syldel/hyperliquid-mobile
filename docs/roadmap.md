@@ -801,7 +801,12 @@ levier ; `@107` garde Buy / Sell et le seul bandeau du contrôle de prix. À 360
   avec un petit ordre réel, puis de la permettre. Rappel : l'exchange renvoie-t-il un ordre d'outcome dans la liste que
   l'app interroge ? Non mesuré non plus.
 - Les formes de nom et les identifiants viennent des pages « Asset IDs », « Info endpoint », « HIP-4 outcome
-  markets » et de la FAQ « Trade outcome looks incorrect », relues le 2026-10-19.
+  markets » et de la FAQ « Trade outcome looks incorrect », relues le 2026-10-19. **Où les retrouver, ce qui a été
+  vérifié et ce qui reste à mesurer pour un futur chantier outcomes :
+  `nest-trading-bot/docs/hyperliquid/spot-and-outcomes.md` (2026-10-20).**
+- « Spot Balances » (`balances.page.html`) range ses lignes par `balance.token`, alors que l'exemple de la doc montre
+  un solde d'outcome (`+1230`) **sans** `token` : deux soldes d'outcome auraient la même clé. Hypothèse tirée d'un
+  exemple, non mesurée ; sans effet tant qu'aucun outcome n'est porté.
 
 ## À éprouver en réel : ce qu'aucun double ne peut établir
 
