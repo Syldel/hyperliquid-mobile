@@ -121,6 +121,11 @@ plateformes établis la traitent (Freqtrade pour le bot, TradingView pour l'affi
 proposer, et le citer. Un standard oriente, il ne décide pas ; un écart se justifie. Ce qui a
 déjà été confronté côté bot : `nest-trading-bot/docs/trading/professional-practices.md`.
 
+**Lire une page de documentation en brut**, jamais à travers un outil qui résume : un résumé a
+déjà fait écrire une précision que le texte ne contient pas (2026-10-27). La règle et la
+méthode : `nest-hyperliquid-gateway/docs/sources.md`, section « Lire une page de documentation
+en brut ».
+
 ## Règles qui coûtent cher si on les ignore
 
 **Ne jamais committer, tagger ou pousser sans demande explicite**, dans aucun des trois
