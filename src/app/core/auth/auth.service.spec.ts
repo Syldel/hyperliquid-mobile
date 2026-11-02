@@ -5,18 +5,10 @@ import { JwtPayload } from '@models/auth.interfaces';
 import { ConfigService } from '@services/config.service';
 import { SecureStorageService } from '@storage/secure.storage.service';
 import { StorageService } from '@storage/storage.service';
-import { jwtDecode } from 'jwt-decode';
 import { AuthService } from './auth.service';
 
-vi.mock('jwt-decode');
-
-const mockJwtDecode = jwtDecode as ReturnType<typeof vi.fn>;
-
-const MOCK_ADDRESS = '0xABC123';
-const MOCK_ADDRESS_2 = '0xDEF456';
-const MOCK_TOKEN = 'mock.jwt.token';
-const MOCK_TOKEN_2 = 'mock.jwt.token2';
-const MOCK_EXPIRED_TOKEN = 'mock.expired.token';
+const MOCK_ADDRESS = '0x' + 'abc123'.padEnd(40, '0');
+const MOCK_ADDRESS_2 = '0x' + 'def456'.padEnd(40, '0');
 
 const MOCK_PAYLOAD: JwtPayload = {
   sub: 'user-1',
@@ -39,6 +31,24 @@ const EXPIRED_PAYLOAD: JwtPayload = {
   exp: Math.floor(Date.now() / 1000) - 100,
 };
 
+/**
+ * Un vrai jeton, décodé par le vrai décodeur : rien n'est simulé entre la
+ * réponse du serveur et ce que l'app range. La signature est quelconque, l'app
+ * ne la vérifie pas (voir jwt-payload.ts).
+ */
+function tokenOf(payload: object): string {
+  const b64url = (text: string) =>
+    btoa(String.fromCharCode(...new TextEncoder().encode(text)))
+      .replace(/=+$/, '')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_');
+  return `${b64url('{"alg":"HS256","typ":"JWT"}')}.${b64url(JSON.stringify(payload))}.c2lnbmF0dXJl`;
+}
+
+const MOCK_TOKEN = tokenOf(MOCK_PAYLOAD);
+const MOCK_TOKEN_2 = tokenOf(MOCK_PAYLOAD_2);
+const MOCK_EXPIRED_TOKEN = tokenOf(EXPIRED_PAYLOAD);
+
 function createStorageMock() {
   return {
     get: vi.fn().mockResolvedValue(null),
@@ -58,11 +68,10 @@ function createSecureStorageMock() {
 async function loginWallet(
   service: AuthService,
   httpMock: HttpTestingController,
-  token = MOCK_TOKEN,
-  address = MOCK_ADDRESS,
-  payload = MOCK_PAYLOAD,
+  payload: JwtPayload = MOCK_PAYLOAD,
 ) {
-  mockJwtDecode.mockReturnValue(payload);
+  const token = tokenOf(payload);
+  const address = payload.wallet;
   const promise = new Promise<void>((resolve) => {
     service.loginWithWallet(address, 'password').subscribe(() => resolve());
   });
@@ -140,7 +149,6 @@ describe('AuthService', () => {
     });
 
     it('should restore valid token and set currentAddress', async () => {
-      mockJwtDecode.mockReturnValue(MOCK_PAYLOAD);
       storageMock.get.mockImplementation((key: string) => {
         if (key === 'userWallets') return Promise.resolve([MOCK_PAYLOAD]);
         if (key === 'currentAddress') return Promise.resolve(MOCK_ADDRESS);
@@ -155,7 +163,6 @@ describe('AuthService', () => {
     });
 
     it('should purge expired tokens on restore', async () => {
-      mockJwtDecode.mockReturnValue(EXPIRED_PAYLOAD);
       secureStorageMock.get.mockResolvedValue({ [MOCK_ADDRESS]: MOCK_EXPIRED_TOKEN });
 
       await service.restoreSession();
@@ -165,7 +172,6 @@ describe('AuthService', () => {
     });
 
     it('should restore currentAddress even if its token is expired', async () => {
-      mockJwtDecode.mockReturnValue(EXPIRED_PAYLOAD);
       storageMock.get.mockImplementation((key: string) => {
         if (key === 'currentAddress') return Promise.resolve(MOCK_ADDRESS);
         return Promise.resolve(null);
@@ -205,7 +211,6 @@ describe('AuthService', () => {
 
   describe('loginWithWallet', () => {
     it('should POST to auth/login with walletAddress and password', async () => {
-      mockJwtDecode.mockReturnValue(MOCK_PAYLOAD);
       service.loginWithWallet(MOCK_ADDRESS, 'password').subscribe();
       const req = httpMock.expectOne('http://api.test/auth/login');
       expect(req.request.method).toBe('POST');
@@ -229,21 +234,40 @@ describe('AuthService', () => {
       await loginWallet(service, httpMock);
 
       const updatedPayload = { ...MOCK_PAYLOAD, username: 'updated-1' };
-      await loginWallet(service, httpMock, MOCK_TOKEN, MOCK_ADDRESS, updatedPayload);
+      await loginWallet(service, httpMock, updatedPayload);
 
       expect(service.userWallets().length).toBe(1);
       expect(service.userWallets()[0].username).toBe('updated-1');
     });
 
     it('should not be logged in if token is already expired', async () => {
-      await loginWallet(service, httpMock, MOCK_EXPIRED_TOKEN, MOCK_ADDRESS, EXPIRED_PAYLOAD);
+      await loginWallet(service, httpMock, EXPIRED_PAYLOAD);
       expect(service.isLoggedIn()).toBe(false);
     });
   });
 
+  // Le décodeur valide la forme du jeton : un jeton sans `exp` n'entre plus
+  // dans les wallets (il n'aurait jamais passé pour expiré).
+  it('should refuse a token without exp, and store nothing', async () => {
+    const { exp: _exp, ...withoutExp } = MOCK_PAYLOAD;
+    const outcome = new Promise<unknown>((resolve) =>
+      service.loginWithWallet(MOCK_ADDRESS, 'password').subscribe({
+        next: () => resolve('ok'),
+        error: (e: unknown) => resolve(e),
+      }),
+    );
+    httpMock.expectOne('http://api.test/auth/login').flush({ access_token: tokenOf(withoutExp) });
+
+    expect(await outcome).toEqual(
+      new Error('Invalid sign-in token: "exp" is missing or malformed'),
+    );
+    expect(service.userWallets()).toEqual([]);
+    expect(service.currentAddress()).toBeNull();
+    expect(secureStorageMock.set).not.toHaveBeenCalled();
+  });
+
   describe('loginWithUsername', () => {
     it('should POST to auth/login with username and password', () => {
-      mockJwtDecode.mockReturnValue(MOCK_PAYLOAD);
       service.loginWithUsername('alice', 'password').subscribe();
       const req = httpMock.expectOne('http://api.test/auth/login');
       expect(req.request.body).toEqual({ username: 'alice', password: 'password' });
@@ -251,7 +275,6 @@ describe('AuthService', () => {
     });
 
     it('should store token and set currentAddress on success', async () => {
-      mockJwtDecode.mockReturnValue(MOCK_PAYLOAD);
       const promise = new Promise<void>((resolve) => {
         service.loginWithUsername('alice', 'password').subscribe(() => resolve());
       });
@@ -265,9 +288,8 @@ describe('AuthService', () => {
 
   describe('chooseUserWallet', () => {
     beforeEach(async () => {
-      await loginWallet(service, httpMock, MOCK_TOKEN, MOCK_ADDRESS, MOCK_PAYLOAD);
-      mockJwtDecode.mockReturnValue(MOCK_PAYLOAD_2);
-      await loginWallet(service, httpMock, MOCK_TOKEN_2, MOCK_ADDRESS_2, MOCK_PAYLOAD_2);
+      await loginWallet(service, httpMock, MOCK_PAYLOAD);
+      await loginWallet(service, httpMock, MOCK_PAYLOAD_2);
     });
 
     it('should switch currentAddress to chosen wallet', async () => {
@@ -301,7 +323,6 @@ describe('AuthService', () => {
    */
   describe('a session restore that failed', () => {
     const outcomeOfLogin = (token = MOCK_TOKEN) => {
-      mockJwtDecode.mockReturnValue(MOCK_PAYLOAD);
       const outcome = new Promise<unknown>((resolve) =>
         service.loginWithWallet(MOCK_ADDRESS, 'password').subscribe({
           next: () => resolve('ok'),
@@ -391,8 +412,8 @@ describe('AuthService', () => {
 
   describe('removeUserWallet', () => {
     beforeEach(async () => {
-      await loginWallet(service, httpMock, MOCK_TOKEN, MOCK_ADDRESS, MOCK_PAYLOAD);
-      await loginWallet(service, httpMock, MOCK_TOKEN_2, MOCK_ADDRESS_2, MOCK_PAYLOAD_2);
+      await loginWallet(service, httpMock, MOCK_PAYLOAD);
+      await loginWallet(service, httpMock, MOCK_PAYLOAD_2);
     });
 
     it('should remove wallet from userWallets', async () => {
@@ -429,8 +450,8 @@ describe('AuthService', () => {
 
   describe('logout', () => {
     beforeEach(async () => {
-      await loginWallet(service, httpMock, MOCK_TOKEN, MOCK_ADDRESS, MOCK_PAYLOAD);
-      await loginWallet(service, httpMock, MOCK_TOKEN_2, MOCK_ADDRESS_2, MOCK_PAYLOAD_2);
+      await loginWallet(service, httpMock, MOCK_PAYLOAD);
+      await loginWallet(service, httpMock, MOCK_PAYLOAD_2);
     });
 
     it('should clear currentAddress by default', async () => {
@@ -473,7 +494,7 @@ describe('AuthService', () => {
 
     it('should remove expired token but keep currentAddress when token expires', async () => {
       const soonPayload = { ...MOCK_PAYLOAD, exp: Math.floor(Date.now() / 1000) + 2 };
-      await loginWallet(service, httpMock, MOCK_TOKEN, MOCK_ADDRESS, soonPayload);
+      await loginWallet(service, httpMock, soonPayload);
 
       TestBed.tick();
       await vi.advanceTimersByTimeAsync(2000);
@@ -484,7 +505,7 @@ describe('AuthService', () => {
     });
 
     it('should remove expired token immediately if delay is zero or negative', async () => {
-      await loginWallet(service, httpMock, MOCK_EXPIRED_TOKEN, MOCK_ADDRESS, EXPIRED_PAYLOAD);
+      await loginWallet(service, httpMock, EXPIRED_PAYLOAD);
 
       TestBed.tick();
       await vi.advanceTimersByTimeAsync(0);

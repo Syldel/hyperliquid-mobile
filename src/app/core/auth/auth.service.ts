@@ -4,8 +4,8 @@ import { AuthResponse, JwtPayload, TokenMap } from '@models/auth.interfaces';
 import { ConfigService } from '@services/config.service';
 import { SecureStorageService } from '@storage/secure.storage.service';
 import { StorageService } from '@storage/storage.service';
-import { jwtDecode } from 'jwt-decode';
 import { BehaviorSubject, from, switchMap } from 'rxjs';
+import { decodeJwtPayload } from './jwt-payload';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -134,7 +134,7 @@ export class AuthService {
 
   private async handleAuthResponse({ access_token }: AuthResponse): Promise<void> {
     await this.assertSessionRestored();
-    const payload = jwtDecode<JwtPayload>(access_token);
+    const payload = decodeJwtPayload(access_token);
 
     const address = payload.wallet;
 
