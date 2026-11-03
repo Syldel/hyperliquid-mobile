@@ -49,13 +49,6 @@ export class LoginPage extends BasePage {
       cssClass: 'login-modal',
     });
 
-    // modal.onDidDismiss().then((result) => {
-    //   if (result.data) {
-    //     console.log('Login successful:', result.data);
-    //     // Handle login success here
-    //   }
-    // });
-
     await modal.present();
   }
 

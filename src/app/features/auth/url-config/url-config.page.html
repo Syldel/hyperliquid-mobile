@@ -11,11 +11,15 @@
     <ion-list>
       <ion-item>
         <ion-label position="stacked">User Service URL</ion-label>
-        <ion-input formControlName="userServiceUrl" placeholder="http://..." type="url"></ion-input>
+        <ion-input
+          formControlName="userServiceUrl"
+          placeholder="https://..."
+          type="url"
+        ></ion-input>
         @if(configForm.get('userServiceUrl')?.invalid && configForm.get('userServiceUrl')?.touched)
         {
         <ion-note color="danger">
-          Please enter a valid URL (e.g., http://... or https://...)
+          Use https://, or http:// only for localhost or a local network address.
         </ion-note>
         }
       </ion-item>
@@ -29,7 +33,7 @@
         @if(configForm.get('hyperliquidPublicUrl')?.invalid &&
         configForm.get('hyperliquidPublicUrl')?.touched) {
         <ion-note color="danger">
-          Please enter a valid URL (e.g., http://... or https://...)
+          Use https://, or http:// only for localhost or a local network address.
         </ion-note>
         }
       </ion-item>
@@ -37,22 +41,22 @@
         <ion-label position="stacked">Hyperliquid Gateway URL</ion-label>
         <ion-input
           formControlName="hyperliquidGatewayUrl"
-          placeholder="http://..."
+          placeholder="https://..."
           type="url"
         ></ion-input>
         @if(configForm.get('hyperliquidGatewayUrl')?.invalid &&
         configForm.get('hyperliquidGatewayUrl')?.touched) {
         <ion-note color="danger">
-          Please enter a valid URL (e.g., http://... or https://...)
+          Use https://, or http:// only for localhost or a local network address.
         </ion-note>
         }
       </ion-item>
       <ion-item>
         <ion-label position="stacked">Bot Service URL</ion-label>
-        <ion-input formControlName="botServiceUrl" placeholder="http://..." type="url"></ion-input>
+        <ion-input formControlName="botServiceUrl" placeholder="https://..." type="url"></ion-input>
         @if(configForm.get('botServiceUrl')?.invalid && configForm.get('botServiceUrl')?.touched) {
         <ion-note color="danger">
-          Please enter a valid URL (e.g., http://... or https://...)
+          Use https://, or http:// only for localhost or a local network address.
         </ion-note>
         }
       </ion-item>

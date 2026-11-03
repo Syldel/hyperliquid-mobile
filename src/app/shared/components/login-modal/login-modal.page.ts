@@ -110,13 +110,10 @@ export class LoginModalPage {
           );
         }
 
-        this.modalCtrl.dismiss({
-          method: this.loginMethod(),
-          credentials:
-            this.loginMethod() === 'wallet'
-              ? { walletAddress: credentials.walletAddress, password: credentials.password }
-              : { walletName: credentials.walletName, password: credentials.password },
-        });
+        // Seulement la méthode : le mot de passe était renvoyé à l'appelant,
+        // qui n'en faisait rien, et restait en mémoire hors du formulaire.
+        // RefreshableLayout ne teste que la présence de `data`.
+        this.modalCtrl.dismiss({ method: this.loginMethod() });
       } catch (err) {
         const toast = await this.toastCtrl.create({
           message: loginErrorMessage(err),

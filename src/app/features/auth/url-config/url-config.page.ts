@@ -20,6 +20,7 @@ import {
 } from '@ionic/angular/standalone';
 import { AppConfig } from '@models/app-config.interface';
 import { PageHeaderComponent } from '@shared/components/page-header/page-header.component';
+import { serviceUrlValidator } from '@utils/service-url.util';
 
 type FormConfig = {
   [K in keyof AppConfig]: FormControl<AppConfig[K]>;
@@ -57,22 +58,16 @@ export class UrlConfigPage implements OnInit {
 
   constructor() {
     this.configForm = this.fb.nonNullable.group<FormConfig>({
-      userServiceUrl: this.fb.nonNullable.control('', [
-        Validators.required,
-        Validators.pattern(/^https?:\/\/.+/),
-      ]),
+      userServiceUrl: this.fb.nonNullable.control('', [Validators.required, serviceUrlValidator]),
       hyperliquidPublicUrl: this.fb.nonNullable.control('', [
         Validators.required,
-        Validators.pattern(/^https?:\/\/.+/),
+        serviceUrlValidator,
       ]),
       hyperliquidGatewayUrl: this.fb.nonNullable.control('', [
         Validators.required,
-        Validators.pattern(/^https?:\/\/.+/),
+        serviceUrlValidator,
       ]),
-      botServiceUrl: this.fb.nonNullable.control('', [
-        Validators.required,
-        Validators.pattern(/^https?:\/\/.+/),
-      ]),
+      botServiceUrl: this.fb.nonNullable.control('', [Validators.required, serviceUrlValidator]),
     });
   }
 
