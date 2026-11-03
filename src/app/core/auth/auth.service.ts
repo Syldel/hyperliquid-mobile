@@ -1,5 +1,5 @@
 import { HttpClient } from '@angular/common/http';
-import { computed, effect, inject, Injectable, signal } from '@angular/core';
+import { computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { AuthResponse, JwtPayload, TokenMap } from '@models/auth.interfaces';
 import { ConfigService } from '@services/config.service';
 import { SecureStorageService } from '@storage/secure.storage.service';
@@ -14,8 +14,20 @@ export class AuthService {
   private readonly secureStorage = inject(SecureStorageService);
   private readonly config = inject(ConfigService);
 
-  private timeoutId: ReturnType<typeof setTimeout> | null = null;
-  private readonly MAX_TIMEOUT = 2_147_483_647;
+  /** Le seul minuteur d'expiration ; jamais plus d'un armé (voir armExpiryTimer). */
+  private expiryTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Le plus long délai qu'accepte `setTimeout` (2^31 − 1 ms, environ 24,8 jours). */
+  private static readonly MAX_TIMEOUT = 2_147_483_647;
+
+  /**
+   * L'heure, en signal. `Date.now()` lu dans un `computed` n'est jamais relu :
+   * Angular mémorise le résultat jusqu'au changement d'un signal, et
+   * `isLoggedIn` restait vrai après l'expiration tant que rien ne supprimait le
+   * jeton. Ce signal n'est pas un battement : il n'avance qu'à l'instant
+   * d'expiration du jeton courant, à l'armement du minuteur et au retour au
+   * premier plan (`resyncExpiry`).
+   */
+  private readonly _now = signal(Date.now());
 
   // --- State ---
   private readonly _tokens = signal<TokenMap>({});
@@ -55,9 +67,13 @@ export class AuthService {
     return address ? this.tokenExp(address) : null;
   });
 
+  /**
+   * Un jeton existe et n'a pas expiré, à l'heure de `_now`. Il bascule tout seul
+   * à l'expiration, que le jeton ait été supprimé ou non.
+   */
   readonly isLoggedIn = computed(() => {
     const exp = this.currentTokenExp();
-    return exp !== null && exp > Date.now() / 1000;
+    return exp !== null && exp * 1000 > this._now();
   });
 
   readonly ready$ = new BehaviorSubject(false);
@@ -75,7 +91,7 @@ export class AuthService {
   readonly restoreFailed = computed(() => this._restoreError() !== null);
 
   constructor() {
-    this.setupAutoLogout();
+    this.watchTokenExpiry();
     this.restoreSession();
   }
 
@@ -284,28 +300,76 @@ export class AuthService {
     return token ? expiryOf(address, token) : null;
   }
 
-  private setupAutoLogout(): void {
+  /**
+   * Un seul minuteur, réarmé à chaque changement du wallet courant ou de son
+   * jeton : l'`effect` l'annule avant de rejouer (`onCleanup`) et à la
+   * destruction du service, et `armExpiryTimer` l'annule encore avant d'en
+   * poser un autre. Deux minuteurs ne peuvent donc pas courir ensemble.
+   */
+  private watchTokenExpiry(): void {
     effect((onCleanup) => {
       const address = this._currentAddress();
-
-      onCleanup(() => {
-        if (this.timeoutId) clearTimeout(this.timeoutId);
-      });
-
-      if (!address) return;
-
-      this.scheduleAutoLogout(address);
+      const exp = this.currentTokenExp();
+      untracked(() => this.armExpiryTimer(address, exp));
+      onCleanup(() => this.clearExpiryTimer());
     });
   }
 
-  public scheduleAutoLogout(address = this._currentAddress()): void {
-    if (this.timeoutId) clearTimeout(this.timeoutId);
-    if (!address) return;
+  /**
+   * À appeler au retour au premier plan : un minuteur peut avoir été retardé
+   * pendant une suspension, et l'heure doit être juste dès la reprise.
+   */
+  resyncExpiry(): void {
+    this.armExpiryTimer(this._currentAddress(), this.currentTokenExp());
+  }
 
-    const delay = this.removeTokenIfExpired(address);
-    if (delay === null || delay <= 0) return;
+  private armExpiryTimer(address: string | null, exp: number | null): void {
+    this.clearExpiryTimer();
+    this._now.set(Date.now());
+    if (!address || exp === null) return;
 
-    this.timeoutId = setTimeout(() => this.removeToken(address), Math.min(delay, this.MAX_TIMEOUT));
+    const delay = exp * 1000 - Date.now();
+    if (delay <= 0) {
+      this.expire(address, exp);
+      return;
+    }
+    this.expiryTimer = setTimeout(
+      () => {
+        this.expiryTimer = null;
+        this.onExpiryTimer(address, exp);
+      },
+      Math.min(delay, AuthService.MAX_TIMEOUT),
+    );
+  }
+
+  /**
+   * Un minuteur peut partir avant l'expiration (plafond de `setTimeout`,
+   * horloge du téléphone déplacée) : on ne conclut que sur l'heure réelle, et on
+   * réarme pour le reste sinon.
+   */
+  private onExpiryTimer(address: string, exp: number): void {
+    if (Date.now() < exp * 1000) {
+      this.armExpiryTimer(address, exp);
+      return;
+    }
+    this.expire(address, exp);
+  }
+
+  /**
+   * L'heure avance, ce qui fait basculer `isLoggedIn`, puis le jeton expiré est
+   * retiré. Seulement s'il est toujours celui qui a expiré : un jeton remplacé
+   * entre-temps (nouvelle connexion sur le même wallet) n'est pas touché.
+   */
+  private expire(address: string, exp: number): void {
+    this._now.set(Date.now());
+    if (this.tokenExp(address) === exp) this.removeToken(address);
+  }
+
+  private clearExpiryTimer(): void {
+    if (this.expiryTimer !== null) {
+      clearTimeout(this.expiryTimer);
+      this.expiryTimer = null;
+    }
   }
 }
 

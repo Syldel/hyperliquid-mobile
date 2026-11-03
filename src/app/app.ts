@@ -24,7 +24,7 @@ export class AppComponent {
   constructor() {
     effect(() => {
       if (this.lifecycleService.isActive()) {
-        untracked(() => this.authService.scheduleAutoLogout());
+        untracked(() => this.authService.resyncExpiry());
       }
     });
 

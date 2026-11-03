@@ -596,7 +596,7 @@ describe('AuthService', () => {
     });
   });
 
-  describe('setupAutoLogout', () => {
+  describe('token expiry', () => {
     beforeEach(() => {
       vi.useFakeTimers();
     });
@@ -615,6 +615,120 @@ describe('AuthService', () => {
       expect(service.currentAddress()).toBe(MOCK_ADDRESS);
       expect(service.tokens()[MOCK_ADDRESS]).toBeUndefined();
       expect(service.isLoggedIn()).toBe(false);
+    });
+
+    // Le minuteur ne suivait que l'adresse : se reconnecter sur le même wallet
+    // le laissait armé sur l'ancien jeton, et il supprimait le nouveau.
+    it('should not delete a new token of the same wallet at the old expiry', async () => {
+      const now = Math.floor(Date.now() / 1000);
+      await loginWallet(service, httpMock, { ...MOCK_PAYLOAD, exp: now + 2 });
+      TestBed.tick();
+
+      const renewed = { ...MOCK_PAYLOAD, exp: now + 3600 };
+      await loginWallet(service, httpMock, renewed);
+      TestBed.tick();
+      await vi.advanceTimersByTimeAsync(2000);
+
+      expect(service.tokens()[MOCK_ADDRESS]).toBe(tokenOf(renewed));
+      expect(service.isLoggedIn()).toBe(true);
+    });
+
+    /** Les millisecondes jusqu'à l'expiration d'un `exp` en secondes. */
+    const msUntil = (exp: number) => exp * 1000 - Date.now();
+
+    // L'invariant qui manquait : `isLoggedIn` bascule à l'expiration, de
+    // lui-même, et pas une milliseconde avant.
+    it('should turn isLoggedIn false exactly at expiry, not a millisecond before', async () => {
+      const exp = Math.floor(Date.now() / 1000) + 60;
+      await loginWallet(service, httpMock, { ...MOCK_PAYLOAD, exp });
+      TestBed.tick();
+
+      await vi.advanceTimersByTimeAsync(msUntil(exp) - 1);
+      expect(service.isLoggedIn()).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(service.isLoggedIn()).toBe(false);
+    });
+
+    // `isLoggedIn` ne doit pas dépendre de la suppression du jeton : l'ancien
+    // `Date.now()` lu dans le `computed` n'était jamais relu, et seul ce
+    // nettoyage le faisait basculer.
+    it('should turn isLoggedIn false at expiry even if the token is not removed', async () => {
+      const exp = Math.floor(Date.now() / 1000) + 60;
+      await loginWallet(service, httpMock, { ...MOCK_PAYLOAD, exp });
+      TestBed.tick();
+      vi.spyOn(service as unknown as { removeToken: () => void }, 'removeToken').mockImplementation(
+        () => undefined,
+      );
+      // Lu avant l'expiration, comme l'interface le lit en continu : c'est la
+      // valeur mémorisée par le `computed` qui doit changer.
+      expect(service.isLoggedIn()).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(msUntil(exp));
+
+      expect(service.tokens()[MOCK_ADDRESS]).toBeDefined();
+      expect(service.isLoggedIn()).toBe(false);
+    });
+
+    it('should never run more than one expiry timer', async () => {
+      await loginWallet(service, httpMock, MOCK_PAYLOAD);
+      TestBed.tick();
+      expect(vi.getTimerCount()).toBe(1);
+
+      await loginWallet(service, httpMock, MOCK_PAYLOAD_2);
+      TestBed.tick();
+      expect(vi.getTimerCount()).toBe(1);
+
+      await service.chooseUserWallet(MOCK_ADDRESS);
+      TestBed.tick();
+      service.resyncExpiry();
+      service.resyncExpiry();
+      expect(vi.getTimerCount()).toBe(1);
+    });
+
+    it('should cancel the timer when signing out, and when no wallet is current', async () => {
+      await loginWallet(service, httpMock, MOCK_PAYLOAD);
+      await loginWallet(service, httpMock, MOCK_PAYLOAD_2);
+      TestBed.tick();
+
+      await service.signOut();
+      TestBed.tick();
+      expect(vi.getTimerCount()).toBe(0);
+
+      await service.chooseUserWallet(MOCK_ADDRESS);
+      TestBed.tick();
+      await service.switchWallet();
+      TestBed.tick();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    // Un téléphone en veille peut retarder le minuteur : au retour au premier
+    // plan, l'état doit être juste tout de suite.
+    it('should catch up on resync when the timer was held back', async () => {
+      const exp = Math.floor(Date.now() / 1000) + 60;
+      await loginWallet(service, httpMock, { ...MOCK_PAYLOAD, exp });
+      TestBed.tick();
+
+      // L'horloge avance sans que le minuteur ne parte.
+      vi.setSystemTime(Date.now() + msUntil(exp) + 5_000);
+      service.resyncExpiry();
+
+      expect(service.isLoggedIn()).toBe(false);
+      expect(service.tokens()[MOCK_ADDRESS]).toBeUndefined();
+    });
+
+    // Au-delà de 2^31 − 1 ms, setTimeout ne peut pas attendre d'un trait : le
+    // minuteur part avant l'expiration, et ne doit pas la conclure.
+    it('should not expire a token when the timer fires before its expiry', async () => {
+      const exp = Math.floor(Date.now() / 1000) + 30 * 24 * 3600;
+      await loginWallet(service, httpMock, { ...MOCK_PAYLOAD, exp });
+      TestBed.tick();
+
+      await vi.advanceTimersByTimeAsync(2_147_483_647);
+
+      expect(service.isLoggedIn()).toBe(true);
+      expect(service.tokens()[MOCK_ADDRESS]).toBeDefined();
+      expect(vi.getTimerCount()).toBe(1);
     });
 
     it('should remove expired token immediately if delay is zero or negative', async () => {
