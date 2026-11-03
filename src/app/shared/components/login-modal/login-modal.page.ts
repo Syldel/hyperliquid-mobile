@@ -25,6 +25,7 @@ import {
 } from '@ionic/angular/standalone';
 import { lastValueFrom } from 'rxjs';
 import { PageHeaderComponent } from '../page-header/page-header.component';
+import { loginErrorMessage } from './login-error-message';
 
 @Component({
   selector: 'app-login-modal',
@@ -117,16 +118,9 @@ export class LoginModalPage {
               : { walletName: credentials.walletName, password: credentials.password },
         });
       } catch (err) {
-        let message = 'Login failed. Please try again.';
-
-        const status = (err as { status?: unknown } | null)?.status;
-        if (status === 0) {
-          message = 'Network error or CORS policy problem.';
-        }
-
         const toast = await this.toastCtrl.create({
-          message: message + ' (status: ' + String(status) + ')',
-          duration: 4000,
+          message: loginErrorMessage(err),
+          duration: 6000,
           color: 'danger',
           position: 'top',
         });
