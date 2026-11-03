@@ -24,7 +24,7 @@
       </ion-label>
     </ion-item>
 
-    <app-token-expiry [exp]="user.exp" />
+    <app-token-expiry [exp]="tokenExp()" />
   </ion-list>
 
   } @else {

@@ -30,6 +30,7 @@ import {
   receiptOutline,
   settingsOutline,
   statsChartOutline,
+  swapHorizontalOutline,
 } from 'ionicons/icons';
 
 @Component({
@@ -73,6 +74,7 @@ export class MenuComponent implements OnInit {
       lockClosedOutline,
       pulseOutline,
       listOutline,
+      swapHorizontalOutline,
     });
   }
 
@@ -85,8 +87,15 @@ export class MenuComponent implements OnInit {
     this.menuCtrl.close('main-menu');
   }
 
-  logout() {
-    this.authService.logout();
+  /** Revient à la liste des wallets ; les jetons restent (voir AuthService). */
+  async switchWallet() {
+    await this.authService.switchWallet();
+    this.router.navigate(['/auth/login']);
+  }
+
+  /** Supprime le jeton du wallet courant, puis revient à la liste. */
+  async signOut() {
+    await this.authService.signOut();
     this.router.navigate(['/auth/login']);
   }
 }

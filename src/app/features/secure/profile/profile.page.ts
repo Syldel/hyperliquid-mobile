@@ -41,6 +41,11 @@ export class ProfilePage extends MenuBasePage implements OnInit {
     this.lifecycle.foregroundCount();
     return this.authService.isLoggedIn();
   });
+  /** Lue dans le jeton, pas dans `currentUser().exp` (voir AuthService.currentTokenExp). */
+  readonly tokenExp = computed(() => {
+    this.lifecycle.foregroundCount();
+    return this.authService.currentTokenExp();
+  });
   readonly currentUser = computed(() => {
     this.lifecycle.foregroundCount();
     return this.authService.currentWallet();

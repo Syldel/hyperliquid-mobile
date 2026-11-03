@@ -448,38 +448,151 @@ describe('AuthService', () => {
     });
   });
 
-  describe('logout', () => {
+  describe('switchWallet', () => {
     beforeEach(async () => {
       await loginWallet(service, httpMock, MOCK_PAYLOAD);
       await loginWallet(service, httpMock, MOCK_PAYLOAD_2);
     });
 
     it('should clear currentAddress by default', async () => {
-      await service.logout();
+      await service.switchWallet();
       expect(service.currentAddress()).toBeNull();
     });
 
-    it('should keep tokens intact after logout', async () => {
-      await service.logout();
+    it('should keep tokens intact after switching wallet', async () => {
+      await service.switchWallet();
       expect(service.tokens()[MOCK_ADDRESS]).toBe(MOCK_TOKEN);
       expect(service.tokens()[MOCK_ADDRESS_2]).toBe(MOCK_TOKEN_2);
     });
 
     it('should clear currentAddress when specific address matches', async () => {
-      await service.logout(MOCK_ADDRESS_2);
+      await service.switchWallet(MOCK_ADDRESS_2);
       expect(service.currentAddress()).toBeNull();
     });
 
     it('should not clear currentAddress when specific address does not match current', async () => {
-      await service.logout(MOCK_ADDRESS);
+      await service.switchWallet(MOCK_ADDRESS);
       expect(service.currentAddress()).toBe(MOCK_ADDRESS_2);
     });
 
     it('should do nothing if no current address and no address provided', async () => {
       service['_currentAddress'].set(null); // arrange: force null directly
       secureStorageMock.set.mockClear(); // reset call history
-      await service.logout();
+      await service.switchWallet();
       expect(secureStorageMock.set).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('signOut', () => {
+    beforeEach(async () => {
+      await loginWallet(service, httpMock, MOCK_PAYLOAD);
+      await loginWallet(service, httpMock, MOCK_PAYLOAD_2);
+    });
+
+    // Le « Logout » d'avant gardait le jeton : valide jusqu'à une heure de plus.
+    it('should delete the token of the current wallet, in memory and in secure storage', async () => {
+      await service.signOut();
+
+      expect(service.tokens()[MOCK_ADDRESS_2]).toBeUndefined();
+      expect(secureStorageMock.set).toHaveBeenLastCalledWith('tokens', {
+        [MOCK_ADDRESS]: MOCK_TOKEN,
+      });
+    });
+
+    it("should keep the other wallets' tokens", async () => {
+      await service.signOut();
+      expect(service.tokens()[MOCK_ADDRESS]).toBe(MOCK_TOKEN);
+    });
+
+    it('should keep the wallet in the list, and go back to it', async () => {
+      await service.signOut();
+
+      expect(service.currentAddress()).toBeNull();
+      expect(service.userWallets().map((w) => w.wallet)).toContain(MOCK_ADDRESS_2);
+    });
+
+    // Rouvert, le wallet se consulte sans jeton : il ne doit pas passer pour
+    // connecté, alors que sa charge garde un `exp` futur.
+    it('should not count a reopened signed-out wallet as logged in', async () => {
+      await service.signOut();
+      await service.chooseUserWallet(MOCK_ADDRESS_2);
+
+      expect(service.currentAddress()).toBe(MOCK_ADDRESS_2);
+      expect(service.currentToken()).toBeNull();
+      expect(service.isLoggedIn()).toBe(false);
+    });
+
+    it('should refuse to write when the stored session could not be read', async () => {
+      service['_restoreError'].set(new Error('keychain locked'));
+      secureStorageMock.get.mockRejectedValue(new Error('keychain locked'));
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      secureStorageMock.set.mockClear();
+
+      await expect(service.signOut()).rejects.toThrow('could not be read');
+      expect(secureStorageMock.set).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * L'expiration se lit dans le jeton stocké, jamais dans la copie de sa
+   * charge rangée dans `userWallets` : après « Sign out », la copie gardait un
+   * `exp` futur et le profil affichait « Valid » pour un jeton absent.
+   */
+  describe('the token is the authority on expiry', () => {
+    beforeEach(async () => {
+      await loginWallet(service, httpMock, MOCK_PAYLOAD);
+    });
+
+    it('should read the expiry from the stored token', () => {
+      expect(service.currentTokenExp()).toBe(MOCK_PAYLOAD.exp);
+    });
+
+    it('should have no expiry once signed out, whatever the stored copy says', async () => {
+      await service.signOut();
+      await service.chooseUserWallet(MOCK_ADDRESS);
+
+      expect(service.currentWallet()?.exp).toBe(MOCK_PAYLOAD.exp);
+      expect(service.currentTokenExp()).toBeNull();
+      expect(service.isLoggedIn()).toBe(false);
+    });
+
+    it('should ignore the stored copy when it disagrees with the token', () => {
+      service['_userWallets'].update((wallets) =>
+        wallets.map((w) => ({ ...w, exp: Math.floor(Date.now() / 1000) - 100 })),
+      );
+
+      expect(service.isLoggedIn()).toBe(true);
+    });
+
+    it('should ignore, and report, a stored token that cannot be read', () => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      service['_tokens'].set({ [MOCK_ADDRESS]: 'not.a.token' });
+
+      expect(service.currentTokenExp()).toBeNull();
+      expect(service.isLoggedIn()).toBe(false);
+      expect(error).toHaveBeenCalledWith(
+        expect.stringContaining('is unreadable'),
+        expect.anything(),
+      );
+    });
+
+    it('should ignore a token stored under another wallet than its own', () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      service['_tokens'].set({ [MOCK_ADDRESS]: MOCK_TOKEN_2 });
+
+      expect(service.currentTokenExp()).toBeNull();
+    });
+
+    // Le modèle de session : un wallet de la liste s'ouvre avec ou sans jeton.
+    it('should open a wallet whose token has expired, and drop that token', async () => {
+      await loginWallet(service, httpMock, MOCK_PAYLOAD_2);
+      service['_tokens'].update((tokens) => ({ ...tokens, [MOCK_ADDRESS]: MOCK_EXPIRED_TOKEN }));
+
+      await service.chooseUserWallet(MOCK_ADDRESS);
+
+      expect(service.currentAddress()).toBe(MOCK_ADDRESS);
+      expect(service.tokens()[MOCK_ADDRESS]).toBeUndefined();
+      expect(service.isLoggedIn()).toBe(false);
     });
   });
 

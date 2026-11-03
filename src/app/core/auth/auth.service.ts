@@ -40,16 +40,24 @@ export class AuthService {
     return this._tokens()[address] ?? null;
   });
 
-  readonly isLoggedIn = computed(() => {
-    this._tokens(); // dépendance silencieuse
-
+  /**
+   * L'expiration du jeton du wallet courant, en secondes, **lue dans le jeton
+   * stocké** ; `null` sans jeton.
+   *
+   * Le jeton fait foi, pas la copie de sa charge rangée dans `userWallets` à la
+   * connexion. Les deux restaient d'accord tant qu'un jeton n'était supprimé
+   * qu'à son expiration ; `signOut` le supprime avant, et le profil affichait
+   * « Valid, 54m remaining » à côté de « Sign in again » pour un jeton absent
+   * (mesuré le 2026-11-03). `userWallets` ne sert plus qu'à l'identité.
+   */
+  readonly currentTokenExp = computed(() => {
     const address = this._currentAddress();
-    if (!address) return false;
+    return address ? this.tokenExp(address) : null;
+  });
 
-    const payload = this._userWallets().find((p) => p.wallet === address);
-    if (!payload) return false;
-
-    return payload.exp > Date.now() / 1000;
+  readonly isLoggedIn = computed(() => {
+    const exp = this.currentTokenExp();
+    return exp !== null && exp > Date.now() / 1000;
   });
 
   readonly ready$ = new BehaviorSubject(false);
@@ -152,10 +160,18 @@ export class AuthService {
 
   // --- Wallet management ---
 
+  /**
+   * Ouvre un wallet de la liste, avec ou sans jeton valide : c'est le modèle de
+   * session (docs/ecosystem.md, une adresse mémorisée, un jeton optionnel). Un
+   * jeton expiré est supprimé au passage.
+   *
+   * Le choix dépendait de l'expiration de la copie dans `userWallets` : un
+   * wallet au jeton expiré ne s'ouvrait pas, et l'écran gardait le précédent.
+   */
   async chooseUserWallet(walletAddress: string): Promise<void> {
-    const delay = this.removeTokenIfExpired(walletAddress);
-    if (!delay) return;
+    if (!this._userWallets().some((w) => w.wallet === walletAddress)) return;
 
+    this.removeTokenIfExpired(walletAddress);
     this._currentAddress.set(walletAddress);
     await this.storage.set('currentAddress', walletAddress);
   }
@@ -176,14 +192,20 @@ export class AuthService {
     }
   }
 
-  // --- Logout ---
+  // --- Changer de wallet, se déconnecter ---
+  //
+  // Deux gestes distincts (docs/ecosystem.md, le modèle de session : une
+  // adresse mémorisée, un jeton optionnel). L'unique « Logout » faisait le
+  // premier : il oubliait l'adresse mais gardait le jeton, valide jusqu'à une
+  // heure sur le téléphone, alors que le menu annonçait une déconnexion.
 
-  async logout(walletAddress?: string): Promise<void> {
+  /**
+   * Revient à la liste des wallets en gardant leurs jetons : rouvrir le même
+   * wallet ne redemande pas le mot de passe tant que son jeton est valide.
+   */
+  async switchWallet(walletAddress?: string): Promise<void> {
     const target = walletAddress ?? this._currentAddress();
     if (!target) return;
-
-    // this._tokens.update(({ [target]: _, ...rest }) => rest);
-    // await this.secureStorage.set('tokens', this._tokens());
 
     if (this._currentAddress() === target) {
       this._currentAddress.set(null);
@@ -191,11 +213,28 @@ export class AuthService {
     }
   }
 
-  removeTokenIfExpired(address: string): number | null {
-    const payload = this._userWallets().find((p) => p.wallet === address);
-    if (!payload) return null;
+  /**
+   * Supprime le jeton du wallet courant, puis revient à la liste. Le wallet y
+   * reste : rouvert, il se consulte sans jeton (l'API publique suffit), et ce
+   * qui exige une authentification redemande le mot de passe.
+   */
+  async signOut(): Promise<void> {
+    const target = this._currentAddress();
+    if (!target) return;
 
-    const delay = payload.exp * 1000 - Date.now();
+    await this.assertSessionRestored();
+    this.removeToken(target);
+    await this.secureStorage.set('tokens', this._tokens());
+
+    this._currentAddress.set(null);
+    await this.storage.set('currentAddress', null);
+  }
+
+  removeTokenIfExpired(address: string): number | null {
+    const exp = this.tokenExp(address);
+    if (exp === null) return null;
+
+    const delay = exp * 1000 - Date.now();
     if (delay <= 0) {
       this.removeToken(address);
     }
@@ -232,11 +271,17 @@ export class AuthService {
     const now = Date.now() / 1000;
 
     return Object.fromEntries(
-      Object.entries(tokenMap).filter(([address]) => {
-        const payload = this._userWallets().find((p) => p.wallet === address);
-        return payload && payload.exp > now;
+      Object.entries(tokenMap).filter(([address, token]) => {
+        const exp = expiryOf(address, token);
+        return exp !== null && exp > now;
       }),
     );
+  }
+
+  /** L'expiration du jeton stocké pour `address`, ou `null` sans jeton lisible. */
+  private tokenExp(address: string): number | null {
+    const token = this._tokens()[address];
+    return token ? expiryOf(address, token) : null;
   }
 
   private setupAutoLogout(): void {
@@ -261,5 +306,24 @@ export class AuthService {
     if (delay === null || delay <= 0) return;
 
     this.timeoutId = setTimeout(() => this.removeToken(address), Math.min(delay, this.MAX_TIMEOUT));
+  }
+}
+
+/**
+ * L'expiration d'un jeton stocké, s'il se lit et appartient bien au wallet
+ * sous lequel il est rangé ; `null` sinon, en le disant : un jeton illisible ou
+ * rangé sous la mauvaise adresse ne compte pas comme une session.
+ */
+function expiryOf(address: string, token: string): number | null {
+  try {
+    const payload = decodeJwtPayload(token);
+    if (payload.wallet.toLowerCase() !== address.toLowerCase()) {
+      console.error(`Stored token for ${address} belongs to ${payload.wallet}; ignored.`);
+      return null;
+    }
+    return payload.exp;
+  } catch (err) {
+    console.error(`Stored token for ${address} is unreadable; ignored.`, err);
+    return null;
   }
 }

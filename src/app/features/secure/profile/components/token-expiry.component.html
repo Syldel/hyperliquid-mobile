@@ -1,19 +1,30 @@
-<ion-item>
-  <ion-label>
-    <p>Token expires</p>
-    <h2>{{ exp() * 1000 | date: 'medium' }}</h2>
-    @if (remainingLabel(); as label) {
-      <p>
-        <ion-text [color]="color()">{{ label }} remaining</ion-text>
-      </p>
-    }
-  </ion-label>
-  <ion-badge
-    slot="end"
-    [color]="color()"
-    aria-live="polite"
-    [attr.aria-label]="remainingLabel() ? 'Token valid' : 'Token expired'"
-  >
-    {{ remainingLabel() ? 'Valid' : 'Expired' }}
-  </ion-badge>
-</ion-item>
+@if (exp(); as exp) {
+  <ion-item>
+    <ion-label>
+      <p>Token expires</p>
+      <h2>{{ exp * 1000 | date: 'medium' }}</h2>
+      @if (remainingLabel(); as label) {
+        <p>
+          <ion-text [color]="color()">{{ label }} remaining</ion-text>
+        </p>
+      }
+    </ion-label>
+    <ion-badge
+      slot="end"
+      [color]="color()"
+      aria-live="polite"
+      [attr.aria-label]="remainingLabel() ? 'Token valid' : 'Token expired'"
+    >
+      {{ remainingLabel() ? 'Valid' : 'Expired' }}
+    </ion-badge>
+  </ion-item>
+} @else {
+  <!-- Pas de jeton : signé dehors, ou expiré puis supprimé. Aucune date à annoncer. -->
+  <ion-item>
+    <ion-label>
+      <p>Token</p>
+      <h2>None</h2>
+    </ion-label>
+    <ion-badge slot="end" color="medium" aria-label="No token: signed out">Signed out</ion-badge>
+  </ion-item>
+}

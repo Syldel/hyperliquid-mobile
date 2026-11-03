@@ -100,6 +100,19 @@ l'utilisateur d'écrans qui n'avaient pas besoin de lui. Les lignes commentées 
 ⚠️ Ne pas câbler `AuthGuard` sur `/secure` en croyant réparer un oubli. Ce serait
 remplacer cette architecture par une autre.
 
+**Changer de wallet n'est pas se déconnecter** (depuis le 2026-11-03). Le menu propose les
+deux, parce que le modèle les distingue :
+
+| Geste             | Méthode        | L'adresse courante | Le jeton du wallet                          |
+| ----------------- | -------------- | ------------------ | ------------------------------------------- |
+| « Switch wallet » | `switchWallet` | oubliée            | **gardé** : rouvrir le wallet suffit        |
+| « Sign out »      | `signOut`      | oubliée            | **supprimé**, de la mémoire et du trousseau |
+
+L'unique « Logout » d'avant faisait le premier sous le nom du second : un jeton valide restait
+sur le téléphone jusqu'à une heure. Un wallet déconnecté reste dans la liste ; rouvert, il se
+consulte sans jeton, et `isLoggedIn()` exige désormais qu'un jeton existe, pas seulement que la
+charge mémorisée ne soit pas expirée.
+
 ## À qui le jeton a le droit d'être montré
 
 **Deux services le valident, et l'intercepteur ne le joint qu'à eux :**

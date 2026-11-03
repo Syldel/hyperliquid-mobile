@@ -61,10 +61,16 @@
     </ion-list>
   </ion-content>
   <ion-footer>
-    <ion-item (click)="logout()" lines="none">
-      <ion-icon aria-hidden="true" name="log-out-outline" slot="start"></ion-icon>
-      <ion-label>Logout</ion-label>
+    <ion-item (click)="switchWallet()" lines="none">
+      <ion-icon aria-hidden="true" name="swap-horizontal-outline" slot="start"></ion-icon>
+      <ion-label>Switch wallet</ion-label>
     </ion-item>
+    @if (isLoggedIn()) {
+      <ion-item (click)="signOut()" lines="none">
+        <ion-icon aria-hidden="true" name="log-out-outline" slot="start"></ion-icon>
+        <ion-label>Sign out</ion-label>
+      </ion-item>
+    }
   </ion-footer>
 </ion-menu>
 

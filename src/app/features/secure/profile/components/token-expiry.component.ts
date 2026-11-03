@@ -12,7 +12,8 @@ import { interval } from 'rxjs';
   templateUrl: './token-expiry.component.html',
 })
 export class TokenExpiryComponent {
-  readonly exp = input.required<number>(); // timestamp en secondes
+  /** En secondes, lue dans le jeton ; `null` : aucun jeton (déconnecté). */
+  readonly exp = input.required<number | null>();
 
   private readonly lifecycle = inject(AppLifecycleService);
   private readonly tick = toSignal(interval(1000));
@@ -20,7 +21,9 @@ export class TokenExpiryComponent {
   readonly remainingMs = computed(() => {
     this.tick();
     this.lifecycle.foregroundCount();
-    const ms = this.exp() * 1000 - Date.now();
+    const exp = this.exp();
+    if (exp === null) return null;
+    const ms = exp * 1000 - Date.now();
     return ms > 0 ? ms : null;
   });
 
