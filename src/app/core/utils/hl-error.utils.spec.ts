@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { extractErrorMessage } from './hl-error.utils';
+import { exchangeRefusal, extractErrorMessage } from './hl-error.utils';
 
 /**
  * ============================================================================
@@ -51,5 +51,41 @@ describe('extractErrorMessage', () => {
     it('still says something when the error carries no message', () => {
       expect(extractErrorMessage(new Error(''))).not.toContain('undefined');
     });
+  });
+});
+
+describe('exchangeRefusal', () => {
+  // La forme mesurée le 2026-10-29 pour un agent inconnu de Hyperliquid.
+  it('names a whole-action refusal with the exchange text', () => {
+    expect(
+      exchangeRefusal({
+        status: 'err',
+        response: 'User or API Wallet 0x18176fd945515d65b66f3c524278c6cd76202d17 does not exist.',
+      }),
+    ).toBe(
+      'Refused by Hyperliquid: User or API Wallet 0x18176fd945515d65b66f3c524278c6cd76202d17 does not exist.',
+    );
+  });
+
+  // Une forme non documentée ne doit pas s'effacer : elle s'écrit telle quelle.
+  it('still says something when the refusal carries no text', () => {
+    expect(exchangeRefusal({ status: 'err' })).toBe('Refused by Hyperliquid: null');
+    expect(exchangeRefusal({ status: 'err', response: { code: 7 } })).toBe(
+      'Refused by Hyperliquid: {"code":7}',
+    );
+  });
+
+  // Les refus par ordre vivent dans `statuses` : ce n'est pas un refus d'ensemble.
+  it('leaves an accepted envelope, even with per-order errors, to its statuses', () => {
+    expect(
+      exchangeRefusal({
+        status: 'ok',
+        response: { type: 'order', data: { statuses: [{ error: 'Insufficient margin' }] } },
+      }),
+    ).toBeNull();
+  });
+
+  it.each([null, undefined, 'err', 42])('ignores a reply that is not an envelope (%p)', (reply) => {
+    expect(exchangeRefusal(reply)).toBeNull();
   });
 });

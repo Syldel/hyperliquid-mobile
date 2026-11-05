@@ -652,4 +652,62 @@ describe('OrderFormComponent — price wiring', () => {
       });
     });
   });
+
+  /**
+   * Un refus d'ensemble de l'exchange (HTTP 200, `status: 'err'`), relayé tel quel par le gateway :
+   * la forme mesurée le 2026-10-29 pour un agent que Hyperliquid ne connaît pas.
+   */
+  describe('a refusal of the whole action by Hyperliquid', () => {
+    const refusal = {
+      status: 'err',
+      response: 'User or API Wallet 0x18176fd945515d65b66f3c524278c6cd76202d17 does not exist.',
+    };
+
+    function gateway(): Record<string, unknown> {
+      return (form as unknown as { hlGateway: Record<string, unknown> }).hlGateway;
+    }
+
+    it('shows the exchange text and places no protective order after a refused new order', () => {
+      create((component) => (component.defaultCoin = 'BTC'));
+      const placeOrders = vi.fn(() => of({ status: 'ok' }));
+      gateway()['placeOrder'] = vi.fn(() => of(refusal));
+      gateway()['placeOrders'] = placeOrders;
+      form.protectiveOrders.set([{ id: 'p1', label: 'SL' } as never]);
+      form.sz.set('0.001');
+      form.limitPx.set('80000');
+      settle();
+
+      form.submit();
+
+      expect(gateway()['placeOrder']).toHaveBeenCalledTimes(1);
+      expect(form.error()).toBe(
+        'Refused by Hyperliquid: User or API Wallet 0x18176fd945515d65b66f3c524278c6cd76202d17 does not exist.',
+      );
+      expect(placeOrders).not.toHaveBeenCalled();
+    });
+
+    // Un `modify` refusé peut avoir annulé l'ordre d'origine (mesuré le 2026-10-27) : on le dit.
+    it('shows the exchange text after a refused modification, and says to check the order', () => {
+      create(
+        (component) =>
+          (component.existingOrder = {
+            oid: 1,
+            coin: 'BTC',
+            side: 'B',
+            limitPx: '80000',
+            sz: '0.001',
+            reduceOnly: false,
+            isTrigger: false,
+            orderType: 'Limit',
+          } as unknown as HLFrontendOpenOrder),
+      );
+      gateway()['modifyOrder'] = vi.fn(() => of(refusal));
+
+      form.submit();
+
+      expect(gateway()['modifyOrder']).toHaveBeenCalledTimes(1);
+      expect(form.error()).toContain('Refused by Hyperliquid: User or API Wallet');
+      expect(form.error()).toContain('the original may have been cancelled');
+    });
+  });
 });

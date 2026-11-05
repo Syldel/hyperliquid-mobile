@@ -45,7 +45,7 @@ import {
   HLTif,
   hlPerpDexOf,
 } from '@syldel/hl-shared-types';
-import { extractErrorMessage } from '@utils/hl-error.utils';
+import { exchangeRefusal, extractErrorMessage } from '@utils/hl-error.utils';
 import { roundPrice, roundSize } from '@utils/hl-rounding.utils';
 import {
   buildProtectiveOrderDetails,
@@ -836,6 +836,11 @@ export class OrderFormComponent implements OnInit {
 
     return this.hlGateway.placeOrders(orders).pipe(
       tap((res) => {
+        const refusal = exchangeRefusal(res);
+        if (refusal) {
+          labels.forEach((label) => this.presentToast(`${label} failed: ${refusal}`, 'danger'));
+          return;
+        }
         const statuses: HLPlaceOrderStatus[] = res?.response?.data?.statuses ?? [];
         labels.forEach((label, i) => this.showOrderStatusToast(statuses[i], label));
         this.availableCapitalService.invalidate();
@@ -925,8 +930,25 @@ export class OrderFormComponent implements OnInit {
             this.availableCapitalService.invalidate();
             this.modalCtrl.dismiss(null, 'confirm');
           } else {
-            this.error.set('Failed to update order.');
+            // Mesuré le 2026-10-27 : un `modify` refusé peut avoir **annulé**
+            // l'ordre d'origine (« Error placing new order during modify »).
+            // Pas toujours (un agent inconnu est refusé avant tout) : on le
+            // dit comme une possibilité, à vérifier.
+            const refusal = exchangeRefusal(res) ?? 'Failed to update order: unexpected reply.';
+            this.error.set(
+              `${refusal} Check the open orders: the original may have been cancelled.`,
+            );
+            this.availableCapitalService.invalidate();
           }
+          return;
+        }
+
+        // Refus d'ensemble : rien n'a été posé, donc aucun ordre de protection
+        // ne doit suivre. Avant, « no response » s'affichait et les protections
+        // partaient quand même.
+        const refusal = exchangeRefusal(res);
+        if (refusal) {
+          this.error.set(refusal);
           return;
         }
 

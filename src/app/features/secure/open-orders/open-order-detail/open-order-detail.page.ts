@@ -31,7 +31,7 @@ import {
   HLOrderStatusResponse,
   Timestamp,
 } from '@syldel/hl-shared-types';
-import { extractErrorMessage } from '@utils/hl-error.utils';
+import { exchangeRefusal, extractErrorMessage } from '@utils/hl-error.utils';
 import { orderSideLabel } from '@utils/market-kind.util';
 import { addIcons } from 'ionicons';
 import { closeOutline, createOutline, trashOutline } from 'ionicons/icons';
@@ -216,7 +216,19 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
       .subscribe({
         next: (res) => {
           this.cancelling.set(false);
-          const status = res.response.data.statuses[0];
+          // Refus d'ensemble (`response` est alors un texte) : lire
+          // `response.data.statuses` levait une TypeError dans ce rappel, et
+          // rien ne s'affichait.
+          const refusal = exchangeRefusal(res);
+          if (refusal) {
+            this.showToast(`Cancel failed: ${refusal}`, 'danger');
+            return;
+          }
+          const status = res?.response?.data?.statuses?.[0];
+          if (status === undefined) {
+            this.showToast('Cancel failed: unexpected reply from the gateway.', 'danger');
+            return;
+          }
           if (status === 'success') {
             this.showToast(`Order ${this.oid()} cancelled`, 'success');
             this.availableCapitalService.invalidate();
