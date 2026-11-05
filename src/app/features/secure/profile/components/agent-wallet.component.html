@@ -1,0 +1,24 @@
+@if (status(); as status) {
+  @if (status.kind !== 'loading') {
+    <ion-item>
+      <ion-label class="ion-text-wrap">
+        <p>Agent wallet</p>
+        @if (status.kind === 'valid' || status.kind === 'expired') {
+          <h2>{{ status.agent.name }}</h2>
+          <p class="agent-address" [attr.title]="status.agent.address">
+            {{ shortAddress() }}
+          </p>
+          <p>Valid until {{ validUntilLabel() }}</p>
+        }
+        @if (status.kind !== 'valid' || status.level !== 'ok') {
+          <p class="agent-summary" [class.agent-summary--danger]="status.level === 'danger'">
+            {{ summary() }}
+          </p>
+        }
+      </ion-label>
+      @if (badge(); as badge) {
+        <ion-badge slot="end" [color]="badge.color" aria-live="polite">{{ badge.label }}</ion-badge>
+      }
+    </ion-item>
+  }
+}

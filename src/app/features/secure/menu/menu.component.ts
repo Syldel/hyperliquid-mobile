@@ -1,6 +1,7 @@
 import { Component, computed, inject, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '@auth/auth.service';
+import { AgentStatusService } from '@services/agent-status.service';
 import {
   IonButton,
   IonContent,
@@ -22,6 +23,7 @@ import {
   gitBranchOutline,
   hardwareChipOutline,
   homeOutline,
+  keyOutline,
   listOutline,
   lockClosedOutline,
   logOutOutline,
@@ -60,6 +62,28 @@ export class MenuComponent implements OnInit {
 
   readonly isLoggedIn = computed(() => this.authService.isLoggedIn());
 
+  private readonly agentStatus = inject(AgentStatusService).status;
+
+  /**
+   * `Agent · 42 d`, ou ce qui ne va pas. Rien tant que l'agent n'est pas lu :
+   * hors connexion, ou pendant la lecture qui suit la connexion.
+   */
+  readonly agentLine = computed(() => {
+    const status = this.agentStatus();
+    switch (status.kind) {
+      case 'loading':
+        return null;
+      case 'valid':
+        return { level: status.level, text: `Agent · ${status.remaining}` };
+      case 'expired':
+        return { level: status.level, text: 'Agent · expired' };
+      case 'missing':
+        return { level: status.level, text: 'Agent · unknown expiry' };
+      case 'unavailable':
+        return { level: status.level, text: 'Agent · status unavailable' };
+    }
+  });
+
   constructor() {
     addIcons({
       gitBranchOutline,
@@ -75,6 +99,7 @@ export class MenuComponent implements OnInit {
       pulseOutline,
       listOutline,
       swapHorizontalOutline,
+      keyOutline,
     });
   }
 

@@ -5,3 +5,17 @@ ion-item {
 app-user-avatar-btn {
   --icon-color: rgba(var(--ion-color-contrast-rgb), 0.85);
 }
+
+// Le palier de l'agent en couleur de texte : `warning-shade` et `danger`,
+// jamais `color="warning"` (jaune de base, 1,59:1 — docs/theming.md).
+.agent-line {
+  font-size: 0.9rem;
+
+  .agent-line--warning {
+    color: var(--ion-color-warning-shade);
+  }
+
+  .agent-line--danger {
+    color: var(--ion-color-danger);
+  }
+}

@@ -15,6 +15,7 @@ import { LoginModalPage } from '@shared/components/login-modal/login-modal.page'
 import { PageHeaderComponent } from '@shared/components/page-header/page-header.component';
 import { addIcons } from 'ionicons';
 import { logInOutline } from 'ionicons/icons';
+import { AgentWalletComponent } from './components/agent-wallet.component';
 import { TokenExpiryComponent } from './components/token-expiry.component';
 
 @Component({
@@ -30,6 +31,7 @@ import { TokenExpiryComponent } from './components/token-expiry.component';
     IonNote,
     PageHeaderComponent,
     TokenExpiryComponent,
+    AgentWalletComponent,
   ],
   templateUrl: './profile.page.html',
 })

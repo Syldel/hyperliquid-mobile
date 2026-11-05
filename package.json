@@ -41,7 +41,7 @@
     "@capacitor/preferences": "^8.0.1",
     "@ionic/angular": "^8.8.2",
     "@syldel/hl-shared-types": "^0.0.28",
-    "@syldel/trading-shared-types": "github:Syldel/trading-shared-types#v0.33.0",
+    "@syldel/trading-shared-types": "github:Syldel/trading-shared-types#v0.34.0",
     "capacitor-secure-storage-plugin": "^0.13.0",
     "lightweight-charts": "^5.2.0",
     "rxjs": "~7.8.2",

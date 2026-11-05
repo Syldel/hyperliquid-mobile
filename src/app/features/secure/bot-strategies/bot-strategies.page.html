@@ -5,6 +5,7 @@
   emptyMessage="No bot strategy found"
   (dataLoaded)="user.set($event)"
 >
+  <app-agent-expiry-notice />
   <ion-list>
     @for (entry of botEntries(); track entry.key) {
     <ion-item-group>

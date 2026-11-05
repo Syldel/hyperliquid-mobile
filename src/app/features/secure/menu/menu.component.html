@@ -61,6 +61,18 @@
     </ion-list>
   </ion-content>
   <ion-footer>
+    <!-- En permanence, connecté : l'agent qui signe et le temps qui lui reste. -->
+    @if (agentLine(); as line) {
+      <ion-item (click)="onMenuItemClick('/secure/profile')" lines="none" class="agent-line">
+        <ion-icon aria-hidden="true" name="key-outline" slot="start"></ion-icon>
+        <ion-label
+          [class.agent-line--warning]="line.level === 'warning'"
+          [class.agent-line--danger]="line.level === 'danger'"
+        >
+          {{ line.text }}
+        </ion-label>
+      </ion-item>
+    }
     <ion-item (click)="switchWallet()" lines="none">
       <ion-icon aria-hidden="true" name="swap-horizontal-outline" slot="start"></ion-icon>
       <ion-label>Switch wallet</ion-label>

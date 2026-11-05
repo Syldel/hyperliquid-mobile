@@ -73,6 +73,30 @@ du jeton.
 
 ---
 
+# L'agent qui signe, et son expiration
+
+Les ordres sont signés par un agent (« API wallet » Hyperliquid) dont la clé ne quitte jamais les
+services. L'app n'en voit que les données publiques, dans `ExternalUser.agent` (`/auth/me`,
+types partagés ≥ 0.34.0) : adresse, nom, `validUntil`, **déclarés** par `set-agent-key`
+(`nest-mongo-user/docs/agent-key.md`), pas lus chez Hyperliquid.
+
+- `AgentStatusService` les lit à chaque wallet qui devient connecté (connexion, restauration,
+  changement de wallet), **pas** au retour au premier plan (décision du 2026-11-05 : la date ne
+  change que par `set-agent-key`). Le palier se recalcule sans réseau, chaque minute et au
+  retour au premier plan ;
+- paliers (`agent-expiry.util.ts`) : orange à 14 jours, rouge à 3, rouge aussi expiré ou
+  **inconnu** — le gateway refuse alors de signer (HTTP 412). Une lecture échouée s'affiche
+  « unavailable », jamais « ok » ;
+- où : la page Profile (date écrite comme la page API de Hyperliquid, `04/05/2027 13:00:28`),
+  `Agent · 42 d` en pied de menu, et une ligne `app-agent-expiry-notice` dans les vues qui
+  signent — formulaire d'ordre, détail d'ordre, Bot Strategies et sa modale de paire. Dans le
+  flux et non en bandeau fixe : ces vues s'ouvrent souvent en modale, au-dessus du shell, et un
+  bandeau fixe aurait pu masquer un bouton d'envoi.
+
+Vérifié le 2026-11-05 à 360 px, en clair et en sombre, contre un double local de `/auth/me`
+(forme copiée de nest-mongo-user) : contrastes calculés de 5,24:1 à 8,68:1. ⚠️ Pas encore vu
+contre le vrai service, ni l'état « unavailable » dans le navigateur (couvert par les tests).
+
 # Le modèle de session : une adresse mémorisée, un jeton optionnel
 
 C'est un choix d'architecture, pas un état de fait provisoire, et il explique plusieurs

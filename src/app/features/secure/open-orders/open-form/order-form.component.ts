@@ -90,6 +90,7 @@ import {
   type OriginalTriggerOrder,
   type TriggerOrderState,
 } from './order-limit.util';
+import { AgentExpiryNoticeComponent } from '@shared/components/agent-expiry-notice/agent-expiry-notice.component';
 
 export type OrderFormMode = 'place' | 'modify';
 
@@ -98,6 +99,7 @@ export type OrderFormMode = 'place' | 'modify';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    AgentExpiryNoticeComponent,
     CommonModule,
     RefreshableLayoutComponent,
     FormsModule,

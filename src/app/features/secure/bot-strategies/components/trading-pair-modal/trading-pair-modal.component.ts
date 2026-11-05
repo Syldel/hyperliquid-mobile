@@ -104,6 +104,7 @@ import {
   pairStrategyStatus,
   type PairStrategyStatus,
 } from '../../domain/pair-strategy-status.util';
+import { AgentExpiryNoticeComponent } from '@shared/components/agent-expiry-notice/agent-expiry-notice.component';
 
 interface TradingPairForm {
   exchangeKey: FormControl<string>;
@@ -124,6 +125,7 @@ export interface TradingPairModalResult {
   selector: 'app-trading-pair-modal',
   standalone: true,
   imports: [
+    AgentExpiryNoticeComponent,
     ReactiveFormsModule,
     TitleCasePipe,
     CurrencyPipe,

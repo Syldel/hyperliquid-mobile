@@ -1,0 +1,14 @@
+// Abrégée à 29 caractères (voir `shortAddress`) ; si une police plus large
+// la faisait déborder, elle se coupe plutôt que d'élargir la ligne.
+.agent-address {
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-summary {
+  color: var(--ion-color-warning-shade);
+
+  &--danger {
+    color: var(--ion-color-danger);
+  }
+}

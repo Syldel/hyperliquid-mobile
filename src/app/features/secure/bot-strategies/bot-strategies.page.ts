@@ -61,11 +61,13 @@ import {
   pairStrategyStatus,
   type PairStrategyStatus,
 } from './domain/pair-strategy-status.util';
+import { AgentExpiryNoticeComponent } from '@shared/components/agent-expiry-notice/agent-expiry-notice.component';
 
 @Component({
   selector: 'app-bot-strategies',
   standalone: true,
   imports: [
+    AgentExpiryNoticeComponent,
     RefreshableLayoutComponent,
     IonList,
     IonItem,

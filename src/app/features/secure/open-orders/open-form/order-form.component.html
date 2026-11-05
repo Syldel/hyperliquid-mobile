@@ -11,6 +11,8 @@
     </ion-button>
   </ng-template>
 
+  <app-agent-expiry-notice />
+
   @if (marketNotice(); as notice) {
     <div class="market-data-notice">
       <p class="error-message error-message--small error-message--padded">{{ notice }}</p>

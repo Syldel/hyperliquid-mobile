@@ -38,12 +38,14 @@ import { closeOutline, createOutline, trashOutline } from 'ionicons/icons';
 import { of, switchMap } from 'rxjs';
 import { OrderFormComponent } from '../open-form/order-form.component';
 import { describeStuckTriggered, isStuckTriggeredOrder } from '../stuck-triggered-order.util';
+import { AgentExpiryNoticeComponent } from '@shared/components/agent-expiry-notice/agent-expiry-notice.component';
 
 @Component({
   selector: 'app-open-order-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    AgentExpiryNoticeComponent,
     RefreshableLayoutComponent,
     IonButton,
     IonIcon,
