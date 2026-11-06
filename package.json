@@ -24,7 +24,7 @@
     "test:ci": "ng test --watch=false",
     "verify": "npm run typecheck && npm run lint && npm run format:check && npm run test:ci && npm run build",
     "prepare": "husky || true",
-    "postinstall": "npx capacitor-assets generate --android"
+    "postinstall": "npx capacitor-assets generate --android && node scripts/android/generate-android-icons.mjs"
   },
   "private": true,
   "packageManager": "npm@11.12.1",

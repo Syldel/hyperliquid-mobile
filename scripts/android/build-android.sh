@@ -116,6 +116,7 @@ echo ""
 echo "🔧 Starting Android build ($TYPE) with configuration ($CONFIGURATION)..."
 
 npx capacitor-assets generate --android
+node scripts/android/generate-android-icons.mjs
 
 npx ng build --configuration $CONFIGURATION
 
