@@ -1,37 +1,42 @@
 import { TestBed } from '@angular/core/testing';
-import { SecureStoragePlugin } from 'capacitor-secure-storage-plugin';
-import { SecureStorageReadError, SecureStorageService } from './secure.storage.service';
+import {
+  SECURE_STORAGE_PLUGIN,
+  SecureStorageReadError,
+  SecureStorageService,
+} from './secure.storage.service';
 
 /**
  * Le plugin, comme son implémentation web le fait — copié de
  * `node_modules/capacitor-secure-storage-plugin/dist/esm/web.js` : `get` et
  * `remove` **rejettent** quand la clé est absente, `set` et `clear` rendent
  * `{ value: true }`, `keys` rend `{ value: string[] }`.
+ *
+ * Il est fourni au service par le provider `SECURE_STORAGE_PLUGIN` (et non par
+ * `vi.mock`) : le service, le spec et les `vi.spyOn` ci-dessous partagent ainsi
+ * le même objet, quel que soit l'ordre de chargement des modules dans le build.
  */
-const { store } = vi.hoisted(() => ({ store: new Map<string, string>() }));
+const store = new Map<string, string>();
 
-vi.mock('capacitor-secure-storage-plugin', () => ({
-  SecureStoragePlugin: {
-    get: ({ key }: { key: string }) =>
-      store.has(key)
-        ? Promise.resolve({ value: store.get(key) })
-        : Promise.reject('Item with given key does not exist'),
-    set: ({ key, value }: { key: string; value: string }) => {
-      store.set(key, value);
-      return Promise.resolve({ value: true });
-    },
-    remove: ({ key }: { key: string }) => {
-      if (!store.has(key)) return Promise.reject('Item with given key does not exist');
-      store.delete(key);
-      return Promise.resolve({ value: true });
-    },
-    clear: () => {
-      store.clear();
-      return Promise.resolve({ value: true });
-    },
-    keys: () => Promise.resolve({ value: [...store.keys()] }),
+const fakePlugin = {
+  get: ({ key }: { key: string }): Promise<{ value: string }> =>
+    store.has(key)
+      ? Promise.resolve({ value: store.get(key) as string })
+      : Promise.reject('Item with given key does not exist'),
+  set: ({ key, value }: { key: string; value: string }): Promise<{ value: boolean }> => {
+    store.set(key, value);
+    return Promise.resolve({ value: true });
   },
-}));
+  remove: ({ key }: { key: string }): Promise<{ value: boolean }> => {
+    if (!store.has(key)) return Promise.reject('Item with given key does not exist');
+    store.delete(key);
+    return Promise.resolve({ value: true });
+  },
+  clear: (): Promise<{ value: boolean }> => {
+    store.clear();
+    return Promise.resolve({ value: true });
+  },
+  keys: (): Promise<{ value: string[] }> => Promise.resolve({ value: [...store.keys()] }),
+};
 
 /**
  * ============================================================================
@@ -50,6 +55,9 @@ describe('SecureStorageService', () => {
   beforeEach(() => {
     store.clear();
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    TestBed.configureTestingModule({
+      providers: [{ provide: SECURE_STORAGE_PLUGIN, useValue: fakePlugin }],
+    });
     service = TestBed.inject(SecureStorageService);
   });
 
@@ -136,7 +144,7 @@ describe('SecureStorageService', () => {
   describe('when the keychain cannot be read', () => {
     it('throws a named error instead of answering "absent"', async () => {
       await service.set('tokens', { a: 1 });
-      vi.spyOn(SecureStoragePlugin, 'get').mockRejectedValueOnce(new Error('keychain locked'));
+      vi.spyOn(fakePlugin, 'get').mockRejectedValueOnce(new Error('keychain locked'));
 
       const failure = await service.get('tokens').catch((e: unknown) => e);
 
@@ -149,7 +157,7 @@ describe('SecureStorageService', () => {
     // par une version du plugin serait pris pour une absence.
     it('does not take an unfamiliar rejection message for an absence', async () => {
       await service.set('tokens', { a: 1 });
-      vi.spyOn(SecureStoragePlugin, 'get').mockRejectedValueOnce(
+      vi.spyOn(fakePlugin, 'get').mockRejectedValueOnce(
         'Item with given key does not exist (reworded)',
       );
 
@@ -157,13 +165,13 @@ describe('SecureStorageService', () => {
     });
 
     it('throws when the list of keys itself cannot be read', async () => {
-      vi.spyOn(SecureStoragePlugin, 'keys').mockRejectedValueOnce(new Error('denied'));
+      vi.spyOn(fakePlugin, 'keys').mockRejectedValueOnce(new Error('denied'));
 
       await expect(service.get('tokens')).rejects.toBeInstanceOf(SecureStorageReadError);
     });
 
     it('says so in the console as well', async () => {
-      vi.spyOn(SecureStoragePlugin, 'keys').mockRejectedValueOnce(new Error('denied'));
+      vi.spyOn(fakePlugin, 'keys').mockRejectedValueOnce(new Error('denied'));
 
       await service.get('tokens').catch(() => undefined);
 
@@ -171,7 +179,7 @@ describe('SecureStorageService', () => {
     });
 
     it('makes isExist throw rather than answer false', async () => {
-      vi.spyOn(SecureStoragePlugin, 'keys').mockRejectedValueOnce(new Error('denied'));
+      vi.spyOn(fakePlugin, 'keys').mockRejectedValueOnce(new Error('denied'));
 
       await expect(service.isExist('tokens')).rejects.toBeInstanceOf(SecureStorageReadError);
     });
@@ -179,14 +187,14 @@ describe('SecureStorageService', () => {
 
   describe('when the keychain refuses a write', () => {
     it('reports a failed write as false, and says so in the console', async () => {
-      vi.spyOn(SecureStoragePlugin, 'set').mockRejectedValueOnce(new Error('keychain locked'));
+      vi.spyOn(fakePlugin, 'set').mockRejectedValueOnce(new Error('keychain locked'));
 
       expect(await service.set('tokens', { a: 1 })).toBe(false);
       expect(console.error).toHaveBeenCalled();
     });
 
     it('does not report a refused write as a success', async () => {
-      vi.spyOn(SecureStoragePlugin, 'set').mockResolvedValueOnce({ value: false });
+      vi.spyOn(fakePlugin, 'set').mockResolvedValueOnce({ value: false });
 
       expect(await service.set('tokens', { a: 1 })).toBe(false);
     });

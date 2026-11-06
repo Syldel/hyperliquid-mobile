@@ -1,5 +1,32 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable, InjectionToken } from '@angular/core';
 import { SecureStoragePlugin } from 'capacitor-secure-storage-plugin';
+
+/** La partie du plugin de trousseau que le service utilise. */
+export type SecureStoragePluginApi = Pick<
+  typeof SecureStoragePlugin,
+  'get' | 'set' | 'remove' | 'clear' | 'keys'
+>;
+
+/**
+ * Le plugin est injecté plutôt qu'importé en dur : un spec fournit un faux par
+ * `providers`, et le service et le spec manipulent forcément le même objet.
+ */
+export const SECURE_STORAGE_PLUGIN = new InjectionToken<SecureStoragePluginApi>(
+  'SECURE_STORAGE_PLUGIN',
+  {
+    providedIn: 'root',
+    // Objet simple, et non le plugin : celui-ci est un Proxy qui répond à toute
+    // propriété, `ngOnDestroy` compris. Angular l'appellerait à la destruction de
+    // l'injecteur, et le plugin web rejetterait avec UNIMPLEMENTED.
+    factory: () => ({
+      get: (options) => SecureStoragePlugin.get(options),
+      set: (options) => SecureStoragePlugin.set(options),
+      remove: (options) => SecureStoragePlugin.remove(options),
+      clear: () => SecureStoragePlugin.clear(),
+      keys: () => SecureStoragePlugin.keys(),
+    }),
+  },
+);
 
 /**
  * Le trousseau n'a pas pu être lu — distinct d'une clé qui n'existe pas.
@@ -22,7 +49,7 @@ export class SecureStorageReadError extends Error {
 
 @Injectable({ providedIn: 'root' })
 export class SecureStorageService {
-  constructor() {}
+  private readonly plugin = inject(SECURE_STORAGE_PLUGIN);
 
   /**
    * Même contrat que `StorageService.set` : tout est encodé en JSON, chaînes
@@ -44,7 +71,7 @@ export class SecureStorageService {
 
   async clear(): Promise<boolean> {
     try {
-      const result = await SecureStoragePlugin.clear();
+      const result = await this.plugin.clear();
       return result.value;
     } catch (e) {
       console.error('clear() error:', e);
@@ -54,7 +81,7 @@ export class SecureStorageService {
 
   async remove(key: string): Promise<boolean> {
     try {
-      const result = await SecureStoragePlugin.remove({ key });
+      const result = await this.plugin.remove({ key });
       return result.value;
     } catch (e) {
       console.error(`remove(${key}) error:`, e);
@@ -74,10 +101,10 @@ export class SecureStorageService {
   async get<T = unknown>(key: string): Promise<T | null> {
     let rawValue: string | undefined;
     try {
-      const { value: keys } = await SecureStoragePlugin.keys();
+      const { value: keys } = await this.plugin.keys();
       if (!keys.includes(key)) return null;
 
-      rawValue = (await SecureStoragePlugin.get({ key }))?.value;
+      rawValue = (await this.plugin.get({ key }))?.value;
     } catch (e) {
       console.error(`get(${key}) error:`, e);
       throw new SecureStorageReadError(key, e);
@@ -99,7 +126,7 @@ export class SecureStorageService {
     // panne du trousseau, et ne doit pas se faire passer pour un `false`.
     const value = this._stringifyContent(key, data);
     try {
-      const result = await SecureStoragePlugin.set({ key, value });
+      const result = await this.plugin.set({ key, value });
       return result.value;
     } catch (e) {
       console.error(`set(${key}) error:`, e);
@@ -110,7 +137,7 @@ export class SecureStorageService {
   /** `false` pour une clé absente. Lève {@link SecureStorageReadError} si le trousseau est illisible. */
   async isExist(key: string): Promise<boolean> {
     try {
-      const { value: keys } = await SecureStoragePlugin.keys();
+      const { value: keys } = await this.plugin.keys();
       return keys.includes(key);
     } catch (e) {
       throw new SecureStorageReadError(key, e);

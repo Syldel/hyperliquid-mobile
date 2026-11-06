@@ -1,26 +1,28 @@
 import { TestBed } from '@angular/core/testing';
-import { StorageService } from './storage.service';
+import { PREFERENCES, StorageService } from './storage.service';
 
 /**
  * Le plugin Preferences, tel que son implémentation web le fait : un
  * `localStorage` qui **convertit en chaîne** ce qu'on lui donne (`setItem`) et
  * rend `null` pour une clé absente. Copié de
  * `node_modules/@capacitor/preferences/dist/esm/web.js`, pas deviné.
+ *
+ * Il est fourni au service par le provider `PREFERENCES` (et non par `vi.mock`) :
+ * le service et le spec partagent ainsi le même objet, quel que soit l'ordre de
+ * chargement des modules dans le build.
  */
-const { store } = vi.hoisted(() => ({ store: new Map<string, string>() }));
+const store = new Map<string, string>();
 
-vi.mock('@capacitor/preferences', () => ({
-  Preferences: {
-    get: async ({ key }: { key: string }) => ({ value: store.get(key) ?? null }),
-    set: async ({ key, value }: { key: string; value: unknown }) => {
-      store.set(key, String(value));
-    },
-    remove: async ({ key }: { key: string }) => {
-      store.delete(key);
-    },
-    clear: async () => store.clear(),
+const fakePreferences = {
+  get: async ({ key }: { key: string }) => ({ value: store.get(key) ?? null }),
+  set: async ({ key, value }: { key: string; value: unknown }) => {
+    store.set(key, String(value));
   },
-}));
+  remove: async ({ key }: { key: string }) => {
+    store.delete(key);
+  },
+  clear: async () => store.clear(),
+};
 
 /**
  * ============================================================================
@@ -38,6 +40,9 @@ describe('StorageService', () => {
 
   beforeEach(() => {
     store.clear();
+    TestBed.configureTestingModule({
+      providers: [{ provide: PREFERENCES, useValue: fakePreferences }],
+    });
     service = TestBed.inject(StorageService);
   });
 

@@ -1,8 +1,31 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable, InjectionToken } from '@angular/core';
 import { Preferences } from '@capacitor/preferences';
+
+/** La partie du plugin Preferences que le service utilise. */
+export type PreferencesApi = Pick<typeof Preferences, 'get' | 'set' | 'remove' | 'clear'>;
+
+/**
+ * Le plugin est injecté plutôt qu'importé en dur : un spec fournit un faux par
+ * `providers`, et le service et le spec manipulent forcément le même objet,
+ * quel que soit l'ordre de chargement des modules ou l'état du cache du builder.
+ */
+export const PREFERENCES = new InjectionToken<PreferencesApi>('PREFERENCES', {
+  providedIn: 'root',
+  // Objet simple, et non le plugin : celui-ci est un Proxy qui répond à toute
+  // propriété, `ngOnDestroy` compris. Angular l'appellerait à la destruction de
+  // l'injecteur, et le plugin web rejetterait avec UNIMPLEMENTED.
+  factory: () => ({
+    get: (options) => Preferences.get(options),
+    set: (options) => Preferences.set(options),
+    remove: (options) => Preferences.remove(options),
+    clear: () => Preferences.clear(),
+  }),
+});
 
 @Injectable({ providedIn: 'root' })
 export class StorageService {
+  private readonly prefs = inject(PREFERENCES);
+
   /**
    * Stocke une valeur, **toujours encodée en JSON** — chaînes comprises.
    *
@@ -28,12 +51,12 @@ export class StorageService {
         `StorageService.set("${key}"): refusing to store a value with no JSON form (${typeof value}). Use null to clear, or remove().`,
       );
     }
-    await Preferences.set({ key, value: encoded });
+    await this.prefs.set({ key, value: encoded });
   }
 
   /** Récupère une valeur, si c'était un objet, on parse automatiquement */
   async get<T = unknown>(key: string): Promise<T | null> {
-    const { value } = await Preferences.get({ key });
+    const { value } = await this.prefs.get({ key });
     if (!value) return null;
 
     try {
@@ -44,10 +67,10 @@ export class StorageService {
   }
 
   async remove(key: string): Promise<void> {
-    await Preferences.remove({ key });
+    await this.prefs.remove({ key });
   }
 
   async clear(): Promise<void> {
-    await Preferences.clear();
+    await this.prefs.clear();
   }
 }
