@@ -45,7 +45,7 @@ import {
   HLTif,
   hlPerpDexOf,
 } from '@syldel/hl-shared-types';
-import { exchangeRefusal, extractErrorMessage } from '@utils/hl-error.utils';
+import { exchangeRefusal, extractErrorMessage, modifyRefusal } from '@utils/hl-error.utils';
 import { roundPrice, roundSize } from '@utils/hl-rounding.utils';
 import {
   buildProtectiveOrderDetails,
@@ -923,20 +923,23 @@ export class OrderFormComponent implements OnInit {
         this.submitting.set(false);
 
         if (this.isModify()) {
-          // La réponse de modifyOrder ne contient pas forcément data.statuses:
-          // status: 'ok' suffit à confirmer le succès de la modification.
-          if (res?.status === 'ok') {
+          // Un `ok` sans `data.statuses` reste un succès (la réponse d'un
+          // `modify` n'en porte pas forcément). Mais un `ok` peut aussi porter
+          // un refus par ordre, `statuses[0].error` : c'est la forme mesurée le
+          // 2026-11-09 pour le même refus dans un lot (`modifyRefusal`).
+          const refusal = modifyRefusal(res);
+          if (refusal === null && res?.status === 'ok') {
             this.presentToast('Order updated', 'success');
             this.availableCapitalService.invalidate();
             this.modalCtrl.dismiss(null, 'confirm');
           } else {
-            // Mesuré le 2026-10-27 : un `modify` refusé peut avoir **annulé**
-            // l'ordre d'origine (« Error placing new order during modify »).
-            // Pas toujours (un agent inconnu est refusé avant tout) : on le
-            // dit comme une possibilité, à vérifier.
-            const refusal = exchangeRefusal(res) ?? 'Failed to update order: unexpected reply.';
+            // Mesuré le 2026-10-27 et le 2026-11-09 : un `modify` refusé a
+            // **annulé** l'ordre d'origine (« Error placing new order during
+            // modify »), pour un croisement comme pour un montant sous le
+            // minimum. Pas toujours (un agent inconnu est refusé avant tout) :
+            // on le dit comme une possibilité, à vérifier.
             this.error.set(
-              `${refusal} Check the open orders: the original may have been cancelled.`,
+              `${refusal ?? 'Failed to update order: unexpected reply.'} Check the open orders: the original may have been cancelled.`,
             );
             this.availableCapitalService.invalidate();
           }

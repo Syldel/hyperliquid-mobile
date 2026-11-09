@@ -51,3 +51,28 @@ export function exchangeRefusal(reply: unknown): string | null {
       : JSON.stringify(envelope.response ?? null);
   return `Refused by Hyperliquid: ${text}`;
 }
+
+/**
+ * Le refus d'un `modify`, quel que soit le niveau où l'exchange le range.
+ *
+ * Mesuré sur le mainnet : un `modify` seul refusé répond par un refus d'ensemble (`status: 'err'`,
+ * 2026-10-27 et 2026-11-09), mais le MÊME refus, dans un `batchModify`, arrive dans une réponse
+ * `ok`, en `statuses[i].error` (2026-11-09). Cette seconde forme n'a jamais été vue pour un
+ * `modify` seul ; rien ne garantit qu'elle n'y arrivera pas. Un écran qui ne lit que
+ * `status === 'ok'` l'annoncerait « Order updated », alors que dans chaque cas mesuré l'ordre
+ * visé n'existait plus après le refus.
+ *
+ * Rend le message à afficher, ou `null` si la réponse ne porte aucun refus.
+ */
+export function modifyRefusal(reply: unknown): string | null {
+  const whole = exchangeRefusal(reply);
+  if (whole !== null) return whole;
+
+  const envelope = reply as { response?: { data?: { statuses?: unknown } } } | null | undefined;
+  const statuses = envelope?.response?.data?.statuses;
+  const first: unknown = Array.isArray(statuses) ? statuses[0] : undefined;
+  const error =
+    first !== null && typeof first === 'object' ? (first as { error?: unknown }).error : undefined;
+  if (error === undefined || error === null || error === '') return null;
+  return `Refused by Hyperliquid: ${typeof error === 'string' ? error : JSON.stringify(error)}`;
+}

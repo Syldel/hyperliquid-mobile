@@ -709,5 +709,52 @@ describe('OrderFormComponent — price wiring', () => {
       expect(form.error()).toContain('Refused by Hyperliquid: User or API Wallet');
       expect(form.error()).toContain('the original may have been cancelled');
     });
+
+    /**
+     * Un `ok` qui porte un refus par ordre : la forme mesurée le 2026-11-09 pour le même refus dans un
+     * `batchModify`. Jamais vue pour un `modify` seul, mais l'annoncer « Order updated » serait le pire
+     * des deux affichages : dans chaque cas mesuré, l'ordre visé n'existait plus.
+     */
+    it('does not call an accepted envelope carrying a refusal an update', () => {
+      create(
+        (component) =>
+          (component.existingOrder = {
+            oid: 1,
+            coin: 'BTC',
+            side: 'B',
+            limitPx: '80000',
+            sz: '0.001',
+            reduceOnly: false,
+            isTrigger: false,
+            orderType: 'Limit',
+          } as unknown as HLFrontendOpenOrder),
+      );
+      const dismiss = vi.fn();
+      (form as unknown as { modalCtrl: { dismiss: unknown } }).modalCtrl.dismiss = dismiss;
+      gateway()['modifyOrder'] = vi.fn(() =>
+        of({
+          status: 'ok',
+          response: {
+            type: 'order',
+            data: {
+              statuses: [
+                {
+                  error:
+                    'Error placing new order during modify: Post only order would have immediately matched, bbo was 74940@74941.',
+                },
+              ],
+            },
+          },
+        }),
+      );
+
+      form.submit();
+
+      expect(form.error()).toContain(
+        'Refused by Hyperliquid: Error placing new order during modify',
+      );
+      expect(form.error()).toContain('the original may have been cancelled');
+      expect(dismiss).not.toHaveBeenCalled();
+    });
   });
 });

@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { exchangeRefusal, extractErrorMessage } from './hl-error.utils';
+import { exchangeRefusal, extractErrorMessage, modifyRefusal } from './hl-error.utils';
 
 /**
  * ============================================================================
@@ -87,5 +87,51 @@ describe('exchangeRefusal', () => {
 
   it.each([null, undefined, 'err', 42])('ignores a reply that is not an envelope (%p)', (reply) => {
     expect(exchangeRefusal(reply)).toBeNull();
+  });
+});
+
+describe('modifyRefusal', () => {
+  // Les textes et les formes viennent des mesures du 2026-10-27 et du 2026-11-09 (mainnet).
+  const crossing =
+    'Error placing new order during modify: Post only order would have immediately matched, bbo was 74940@74941.';
+
+  it('names a single modify refused as a whole, as measured', () => {
+    expect(
+      modifyRefusal({
+        status: 'err',
+        response: 'Error placing new order during modify: Order must have minimum value of $10.',
+      }),
+    ).toBe(
+      'Refused by Hyperliquid: Error placing new order during modify: Order must have minimum value of $10.',
+    );
+  });
+
+  // La forme du même refus dans un `batchModify` : un `ok` qui n'est pas un succès.
+  it('names a refusal carried by an accepted envelope, in its first status', () => {
+    expect(
+      modifyRefusal({
+        status: 'ok',
+        response: { type: 'order', data: { statuses: [{ error: crossing }] } },
+      }),
+    ).toBe(`Refused by Hyperliquid: ${crossing}`);
+  });
+
+  it('writes a refusal that is not text as it came', () => {
+    expect(
+      modifyRefusal({ status: 'ok', response: { data: { statuses: [{ error: { code: 7 } }] } } }),
+    ).toBe('Refused by Hyperliquid: {"code":7}');
+  });
+
+  it.each([
+    ['an ok with no statuses', { status: 'ok', response: { type: 'default' } }],
+    [
+      'a resting order',
+      { status: 'ok', response: { data: { statuses: [{ resting: { oid: 1 } }] } } },
+    ],
+    ['a plain string status', { status: 'ok', response: { data: { statuses: ['success'] } } }],
+    ['an empty error', { status: 'ok', response: { data: { statuses: [{ error: '' }] } } }],
+    ['no reply', null],
+  ])('finds no refusal in %s', (_label, reply) => {
+    expect(modifyRefusal(reply)).toBeNull();
   });
 });
