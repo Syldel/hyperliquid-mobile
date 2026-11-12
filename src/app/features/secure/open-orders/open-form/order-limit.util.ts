@@ -103,9 +103,45 @@ export function orderPricesReady(input: {
 /**
  * Le minimum d'Hyperliquid pour la valeur d'un ordre, en dollars. Le texte du refus le nomme :
  * « Order must have minimum value of $10 » (mesuré le 2026-11-12). Une fermeture qui SOLDE la
- * position y échappe (mesuré le même jour sur un IOC de 0,71 $), pas une fermeture partielle.
+ * position y échappe (mesuré le même jour, IOC et limite : `isBelowOrderMinimum`), pas une
+ * fermeture partielle.
  */
 export const MIN_ORDER_VALUE_USD = 10;
+
+/**
+ * L'ordre est sous le minimum de 10 $, et Hyperliquid le refusera.
+ *
+ * Exception : un ordre reduce-only, limite ou au marché, qui ferme EXACTEMENT toute la position.
+ * Hyperliquid l'accepte sous 10 $, mesuré le 2026-11-12 deux fois depuis le mobile :
+ * - un IOC de 0,00001 BTC (0,71 $), rempli (603233856328) ;
+ * - un ordre limite ALO de 0,00013 BTC (9,28 $), resté `open` au carnet 5,6 s, puis rempli en
+ *   maker (603249193381).
+ * Une fermeture PARTIELLE sous 10 $ est refusée (2,2 $ et 9,29 $, voir `partialCloseRefusal`).
+ *
+ * Un déclencheur (TP/SL) n'en profite pas : qu'un stop qui vaut moins de 10 $ à son déclencheur
+ * s'exécute n'est pas mesuré.
+ *
+ * `position` : la position lue sur la paire, ou `null`. Si elle a changé depuis, l'ordre n'est plus
+ * une fermeture totale et le serveur le refuse : un refus visible, pas un ordre faux.
+ */
+export function isBelowOrderMinimum(input: {
+  usd: number | null;
+  orderKind: OrderKind;
+  reduceOnly: boolean;
+  isBuy: boolean;
+  sz: number;
+  position: { isBuy: boolean; sz: number } | null;
+}): boolean {
+  const { usd, orderKind, reduceOnly, isBuy, sz, position } = input;
+  if (usd === null || usd >= MIN_ORDER_VALUE_USD) return false;
+  const closesWholePosition =
+    orderKind !== 'trigger' &&
+    reduceOnly &&
+    position !== null &&
+    position.isBuy !== isBuy &&
+    Math.abs(sz - position.sz) <= 1e-12;
+  return !closesWholePosition;
+}
 
 /**
  * Le prix auquel la valeur d'un ordre se compare à `MIN_ORDER_VALUE_USD`.

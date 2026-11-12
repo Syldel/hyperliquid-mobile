@@ -4,6 +4,7 @@ import {
   stopLimitSpread,
   STOP_LIMIT_TIGHT_BELOW,
   limitFromTrigger,
+  isBelowOrderMinimum,
   isPositivePrice,
   orderPricesReady,
   notionalPrice,
@@ -272,5 +273,54 @@ describe('notionalPrice', () => {
 
   it('has no price when nothing is known', () => {
     expect(notionalPrice({ ...base, triggerPx: '', currentPrice: null })).toBeNull();
+  });
+});
+
+describe('isBelowOrderMinimum', () => {
+  // La fermeture mesurée le 2026-11-12 : vente reduce-only de 0,00013 BTC (9,28 $) sur un long de
+  // 0,00013, acceptée au carnet puis remplie.
+  const fullClose = {
+    usd: 9.28,
+    orderKind: 'limit' as const,
+    reduceOnly: true,
+    isBuy: false,
+    sz: 0.00013,
+    position: { isBuy: true, sz: 0.00013 },
+  };
+
+  it('lets 10 $ and more through', () => {
+    expect(isBelowOrderMinimum({ ...fullClose, usd: 10, reduceOnly: false })).toBe(false);
+  });
+
+  it('blocks an ordinary order under 10 $', () => {
+    expect(isBelowOrderMinimum({ ...fullClose, reduceOnly: false, position: null })).toBe(true);
+  });
+
+  it('lets a reduce-only close of the whole position through, limit or market', () => {
+    expect(isBelowOrderMinimum(fullClose)).toBe(false);
+    expect(isBelowOrderMinimum({ ...fullClose, orderKind: 'market' })).toBe(false);
+  });
+
+  // Mesuré : une fermeture partielle sous 10 $ est refusée (2,2 $ et 9,29 $).
+  it('blocks a partial reduce-only close under 10 $', () => {
+    expect(isBelowOrderMinimum({ ...fullClose, sz: 0.0001 })).toBe(true);
+  });
+
+  it('blocks a full-size order that is not reduce-only, or on the side of the position', () => {
+    expect(isBelowOrderMinimum({ ...fullClose, reduceOnly: false })).toBe(true);
+    expect(isBelowOrderMinimum({ ...fullClose, isBuy: true })).toBe(true);
+  });
+
+  // Non mesuré : l'exécution d'un stop qui vaut moins de 10 $ à son déclencheur.
+  it('keeps blocking a trigger under 10 $, even on the whole position', () => {
+    expect(isBelowOrderMinimum({ ...fullClose, orderKind: 'trigger' })).toBe(true);
+  });
+
+  it('blocks when the position is unknown: no exemption on a guess', () => {
+    expect(isBelowOrderMinimum({ ...fullClose, position: null })).toBe(true);
+  });
+
+  it('says nothing without a value', () => {
+    expect(isBelowOrderMinimum({ ...fullClose, usd: null })).toBe(false);
   });
 });

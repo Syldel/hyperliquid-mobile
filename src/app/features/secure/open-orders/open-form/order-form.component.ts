@@ -87,6 +87,7 @@ import {
   type MarketMetaState,
 } from './market-meta-state.util';
 import {
+  isBelowOrderMinimum,
   isLimitOnWrongSide,
   isStopLimitTight,
   limitFromTrigger,
@@ -314,10 +315,17 @@ export class OrderFormComponent implements OnInit {
     if (!sz || isNaN(sz) || !price) return null;
     return sz * price;
   });
-  isSizeInvalid = computed(() => {
-    const usd = this.sizeUsd();
-    return usd !== null && usd < MIN_ORDER_VALUE_USD;
-  });
+  /** Sous 10 $, sauf une fermeture reduce-only de toute la position (`isBelowOrderMinimum`). */
+  isSizeInvalid = computed(() =>
+    isBelowOrderMinimum({
+      usd: this.sizeUsd(),
+      orderKind: this.orderKind(),
+      reduceOnly: this.reduceOnly(),
+      isBuy: this.isBuy(),
+      sz: parseFloat(this.sz()),
+      position: this.heldPosition(),
+    }),
+  );
   sizeUsdClass = computed(() => (this.isSizeInvalid() ? 'diff--danger' : ''));
 
   /** Les prix que l'ordre exige sont des nombres : sinon `"NaN"` partirait au serveur. */

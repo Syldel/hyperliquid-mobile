@@ -1029,6 +1029,15 @@ Profit Limit"`, `triggerCondition: "Price above 81959"`.
     Loss à 2 % : exécution à 72 969 (12:51:33.072), stop posé **0,89 s** plus tard sur 0,00015 (la
     taille remplie), déclencheur 71 510 = 72 969 × 0,98 — ancré sur le prix moyen obtenu.
 
+11. **✅ Une fermeture LIMITE de toute la position sous 10 $ : acceptée, et exécutée.** Mesuré le
+    2026-11-12 depuis le mobile (`Close › Limit`, le blocage du formulaire levé dans le worktree le
+    temps d'un envoi) : position 0,00013 BTC, vente reduce-only **ALO** de 0,00013 à 71 422
+    (≈ 9,28 $, 603249193381), `open` au carnet à 22:47:53.482 UTC, `filled` en maker à
+    22:47:59.073. Avec le point 8 : Hyperliquid exempte du minimum un ordre qui **solde** la
+    position, IOC comme limite, pas une fermeture partielle. Le formulaire bloquait ce cas ; il le
+    laisse passer depuis (`isBelowOrderMinimum`). ⚠️ Pas mesuré pour un déclencheur, qui reste
+    bloqué.
+
 ## Précédent
 
 Le dernier risque refermé — une expression malformée faisant rejeter toute la requête

@@ -125,17 +125,17 @@ clair, 8,68:1 et 6,0:1 en sombre.
 Hyperliquid refuse un ordre de moins de 10 $ (« Order must have minimum value of $10 »,
 `minTradeNtlRejected`). Une seule constante, `MIN_ORDER_VALUE_USD` (`open-form/order-limit.util.ts`).
 
-| Où                   | Ce que l'app fait                                                                                                                            | Mesuré                                                                               |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| formulaire           | bloque sous 10 $ ; un limite se juge à son prix, un ordre au marché au mid, un déclencheur au marché à son **déclencheur** (`notionalPrice`) | un stop de 9,01 $ à sa borne et 10,01 $ à son déclencheur s'est déclenché et exécuté |
-| feuille de fermeture | bloque une fermeture **partielle** sous 10 $ (`partialCloseRefusal`)                                                                         | refusée à 2,2 $ et à 9,29 $, même reduce-only                                        |
-| feuille de fermeture | laisse passer une fermeture **à 100 %**, quelle que soit sa valeur                                                                           | acceptée à 0,71 $ (IOC)                                                              |
+| Où                   | Ce que l'app fait                                                                                                                                           | Mesuré                                                                               |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| formulaire           | bloque sous 10 $ ; un limite se juge à son prix, un ordre au marché au mid, un déclencheur au marché à son **déclencheur** (`notionalPrice`)                | un stop de 9,01 $ à sa borne et 10,01 $ à son déclencheur s'est déclenché et exécuté |
+| formulaire           | laisse passer un ordre reduce-only, limite ou au marché, qui ferme **exactement toute la position** (`isBelowOrderMinimum`) : c'est `Close › Limit` à 100 % | un limite ALO de 9,28 $ accepté au carnet, puis rempli en maker 5,6 s plus tard      |
+| feuille de fermeture | bloque une fermeture **partielle** sous 10 $ (`partialCloseRefusal`)                                                                                        | refusée à 2,2 $ et à 9,29 $, même reduce-only                                        |
+| feuille de fermeture | laisse passer une fermeture **à 100 %**, quelle que soit sa valeur                                                                                          | acceptée à 0,71 $ (IOC)                                                              |
 
-⚠️ **Écart connu : `Close › Limit` à 100 % sous 10 $ est bloqué.** Le formulaire applique son
-contrôle à la taille préréglée de toute la position, alors qu'une fermeture totale échappe au
-minimum. Laissé ainsi à dessein (2026-11-12) : l'acceptation n'est mesurée que pour un **IOC**,
-pas pour un ordre limite reduce-only qui attend au carnet, et `Close › Market` couvre ce besoin.
-À rouvrir après une mesure.
+Un **déclencheur** (TP/SL) sur toute la position reste bloqué sous 10 $ : son exécution sous 10 $ à
+son déclencheur n'est pas mesurée. ⚠️ L'exemption se fonde sur la position lue au choix de la
+paire ; si elle a changé depuis, l'ordre n'est plus une fermeture totale et Hyperliquid le refuse,
+un refus visible.
 
 ## La fermeture depuis la carte d'une position
 
@@ -152,12 +152,13 @@ Mesuré le 2026-11-12 par l'utilisateur (l'agent ne passe jamais d'ordre) :
 - l'annulation des stops de taille fixe à la milliseconde d'une fermeture totale, trois fois (BTC
   long deux fois, ETH short une fois, par `Close › Market` à 100 %) ;
 - le refus d'une fermeture partielle reduce-only **à 2,2 $ et à 9,29 $** (« Order must have minimum
-  value of $10 »), et l'acceptation d'une fermeture **à 100 %** d'une position de 0,71 $ ;
+  value of $10 »), et l'acceptation d'une fermeture **à 100 %** d'une position sous 10 $, par
+  un IOC (0,71 $) comme par un limite qui attend au carnet (9,28 $, rempli en maker) ;
 - l'acceptation **à la pose** d'un Stop Market qui vaut 9,65 $ à sa borne, puis le
   **déclenchement et l'exécution** d'un autre qui vaut 9,01 $ à sa borne et 10,01 $ à son
   déclencheur.
 
-Voir [roadmap.md](roadmap.md#à-éprouver-en-réel--ce-quaucun-double-ne-peut-établir), points 7 à 10.
+Voir [roadmap.md](roadmap.md#à-éprouver-en-réel--ce-quaucun-double-ne-peut-établir), points 7 à 11.
 
 ⚠️ Reste ouvert :
 

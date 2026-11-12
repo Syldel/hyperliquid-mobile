@@ -403,5 +403,22 @@ describe('OrderFormComponent — market order', () => {
       form.isBuy.set(true);
       expect(form.closeLabel()).toBeNull();
     });
+
+    // Mesuré le 2026-11-12 : un limite reduce-only de 9,28 $ qui soldait la position a été accepté
+    // au carnet puis rempli. Le formulaire le bloquait.
+    it('lets a full close under 10 $ through, but not a partial one', () => {
+      heldPositions = [{ position: { coin: 'BTC', szi: '0.00011', entryPx: '72000' } }];
+      create((component) => {
+        component.closePreset = { coin: 'BTC', isBuy: false, sz: '0.00011' };
+      });
+      form.currentPrice.set(72000);
+      form.limitPx.set('72100'); // 0,00011 × 72 100 ≈ 7,93 $.
+      settle();
+      expect(form.isSizeInvalid()).toBe(false);
+
+      form.sz.set('0.0001');
+      settle();
+      expect(form.isSizeInvalid()).toBe(true);
+    });
   });
 });
