@@ -41,9 +41,9 @@ export function protectiveOrdersOf(
  *   (mesuré par le gateway le 2026-10-27, `position-level-orders.md`) ;
  * - un TP/SL de taille fixe « ne se redimensionne pas » (`take-profit-and-stop-loss-orders-tp-sl.md`) ;
  * - une fermeture totale laisse des reduce-only qui ne réduisent plus rien : statut
- *   `reduceOnlyCanceled` (`info-endpoint.md`). **Mesuré le 2026-11-12, deux fois sur deux**, pour
- *   des stops de taille fixe sur BTC : à la même milliseconde que l'exécution de la fermeture (oids
- *   602705157250 et 602706369092). ⚠️ Pas mesuré pour un TP/SL « de position » : sa phrase dit
+ *   `reduceOnlyCanceled` (`info-endpoint.md`). **Mesuré le 2026-11-12, trois fois sur trois**, pour
+ *   des stops de taille fixe (BTC long, ETH short) : à la même milliseconde que l'exécution de la
+ *   fermeture (oids 602705157250, 602706369092, 602789574942). ⚠️ Pas mesuré pour un TP/SL « de position » : sa phrase dit
  *   « should », pas « cancels ».
  */
 export function describeProtectiveAfterClose(

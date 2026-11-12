@@ -125,7 +125,8 @@ clôture, taille de la position, reduce-only), bouton « Close long » / « Clos
 Mesuré le 2026-11-12 par l'utilisateur (l'agent ne passe jamais d'ordre) :
 
 - l'achat au marché, et les protections posées 0,89 s après l'exécution sur le prix moyen obtenu ;
-- l'annulation des stops de taille fixe à la milliseconde d'une fermeture totale, deux fois ;
+- l'annulation des stops de taille fixe à la milliseconde d'une fermeture totale, trois fois (BTC
+  long deux fois, ETH short une fois, par `Close › Market` à 100 %) ;
 - le refus d'une fermeture partielle reduce-only **à 2,2 $** (un point) ;
 - l'acceptation **à la pose** d'un Stop Market qui vaut 9,65 $ à sa borne.
 

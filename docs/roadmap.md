@@ -978,11 +978,14 @@ Profit Limit"`, `triggerCondition: "Price above 81959"`.
    forme `filled: { totalSz < taille demandée }` ; toute autre forme tombe en état inconnu, jamais
    en succès (`market-fill.util.ts`). La mesure : un ordre plus gros que le premier niveau du
    carnet, avec un glissement très faible.
-7. **✅ Le délai de `reduceOnlyCanceled` après une fermeture totale : aucun, deux fois sur deux.**
-   Mesuré le 2026-11-12 sur BTC (0,00015), avec des stops de **taille fixe** : le stop passe
-   `reduceOnlyCanceled` **à la même milliseconde** que l'exécution de la fermeture (stop limite
-   602705157250 à 12:50:37.020 UTC, stop au marché 602706369092 à 12:52:20.339). La feuille de
-   fermeture dit « cancels it at once » pour eux. ⚠️ Pas mesuré pour un TP/SL « de position » : sa
+7. **✅ Le délai de `reduceOnlyCanceled` après une fermeture totale : aucun, trois fois sur trois.**
+   Mesuré le 2026-11-12, avec des stops de **taille fixe** : le stop passe `reduceOnlyCanceled` **à
+   la même milliseconde** que l'exécution de la fermeture. Sur BTC (0,00015, long) : stop limite
+   602705157250 à 12:50:37.020 UTC, stop au marché 602706369092 à 12:52:20.339. Sur ETH (0,0343,
+   **short**, le stop est un achat) : Stop Market 602789574942 à 21:57:32.974, fermé par
+   `Close › Market` à 100 % depuis le mobile (IOC reduce-only 603225380721, plafond 2 037,4 =
+   mid + 1 %, exécuté en une fois à 2 017,3, frais 0,031137 $ = 0,045 % du notionnel, le taux
+   affiché). La feuille de fermeture dit « cancels it at once » pour eux. ⚠️ Pas mesuré pour un TP/SL « de position » : sa
    phrase dit « should cancel it ».
 8. **⚠️ Une fermeture partielle sous 10 $ : refusée à 2,2 $, seuil non mesuré.** Mesuré le
    2026-11-12, **un seul point** : un IOC reduce-only de 0,00003 BTC (≈ 2,2 $) a fini
