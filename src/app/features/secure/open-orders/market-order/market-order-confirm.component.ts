@@ -22,6 +22,7 @@ import {
   ModalController,
 } from '@ionic/angular/standalone';
 import type { HlActiveAssetLeverage } from '@syldel/hl-shared-types';
+import type { PositionEffect } from '../open-form/order-guards.util';
 import { extractErrorMessage } from '@utils/hl-error.utils';
 import { addIcons } from 'ionicons';
 import { closeOutline } from 'ionicons/icons';
@@ -105,6 +106,11 @@ export class MarketOrderConfirmComponent implements OnInit {
   readonly leverage = input<HlActiveAssetLeverage | null>(null);
   /** `null` : on ne sait pas s'il y a déjà une position sur la paire. */
   readonly hasPosition = input<boolean | null>(null);
+  /**
+   * Ce que l'ordre fait à la position ouverte (`positionEffect`, G2) : le bouton dit « Long », et un
+   * achat qui RÉDUIT un short n'en ouvre pas un. `null` : rien à dire, ou position inconnue.
+   */
+  readonly positionEffect = input<PositionEffect | null>(null);
 
   readonly reading = signal<SnapshotReading | null>(null);
   readonly loading = signal(false);

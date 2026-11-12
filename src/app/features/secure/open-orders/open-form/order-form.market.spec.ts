@@ -183,6 +183,39 @@ describe('OrderFormComponent — market order', () => {
     expect(dismiss).toHaveBeenCalledWith(null, 'confirm');
   });
 
+  // Le bouton dit « Long » ; un achat contre un short le réduit ou le retourne, et la confirmation
+  // le dit, d'après la position relue au moment de confirmer.
+  it('tells the confirmation what the order does to the position re-read at that moment', async () => {
+    startMarketBuy(false);
+    readPositionSize.mockReturnValue(of(-0.00005));
+    confirmRole = 'cancel';
+
+    form.submit();
+    await flush();
+
+    const props = modalCreate.mock.calls[0][0].componentProps;
+    expect(props.positionEffect()).toEqual({
+      kind: 'flips',
+      text: "Closes your short 0.00005 AND opens a long 0.00006. To close only, use the position's Close buttons.",
+    });
+    expect(props.hasPosition()).toBe(true);
+  });
+
+  it('tells the confirmation nothing when there is no position, or when it could not be read', async () => {
+    startMarketBuy(false);
+    confirmRole = 'cancel';
+    form.submit();
+    await flush();
+    expect(modalCreate.mock.calls[0][0].componentProps.positionEffect()).toBeNull();
+
+    readPositionSize.mockReturnValue(throwError(() => new Error('down')));
+    form.submit();
+    await flush();
+    const props = modalCreate.mock.calls[1][0].componentProps;
+    expect(props.positionEffect()).toBeNull();
+    expect(props.hasPosition()).toBeNull();
+  });
+
   it('sends nothing when the confirmation is cancelled', async () => {
     startMarketBuy(false);
     confirmRole = 'cancel';

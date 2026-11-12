@@ -15,6 +15,15 @@
     {{ sz() }} {{ coinTitle() || coin() }}
     <span class="muted">· market (IOC){{ reduceOnly() ? ' · reduce only' : '' }}</span>
   </p>
+  @if (positionEffect(); as effect) {
+    <p
+      class="effect"
+      [class.effect--warning]="effect.kind === 'flips'"
+      [attr.role]="effect.kind === 'flips' ? 'alert' : null"
+    >
+      {{ effect.text }}
+    </p>
+  }
 
   @if (loading() && !snapshot()) {
     <div class="loading">

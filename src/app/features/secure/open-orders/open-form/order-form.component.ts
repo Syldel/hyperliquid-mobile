@@ -1255,12 +1255,23 @@ export class OrderFormComponent implements OnInit {
     const reduceOnly = this.reduceOnly();
     const actionLabel = this.sideLabel(isBuy);
 
-    // Y a-t-il déjà une position ? Seul le prix de liquidation en dépend (« not estimated » sinon).
-    const hasPosition = await new Promise<boolean | null>((resolve) => {
+    // La position, relue au moment de confirmer : le prix de liquidation en dépend (« not
+    // estimated » s'il y en a une), et la confirmation dit ce que l'ordre lui fera (G2). Relue ici
+    // plutôt que prise de `heldPosition`, lue au choix de la paire : elle a pu changer depuis.
+    // `undefined` : la lecture a échoué.
+    const szi = await new Promise<number | null | undefined>((resolve) => {
       this.marketOrders.readPositionSize(coin).subscribe({
-        next: (szi) => resolve(szi !== null),
-        error: () => resolve(null),
+        next: (value) => resolve(value),
+        error: () => resolve(undefined),
       });
+    });
+    const hasPosition = szi === undefined ? null : szi !== null;
+    const effect = positionEffect({
+      position: szi ? { isBuy: szi > 0, sz: Math.abs(szi) } : null,
+      isBuy,
+      sz: parseFloat(sz),
+      reduceOnly,
+      usesBuySell: this.usesBuySell(),
     });
 
     const modal = await this.modalCtrl.create({
@@ -1276,6 +1287,7 @@ export class OrderFormComponent implements OnInit {
         actionLabel: () => actionLabel,
         leverage: () => this.leverage(),
         hasPosition: () => hasPosition,
+        positionEffect: () => effect,
       },
       breakpoints: [0, 1],
       initialBreakpoint: 1,

@@ -7,6 +7,19 @@
   font-size: 15px;
 }
 
+/* Ce que l'ordre fait à la position : en gris s'il la réduit ou la ferme, dans le jaune « texte »
+   s'il la retourne — les tons des garde-fous du formulaire. */
+.effect {
+  margin: -6px 0 12px;
+  font-size: 14px;
+  color: var(--ion-color-medium);
+}
+
+.effect--warning {
+  color: var(--ion-color-warning-shade);
+  font-weight: 500;
+}
+
 .side--buy {
   color: var(--ion-color-success);
 }
