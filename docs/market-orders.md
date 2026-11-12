@@ -127,8 +127,11 @@ Mesuré le 2026-11-12 par l'utilisateur (l'agent ne passe jamais d'ordre) :
 - l'achat au marché, et les protections posées 0,89 s après l'exécution sur le prix moyen obtenu ;
 - l'annulation des stops de taille fixe à la milliseconde d'une fermeture totale, trois fois (BTC
   long deux fois, ETH short une fois, par `Close › Market` à 100 %) ;
-- le refus d'une fermeture partielle reduce-only **à 2,2 $** (un point) ;
-- l'acceptation **à la pose** d'un Stop Market qui vaut 9,65 $ à sa borne.
+- le refus d'une fermeture partielle reduce-only **à 2,2 $** (un point), et l'acceptation d'une
+  fermeture **à 100 %** d'une position de 0,71 $ ;
+- l'acceptation **à la pose** d'un Stop Market qui vaut 9,65 $ à sa borne, puis le
+  **déclenchement et l'exécution** d'un autre qui vaut 9,01 $ à sa borne et 10,01 $ à son
+  déclencheur.
 
 Voir [roadmap.md](roadmap.md#à-éprouver-en-réel--ce-quaucun-double-ne-peut-établir), points 7 à 10.
 
@@ -137,8 +140,7 @@ Voir [roadmap.md](roadmap.md#à-éprouver-en-réel--ce-quaucun-double-ne-peut-é
 - la forme d'un IOC rempli en partie (point 6) ;
 - le seuil d'une fermeture partielle entre 2,2 et 10 $ : le blocage à 10 $ est une supposition
   (point 8) ;
-- la fermeture à 100 % d'une position qui vaut déjà moins de 10 $ ;
-- l'exécution, **au déclenchement**, d'un stop au marché qui vaut moins de 10 $ à sa borne
-  (point 9) : s'il est refusé alors, `notionalPrice` laisse poser un stop qui ne protège pas ;
+- un stop au marché sous 10 $ **à son déclencheur** (le formulaire le bloque) et un stop exécuté
+  sous 10 $ de valeur après un gap (point 9) ;
 - l'annulation d'un TP/SL « de position » par une fermeture totale ;
 - les frais sur la marge isolée.

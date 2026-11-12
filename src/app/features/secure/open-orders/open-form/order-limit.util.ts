@@ -109,11 +109,11 @@ export function orderPricesReady(input: {
  * « 9,69 $ » et bouton désactivé ; un stop de même taille, posé après une exécution au marché
  * (déclencheur 71 510, borne 64 360, 9,65 $), a été ACCEPTÉ à la pose (oid 602706369092).
  *
- * ⚠️ Mesuré : l'acceptation à la POSE. Pas mesuré : qu'un tel stop s'exécute au déclenchement. Si
- * Hyperliquid y contrôle le minimum sur la borne, ce stop serait accepté puis refusé au moment où
- * il doit protéger — et cette règle laisserait poser un stop qui ne protège pas. Il a été annulé
- * par la fermeture avant tout déclenchement. À mesurer avant de s'y fier (roadmap, « À éprouver en
- * réel », point 9).
+ * Et son EXÉCUTION, mesurée le 2026-11-12 au soir : un Stop Market de 0,00014 BTC, 9,01 $ à sa
+ * borne (64 349) et 10,01 $ à son déclencheur (71 498), s'est déclenché et a été REMPLI à 71 493
+ * (603229340180). Hyperliquid ne juge donc pas le minimum à la borne au déclenchement, ce que
+ * cette règle suppose. ⚠️ Un seul cas ; un stop sous 10 $ à son déclencheur reste bloqué ici, et
+ * n'est pas mesuré (roadmap, « À éprouver en réel », point 9).
  *
  * Un ordre au marché se juge au marché ; tout autre au prix limite saisi, sinon au marché.
  */

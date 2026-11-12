@@ -250,8 +250,8 @@ describe('notionalPrice', () => {
   };
 
   // Mesuré le 2026-11-12 : jugé à la borne de 10 %, ce stop affichait 9,69 $ et était bloqué ; le
-  // même genre de stop (borne 9,65 $) a été accepté par Hyperliquid À LA POSE. ⚠️ Son exécution au
-  // déclenchement n'est pas mesurée (voir `notionalPrice`).
+  // même genre de stop (borne 9,65 $) a été accepté par Hyperliquid à la pose ; un autre (9,01 $ à
+  // la borne, 10,01 $ au déclencheur) s'est déclenché et a été rempli (voir `notionalPrice`).
   it('values a market trigger at its trigger, not at the 10 % slippage bound', () => {
     expect(notionalPrice(base)).toBe(71800);
     expect(0.00015 * notionalPrice(base)!).toBeGreaterThan(10);

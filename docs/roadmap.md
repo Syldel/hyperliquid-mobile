@@ -994,18 +994,30 @@ Profit Limit"`, `triggerCondition: "Price above 81959"`.
    (`partialCloseRefusal`) : c'est une **supposition** que le seuil est le minimum ordinaire, choisie
    pour échouer tôt (fermer davantage ou 100 % reste possible). Entre 2,2 et 10 $, elle peut bloquer
    une fermeture qu'Hyperliquid accepterait. La mesure demande une position d'au moins 20 $ (le
-   compte n'en permettait pas le 2026-11-12). ⚠️ Non mesurée non plus : la fermeture à 100 % d'une
-   position qui vaut déjà moins de 10 $, laissée au verdict du serveur.
-9. **⚠️ Un stop au marché sous 10 $ à sa borne : accepté à la pose, exécution non mesurée.**
-   Mesuré le 2026-11-12 : un Stop Market de 0,00015 BTC, déclencheur 71 510, borne 64 360
-   (9,65 $), a été **accepté** (602706369092). Le formulaire le jugeait à la borne et le bloquait ;
-   il le juge maintenant à son déclencheur (`notionalPrice`). Ce stop a été annulé par une fermeture
-   avant tout déclenchement : on ne sait pas si Hyperliquid contrôle le minimum **au
-   déclenchement**, sur la borne. Si oui, ce stop est accepté puis refusé au moment où il doit
-   protéger, et `notionalPrice` est à revoir (avertir à la pose). La mesure prévue : ouvrir
-   0,00015 BTC, poser un Stop Market reduce-only de 0,00013 (≈ 9,4 $ au déclencheur) juste sous le
-   mark, lire son statut une fois déclenché (`filled` ou `minTradeNtlRejected`) ; puis fermer le
-   reliquat de 0,00002 à 100 %, ce qui mesure aussi la fin du point 8.
+   compte n'en permettait pas le 2026-11-12). **La fermeture à 100 % d'une position sous 10 $, elle,
+   est acceptée** : mesuré le 2026-11-12 à 22:13:50.175 UTC, depuis le mobile (`Close › Market` à
+   100 %), un IOC reduce-only de 0,00001 BTC (≈ 0,71 $, plafond 70 740 = mid − 1 %) a été rempli à
+   71 459, frais 0,000321 $ (603233856328). Le minimum ne s'applique donc pas de la même façon à
+   une fermeture qui solde la position et à une fermeture partielle. La feuille ne bloque pas le
+   100 %, à raison.
+9. **✅ Un stop au marché sous 10 $ à sa borne, mais pas à son déclencheur : accepté, déclenché,
+   exécuté.** Mesuré le 2026-11-12, posé depuis le mobile. Ce matin, un Stop Market de 0,00015 BTC
+   (déclencheur 71 510, borne 64 360, 9,65 $ à la borne) avait été **accepté à la pose**
+   (602706369092), puis annulé par une fermeture avant tout déclenchement. Le soir, la mesure de
+   l'exécution : position 0,00015 BTC, Stop Market reduce-only de **0,00014**, déclencheur 71 498,
+   borne 64 349 — **9,01 $ à la borne, 10,01 $ au déclencheur** (603229340180). Posé à 22:04:31,
+   `triggered` puis **`filled`** à 22:11:53.173 UTC, en une exécution à 71 493 (10,009 $), frais
+   0,004504 $ (0,045 %). Hyperliquid n'a donc **pas jugé le minimum à la borne** au
+   déclenchement : `notionalPrice`, qui juge un déclencheur au marché à son déclencheur, est
+   cohérent avec lui sur ce cas.
+
+   La mesure prévue (0,00013, ≈ 9,3 $ **au déclencheur**) était mal conçue : le formulaire bloque à
+   juste titre un stop sous 10 $ à son déclencheur, c'est ce que l'utilisateur a constaté (« ≈ 9.29
+   $ », bouton désactivé), et 0,00014 était le bon cas — sous 10 $ à la borne, au-dessus au
+   déclencheur. ⚠️ Reste non mesuré, et toujours bloqué par le formulaire : un stop sous 10 $ à son
+   déclencheur. ⚠️ Un seul cas, exécuté 5 $ sous le déclencheur ; un gap qui exécuterait sous
+   10 $ de valeur n'est pas mesuré.
+
 10. **✅ Un ordre au marché et ses protections, en réel (2026-11-12).** Achat 0,00015 BTC, plafond
     73 590, exécuté à 72 865 en taker, frais 0,004918 $ (0,045 %, le taux affiché). Avec un Stop
     Loss à 2 % : exécution à 72 969 (12:51:33.072), stop posé **0,89 s** plus tard sur 0,00015 (la

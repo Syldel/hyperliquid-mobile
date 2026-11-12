@@ -89,7 +89,8 @@ describe('partialCloseRefusal', () => {
     );
   });
 
-  it('lets a full close through, even under 10 $: that case is not measured', () => {
+  // Mesuré le 2026-11-12 : une position de 0,71 $ fermée à 100 % a été remplie.
+  it('lets a full close through, even under 10 $: Hyperliquid accepts it', () => {
     expect(partialCloseRefusal({ positionSz: 0.0001, markPx: 72865, closeSz: 0.0001 })).toBeNull();
   });
 

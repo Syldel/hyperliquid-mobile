@@ -79,7 +79,8 @@ export const MIN_ORDER_VALUE_USD = 10;
  * reste possible. Le mesurer demande une position d'au moins 20 $.
  *
  * Une fermeture à 100 % n'est PAS bloquée : une position qui vaut déjà moins de 10 $ doit pouvoir
- * se fermer, et ce cas-là n'a pas été mesuré — le verdict du serveur fait alors autorité.
+ * se fermer, et Hyperliquid l'accepte — mesuré le 2026-11-12, 0,00001 BTC (≈ 0,71 $) fermé à 100 %
+ * depuis le mobile et rempli (oid 603233856328).
  *
  * `markPx` : la valeur de la position divisée par sa taille (`positionValue / |szi|`).
  */
