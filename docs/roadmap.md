@@ -978,19 +978,31 @@ Profit Limit"`, `triggerCondition: "Price above 81959"`.
    forme `filled: { totalSz < taille demandée }` ; toute autre forme tombe en état inconnu, jamais
    en succès (`market-fill.util.ts`). La mesure : un ordre plus gros que le premier niveau du
    carnet, avec un glissement très faible.
-7. **✅ Le délai de `reduceOnlyCanceled` après une fermeture totale : aucun.** Mesuré le
-   2026-11-12, deux fois (BTC, 0,00015) : le stop passe `reduceOnlyCanceled` **à la même
-   milliseconde** que l'exécution de la fermeture (stop limite 602705157250 à 12:50:37.020 UTC,
-   stop au marché 602706369092 à 12:52:20.339). La feuille de fermeture dit « at once ».
-8. **✅ Une fermeture partielle sous 10 $ : refusée.** Mesuré le 2026-11-12 : un IOC reduce-only de
-   0,00003 BTC (≈ 2,2 $) a fini `minTradeNtlRejected` (oid 602702312897). Hyperliquid n'exempte
-   pas un reduce-only du minimum. La feuille de fermeture bloque désormais une fermeture
-   partielle sous 10 $ (`partialCloseRefusal`). ⚠️ Reste non mesurée : la fermeture à 100 %
-   d'une position qui vaut déjà moins de 10 $ — laissée au verdict du serveur.
-9. **✅ Le minimum d'un stop au marché ne se mesure pas à sa borne de 10 %.** Mesuré le 2026-11-12 :
-   un Stop Market de 0,00015 BTC, déclencheur 71 510, borne 64 360 (9,65 $), a été accepté
-   (602706369092). Le formulaire le jugeait à la borne et bloquait un stop valide ; il le juge
-   maintenant à son déclencheur (`notionalPrice`).
+7. **✅ Le délai de `reduceOnlyCanceled` après une fermeture totale : aucun, deux fois sur deux.**
+   Mesuré le 2026-11-12 sur BTC (0,00015), avec des stops de **taille fixe** : le stop passe
+   `reduceOnlyCanceled` **à la même milliseconde** que l'exécution de la fermeture (stop limite
+   602705157250 à 12:50:37.020 UTC, stop au marché 602706369092 à 12:52:20.339). La feuille de
+   fermeture dit « cancels it at once » pour eux. ⚠️ Pas mesuré pour un TP/SL « de position » : sa
+   phrase dit « should cancel it ».
+8. **⚠️ Une fermeture partielle sous 10 $ : refusée à 2,2 $, seuil non mesuré.** Mesuré le
+   2026-11-12, **un seul point** : un IOC reduce-only de 0,00003 BTC (≈ 2,2 $) a fini
+   `minTradeNtlRejected` (oid 602702312897). Hyperliquid n'a donc pas exempté ce reduce-only du
+   minimum. La feuille de fermeture bloque une fermeture partielle sous 10 $
+   (`partialCloseRefusal`) : c'est une **supposition** que le seuil est le minimum ordinaire, choisie
+   pour échouer tôt (fermer davantage ou 100 % reste possible). Entre 2,2 et 10 $, elle peut bloquer
+   une fermeture qu'Hyperliquid accepterait. La mesure demande une position d'au moins 20 $ (le
+   compte n'en permettait pas le 2026-11-12). ⚠️ Non mesurée non plus : la fermeture à 100 % d'une
+   position qui vaut déjà moins de 10 $, laissée au verdict du serveur.
+9. **⚠️ Un stop au marché sous 10 $ à sa borne : accepté à la pose, exécution non mesurée.**
+   Mesuré le 2026-11-12 : un Stop Market de 0,00015 BTC, déclencheur 71 510, borne 64 360
+   (9,65 $), a été **accepté** (602706369092). Le formulaire le jugeait à la borne et le bloquait ;
+   il le juge maintenant à son déclencheur (`notionalPrice`). Ce stop a été annulé par une fermeture
+   avant tout déclenchement : on ne sait pas si Hyperliquid contrôle le minimum **au
+   déclenchement**, sur la borne. Si oui, ce stop est accepté puis refusé au moment où il doit
+   protéger, et `notionalPrice` est à revoir (avertir à la pose). La mesure prévue : ouvrir
+   0,00015 BTC, poser un Stop Market reduce-only de 0,00013 (≈ 9,4 $ au déclencheur) juste sous le
+   mark, lire son statut une fois déclenché (`filled` ou `minTradeNtlRejected`) ; puis fermer le
+   reliquat de 0,00002 à 100 %, ce qui mesure aussi la fin du point 8.
 10. **✅ Un ordre au marché et ses protections, en réel (2026-11-12).** Achat 0,00015 BTC, plafond
     73 590, exécuté à 72 865 en taker, frais 0,004918 $ (0,045 %, le taux affiché). Avec un Stop
     Loss à 2 % : exécution à 72 969 (12:51:33.072), stop posé **0,89 s** plus tard sur 0,00015 (la

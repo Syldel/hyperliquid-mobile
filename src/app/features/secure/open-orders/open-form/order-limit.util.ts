@@ -105,10 +105,17 @@ export function orderPricesReady(input: {
  *
  * Un déclencheur AU MARCHÉ se juge à son déclencheur, pas à son prix limite : ce limite n'est que
  * la borne de glissement de 10 % que l'exchange applique de toute façon. Le juger à la borne
- * bloquait un stop valide — mesuré le 2026-11-12 : 0,00015 BTC, déclencheur 71 800, borne 64 621,
- * « 9,69 $ » et bouton désactivé ; le même stop, posé après une exécution au marché (borne 64 360,
- * 9,65 $), a été ACCEPTÉ par Hyperliquid (oid 602706369092). Un ordre au marché se juge au marché ;
- * tout autre au prix limite saisi, sinon au marché.
+ * bloquait un stop — mesuré le 2026-11-12 : 0,00015 BTC, déclencheur 71 800, borne 64 621,
+ * « 9,69 $ » et bouton désactivé ; un stop de même taille, posé après une exécution au marché
+ * (déclencheur 71 510, borne 64 360, 9,65 $), a été ACCEPTÉ à la pose (oid 602706369092).
+ *
+ * ⚠️ Mesuré : l'acceptation à la POSE. Pas mesuré : qu'un tel stop s'exécute au déclenchement. Si
+ * Hyperliquid y contrôle le minimum sur la borne, ce stop serait accepté puis refusé au moment où
+ * il doit protéger — et cette règle laisserait poser un stop qui ne protège pas. Il a été annulé
+ * par la fermeture avant tout déclenchement. À mesurer avant de s'y fier (roadmap, « À éprouver en
+ * réel », point 9).
+ *
+ * Un ordre au marché se juge au marché ; tout autre au prix limite saisi, sinon au marché.
  */
 export function notionalPrice(input: {
   orderKind: OrderKind;

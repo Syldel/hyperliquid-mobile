@@ -83,8 +83,10 @@ describe('partialCloseRefusal', () => {
   // La position mesurée le 2026-11-12 : 0,00015 BTC à ≈ 72 865.
   const position = { positionSz: 0.00015, markPx: 72865 };
 
-  it('refuses a partial close under 10 $: Hyperliquid answered minTradeNtlRejected', () => {
-    expect(partialCloseRefusal({ ...position, closeSz: 0.00003 })).toContain('≈ 2.19 $');
+  it('blocks a partial close under 10 $, and says what was measured', () => {
+    expect(partialCloseRefusal({ ...position, closeSz: 0.00003 })).toBe(
+      '≈ 2.19 $, under the 10 $ order minimum: Hyperliquid refused a 2.2 $ partial close (minTradeNtlRejected). Close more, or 100 %.',
+    );
   });
 
   it('lets a full close through, even under 10 $: that case is not measured', () => {

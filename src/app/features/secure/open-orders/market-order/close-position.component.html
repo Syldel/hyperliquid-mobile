@@ -42,8 +42,6 @@
         <div>Size to close</div>
         @if (sz() && isSizeInvalid()) {
           <div class="hint notice--high">Between 0 and the position size</div>
-        } @else if (closeRefusal(); as refusal) {
-          <div class="hint notice--high">{{ refusal }}</div>
         }
       </ion-label>
       <ion-input
@@ -54,13 +52,18 @@
         (ionInput)="onSizeInput($event.detail.value ?? '')"
       />
     </ion-item>
+    <!-- Hors du libellé empilé : Ionic le réduit à 75 %, et une phrase de trois lignes y
+         recouvrait la valeur saisie (mesuré le 2026-11-12 à 360 px). -->
+    @if (!(sz() && isSizeInvalid()) && closeRefusal(); as refusal) {
+      <ion-item lines="full" class="field-notice">
+        <ion-label class="ion-text-wrap notice--high" role="alert">{{ refusal }}</ion-label>
+      </ion-item>
+    }
     <ion-item lines="none">
       <ion-label position="stacked">
         <div>Max slippage %</div>
         @if (isSlippageInvalid()) {
           <div class="hint notice--high">{{ slippageBounds.min }} – {{ slippageBounds.max }} %</div>
-        } @else if (slippageWarning(); as warning) {
-          <div class="hint notice--caution ion-text-wrap" role="alert">{{ warning }}</div>
         }
       </ion-label>
       <ion-input
@@ -71,6 +74,11 @@
         (ionInput)="onSlippageInput($event.detail.value ?? '')"
       />
     </ion-item>
+    @if (!isSlippageInvalid() && slippageWarning(); as warning) {
+      <ion-item lines="none" class="field-notice">
+        <ion-label class="ion-text-wrap notice--caution" role="alert">{{ warning }}</ion-label>
+      </ion-item>
+    }
   </ion-list>
 
   <p class="section-label">TP / SL on {{ coin() }}</p>

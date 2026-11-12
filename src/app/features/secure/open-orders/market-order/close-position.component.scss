@@ -35,6 +35,12 @@
   color: var(--ion-color-warning-shade);
 }
 
+/* Un avis sous un champ, sur sa propre ligne et à la taille du texte courant. */
+.field-notice ion-label {
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
 .percents {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

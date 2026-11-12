@@ -26,8 +26,27 @@ formulaire et la fermeture.
 ## La confirmation
 
 Elle lit `l2Book` (poids 2) et `metaAndAssetCtxs` du dex (poids 20) **une fois** à l'ouverture,
-et le taux taker du compte (`userFees`) une fois par session. Passé 10 s, l'envoi exige une
-relecture : un plafond calculé sur un mid périmé ne protège plus rien.
+et le taux taker du compte (`userFees`) une fois par session.
+
+**Elle ne presse pas** (revu le 2026-11-12, avec l'utilisateur). La première version faisait
+défiler l'âge de la lecture (« Market read 7 s ago »), le passait en rouge à 10 s et désactivait
+Confirm : un compte qui court pousse à valider sans lire. Un compte à rebours a été écarté pour la
+même raison, en pire.
+
+- L'heure de la lecture s'affiche, fixe : « Prices as of 14:32:05 ». Passé 10 s, une ligne grise
+  ajoute « Re-read when you confirm ».
+- **Confirm reste actif.** Sur une lecture de plus de 10 s, il **relit** le marché, une fois. L'ordre
+  ne part sans nouveau geste que si ce qu'on a lu tient : le prix plafond n'a pas bougé de plus de
+  **0,1 %** et le verdict n'a pas empiré (`market-recheck.util.ts`). Sinon rien ne part, la feuille
+  dit ce qui a changé (« worst price 2040.3 → 2045.1; risk OK → Caution »), les chiffres concernés
+  sont soulignés, et il faut confirmer de nouveau.
+- Confirm reste inactif **1 s** après chaque changement des chiffres, et les boutons sont dans un
+  pied fixe : rien ne bouge sous un doigt déjà en route.
+
+⚠️ Les seuils de 0,1 % et 1 s sont des choix, pas des mesures. La relecture au moment de confirmer
+est couverte par `market-order-confirm.component.spec.ts`, **pas éprouvée dans le navigateur** :
+dans le vrai formulaire, Confirm envoie l'ordre. L'affichage (heure, ligne grise, avis « changed »
+posé à la main, pied fixe) l'est, à 360 px dans les deux thèmes, le 2026-11-12.
 
 Elle affiche le mid, le prix plafond, le prix moyen estimé (parcours du carnet pour cette
 taille), la valeur, les frais taker, et en ouverture le funding et le prix de liquidation estimé.
@@ -70,6 +89,30 @@ IOC rempli en partie laisserait la part remplie nue.
 Si une protection échoue, le formulaire **ne se ferme pas** : « Position open — not protected »,
 et un bouton « Retry protection » qui ne repose que celles qui manquent, une fois par appui.
 
+## Les garde-fous du formulaire
+
+Des ordres valides pour Hyperliquid, mais probablement pas voulus (`open-form/order-guards.util.ts`).
+**Des avertissements, jamais des blocages** (décidé le 2026-11-12) : le serveur reste juge, et un
+cas inhabituel doit rester possible. Ce qui est certainement faux (un limite du mauvais côté, un
+ordre sous 10 $) est bloqué ailleurs.
+
+|     | Cas                                                                                                                     | Ce qui est dit                                                                                                                    |
+| --- | ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| G1  | un **Close Limit qui croise le marché** : `isPriceInvalid` ignore les reduce-only, il s'exécute donc aussitôt, en taker | « fills now, as a taker, down to X. Use Close › Market for that »                                                                 |
+| G2  | un ordre **de sens opposé à la position**, sans reduce-only                                                             | en gris s'il la réduit ou la ferme ; en avertissement s'il la **retourne** (« Closes your short 0.0343 AND opens a long 0.0157 ») |
+| G3  | une **marge supérieure au capital disponible**, en comptant la marge que libère la position fermée au passage           | « Needs ≈ X $ of margin at 3x, Y $ available »                                                                                    |
+| G4  | un **glissement maximal au-delà de 3 %** (formulaire et feuille de fermeture)                                           | « accepts a price up to X % away from the mid »                                                                                   |
+
+La position vient d'une lecture de `clearinghouseState` (poids 2) à chaque changement de paire,
+**quel que soit le type d'ordre**. La lecture de position existante ne se faisait que pour un
+déclencheur : mesuré le 2026-11-12 sur un short ETH de 0,0343, un achat qui le réduisait passait
+pour une ouverture, G2 se taisait et G3 annonçait une marge qu'il ne demandait pas.
+
+⚠️ G3 est une approximation : frais exclus, capital affiché `total − used` du gateway et non
+l'`availableToTrade` d'Hyperliquid, réservation de marge d'un ordre limite en attente non mesurée.
+Le seuil de G4 (3 %) est un choix. Contrastes mesurés à 360 px : 5,43:1 (jaune) et 6,37:1 (gris) en
+clair, 8,68:1 et 6,0:1 en sombre.
+
 ## La fermeture depuis la carte d'une position
 
 `Close › Market` : 25 / 50 / 75 / 100 % ou une taille libre, IOC reduce-only du côté opposé, même
@@ -79,11 +122,22 @@ clôture, taille de la position, reduce-only), bouton « Close long » / « Clos
 
 ## Mesuré en réel, et ce qui reste ouvert
 
-Mesuré le 2026-11-12 par l'utilisateur (l'agent ne passe jamais d'ordre) : l'achat au marché,
-les protections posées 0,89 s après l'exécution sur le prix moyen obtenu, le refus d'une
-fermeture partielle sous 10 $ (désormais bloquée), et l'annulation des stops à la milliseconde
-d'une fermeture totale. Voir [roadmap.md](roadmap.md#à-éprouver-en-réel--ce-quaucun-double-ne-peut-établir),
-points 7 à 10.
+Mesuré le 2026-11-12 par l'utilisateur (l'agent ne passe jamais d'ordre) :
 
-⚠️ Reste ouvert : la forme d'un IOC rempli en partie (point 6), la fermeture à 100 % d'une
-position qui vaut déjà moins de 10 $, et les frais sur la marge isolée.
+- l'achat au marché, et les protections posées 0,89 s après l'exécution sur le prix moyen obtenu ;
+- l'annulation des stops de taille fixe à la milliseconde d'une fermeture totale, deux fois ;
+- le refus d'une fermeture partielle reduce-only **à 2,2 $** (un point) ;
+- l'acceptation **à la pose** d'un Stop Market qui vaut 9,65 $ à sa borne.
+
+Voir [roadmap.md](roadmap.md#à-éprouver-en-réel--ce-quaucun-double-ne-peut-établir), points 7 à 10.
+
+⚠️ Reste ouvert :
+
+- la forme d'un IOC rempli en partie (point 6) ;
+- le seuil d'une fermeture partielle entre 2,2 et 10 $ : le blocage à 10 $ est une supposition
+  (point 8) ;
+- la fermeture à 100 % d'une position qui vaut déjà moins de 10 $ ;
+- l'exécution, **au déclenchement**, d'un stop au marché qui vaut moins de 10 $ à sa borne
+  (point 9) : s'il est refusé alors, `notionalPrice` laisse poser un stop qui ne protège pas ;
+- l'annulation d'un TP/SL « de position » par une fermeture totale ;
+- les frais sur la marge isolée.
