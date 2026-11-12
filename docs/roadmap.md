@@ -977,7 +977,12 @@ Profit Limit"`, `triggerCondition: "Price above 81959"`.
 6. **⚠️ Un IOC au marché rempli en partie** ([market-orders.md](market-orders.md)). On suppose la
    forme `filled: { totalSz < taille demandée }` ; toute autre forme tombe en état inconnu, jamais
    en succès (`market-fill.util.ts`). La mesure : un ordre plus gros que le premier niveau du
-   carnet, avec un glissement très faible.
+   carnet, avec un glissement très faible. **Reportée le 2026-11-12, faute de taille** : sur 18 perps
+   peu liquides lus ce soir-là, le meilleur prix portait 300 à 1 000 $ ; ME et GOAT n'en
+   portaient que 34 à 42 $ le temps d'une lecture, puis 331 à 1 067 $ une minute plus tard. Avec un
+   compte d'environ 22 $, le remplissage partiel ne s'obtient que par hasard. À reprendre avec un
+   ordre de quelques centaines de dollars, glissement à 0,05 % ; la confirmation dit d'avance la
+   part remplissable (« Fillable within max slippage »).
 7. **✅ Le délai de `reduceOnlyCanceled` après une fermeture totale : aucun, trois fois sur trois.**
    Mesuré le 2026-11-12, avec des stops de **taille fixe** : le stop passe `reduceOnlyCanceled` **à
    la même milliseconde** que l'exécution de la fermeture. Sur BTC (0,00015, long) : stop limite

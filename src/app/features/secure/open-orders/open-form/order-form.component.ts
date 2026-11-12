@@ -90,6 +90,7 @@ import {
   isLimitOnWrongSide,
   isStopLimitTight,
   limitFromTrigger,
+  MIN_ORDER_VALUE_USD,
   notionalPrice,
   orderPricesReady,
   stopLimitSpread,
@@ -102,10 +103,14 @@ import {
   MarketOrderConfirmComponent,
   type MarketOrderTicket,
 } from '../market-order/market-order-confirm.component';
-import { buildMarketOrder, isValidMaxSlippage } from '../market-order/market-execution.util';
+import {
+  buildMarketOrder,
+  isValidMaxSlippage,
+  MAX_MAX_SLIPPAGE_PCT,
+  MIN_MAX_SLIPPAGE_PCT,
+} from '../market-order/market-execution.util';
 import type { MarketFillOutcome } from '../market-order/market-fill.util';
 import { MarketOrderService } from '../market-order/market-order.service';
-import { MIN_MAX_SLIPPAGE_PCT, MAX_MAX_SLIPPAGE_PCT } from '../market-order/market-execution.util';
 import {
   crossingCloseLimitWarning,
   marginShortfallWarning,
@@ -311,7 +316,7 @@ export class OrderFormComponent implements OnInit {
   });
   isSizeInvalid = computed(() => {
     const usd = this.sizeUsd();
-    return usd !== null && usd < 10;
+    return usd !== null && usd < MIN_ORDER_VALUE_USD;
   });
   sizeUsdClass = computed(() => (this.isSizeInvalid() ? 'diff--danger' : ''));
 
@@ -1247,7 +1252,7 @@ export class OrderFormComponent implements OnInit {
       return;
     }
     if (this.isSizeInvalid()) {
-      this.error.set('Hyperliquid refuses an order under 10 $.');
+      this.error.set(`Hyperliquid refuses an order under ${MIN_ORDER_VALUE_USD} $.`);
       return;
     }
 

@@ -1,5 +1,6 @@
 import type { HLFrontendOpenOrder } from '@syldel/hl-shared-types';
 import { roundSize } from '@utils/hl-rounding.utils';
+import { MIN_ORDER_VALUE_USD } from '../open-form/order-limit.util';
 
 /**
  * ============================================================================
@@ -43,8 +44,8 @@ export function protectiveOrdersOf(
  * - une fermeture totale laisse des reduce-only qui ne réduisent plus rien : statut
  *   `reduceOnlyCanceled` (`info-endpoint.md`). **Mesuré le 2026-11-12, trois fois sur trois**, pour
  *   des stops de taille fixe (BTC long, ETH short) : à la même milliseconde que l'exécution de la
- *   fermeture (oids 602705157250, 602706369092, 602789574942). ⚠️ Pas mesuré pour un TP/SL « de position » : sa phrase dit
- *   « should », pas « cancels ».
+ *   fermeture (oids 602705157250, 602706369092, 602789574942). ⚠️ Pas mesuré pour un TP/SL « de
+ *   position » : sa phrase dit « should », pas « cancels ».
  */
 export function describeProtectiveAfterClose(
   order: HLFrontendOpenOrder,
@@ -62,9 +63,6 @@ export function describeProtectiveAfterClose(
     ? `keeps its size ${order.sz}, larger than the ${remainingSz} left`
     : `keeps its size ${order.sz}`;
 }
-
-/** Le minimum d'Hyperliquid pour un ordre, en dollars. */
-export const MIN_ORDER_VALUE_USD = 10;
 
 /**
  * Le blocage d'une fermeture PARTIELLE sous 10 $, ou `null`.

@@ -51,6 +51,13 @@ posé à la main, pied fixe) l'est, à 360 px dans les deux thèmes, le 2026-11-
 Elle affiche le mid, le prix plafond, le prix moyen estimé (parcours du carnet pour cette
 taille), la valeur, les frais taker, et en ouverture le funding et le prix de liquidation estimé.
 
+Sous le résumé (« Long 0.0060 ETH · market (IOC) »), elle dit **ce que l'ordre fait à la position
+ouverte**, avec la phrase du garde-fou G2 (voir plus bas) : « Reduces your short 0.0343 to
+0.0283 » en gris, « Closes your short… AND opens a long… » en avertissement. Le bouton dit
+« Long » ; un achat contre un short n'en ouvre pas un. La position vient d'une relecture faite à
+l'ouverture de la confirmation, pas de celle du choix de la paire ; si elle échoue, rien n'est dit.
+Mesuré dans le navigateur le 2026-11-12 sur un short ETH réel.
+
 ### Le verdict de risque d'exécution
 
 **Le pire critère décide**, il n'y a pas de somme pondérée : un bon volume ne masque pas un
@@ -112,6 +119,23 @@ pour une ouverture, G2 se taisait et G3 annonçait une marge qu'il ne demandait 
 l'`availableToTrade` d'Hyperliquid, réservation de marge d'un ordre limite en attente non mesurée.
 Le seuil de G4 (3 %) est un choix. Contrastes mesurés à 360 px : 5,43:1 (jaune) et 6,37:1 (gris) en
 clair, 8,68:1 et 6,0:1 en sombre.
+
+## Le minimum de 10 $
+
+Hyperliquid refuse un ordre de moins de 10 $ (« Order must have minimum value of $10 »,
+`minTradeNtlRejected`). Une seule constante, `MIN_ORDER_VALUE_USD` (`open-form/order-limit.util.ts`).
+
+| Où                   | Ce que l'app fait                                                                                                                            | Mesuré                                                                               |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| formulaire           | bloque sous 10 $ ; un limite se juge à son prix, un ordre au marché au mid, un déclencheur au marché à son **déclencheur** (`notionalPrice`) | un stop de 9,01 $ à sa borne et 10,01 $ à son déclencheur s'est déclenché et exécuté |
+| feuille de fermeture | bloque une fermeture **partielle** sous 10 $ (`partialCloseRefusal`)                                                                         | refusée à 2,2 $ et à 9,29 $, même reduce-only                                        |
+| feuille de fermeture | laisse passer une fermeture **à 100 %**, quelle que soit sa valeur                                                                           | acceptée à 0,71 $ (IOC)                                                              |
+
+⚠️ **Écart connu : `Close › Limit` à 100 % sous 10 $ est bloqué.** Le formulaire applique son
+contrôle à la taille préréglée de toute la position, alors qu'une fermeture totale échappe au
+minimum. Laissé ainsi à dessein (2026-11-12) : l'acceptation n'est mesurée que pour un **IOC**,
+pas pour un ordre limite reduce-only qui attend au carnet, et `Close › Market` couvre ce besoin.
+À rouvrir après une mesure.
 
 ## La fermeture depuis la carte d'une position
 

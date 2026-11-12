@@ -12,7 +12,8 @@ import { readBookTop } from './market-execution.util';
  * fois, à l'ouverture de la confirmation. Le prix plafond, le parcours du carnet, le verdict et le
  * prix de liquidation viennent tous d'ELLE.
  *
- * Elle vieillit : au-delà de `MARKET_SNAPSHOT_MAX_AGE_MS`, l'envoi exige une relecture. Un plafond
+ * Elle vieillit : au-delà de `MARKET_SNAPSHOT_MAX_AGE_MS`, Confirm la relit avant d'envoyer, et
+ * n'envoie que si les chiffres tiennent (`market-recheck.util.ts`). Un plafond
  * calculé sur un mid d'il y a une minute ne protège plus rien.
  * ============================================================================
  */

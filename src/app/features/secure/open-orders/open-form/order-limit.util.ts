@@ -101,7 +101,14 @@ export function orderPricesReady(input: {
 }
 
 /**
- * Le prix auquel la valeur d'un ordre se compare au minimum de 10 $ d'Hyperliquid.
+ * Le minimum d'Hyperliquid pour la valeur d'un ordre, en dollars. Le texte du refus le nomme :
+ * « Order must have minimum value of $10 » (mesuré le 2026-11-12). Une fermeture qui SOLDE la
+ * position y échappe (mesuré le même jour sur un IOC de 0,71 $), pas une fermeture partielle.
+ */
+export const MIN_ORDER_VALUE_USD = 10;
+
+/**
+ * Le prix auquel la valeur d'un ordre se compare à `MIN_ORDER_VALUE_USD`.
  *
  * Un déclencheur AU MARCHÉ se juge à son déclencheur, pas à son prix limite : ce limite n'est que
  * la borne de glissement de 10 % que l'exchange applique de toute façon. Le juger à la borne
