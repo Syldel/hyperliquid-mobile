@@ -24,7 +24,10 @@
 
 .side-pills {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  // `minmax(0, 1fr)` et non `1fr` : une colonne `1fr` ne descend pas sous la largeur de son contenu. À 360 px, la
+  // colonne « Side » offre 168 px et les deux boutons en demandaient 190 : « SHORT » débordait de 12 px jusqu'au bord de
+  // l'écran (mesuré le 2026-11-12).
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   padding: 5px 10px;
   height: 48px;
@@ -33,6 +36,10 @@
     --border-radius: 8px;
     --padding-top: 10px;
     --padding-bottom: 10px;
+    // Le texte tient dans la colonne réduite : c'est la marge intérieure par défaut qui ne tenait pas.
+    --padding-start: 4px;
+    --padding-end: 4px;
+    min-width: 0;
     margin: 0;
     font-size: 14px;
   }

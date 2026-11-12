@@ -756,5 +756,31 @@ describe('OrderFormComponent — price wiring', () => {
       expect(form.error()).toContain('the original may have been cancelled');
       expect(dismiss).not.toHaveBeenCalled();
     });
+
+    // Vu à l'écran le 2026-11-12 (mesure 7) : le texte de l'exchange n'a pas de point, et la phrase suivante s'y collait.
+    it('separates the exchange text from the hint that follows it', () => {
+      create(
+        (component) =>
+          (component.existingOrder = {
+            oid: 1,
+            coin: 'BTC',
+            side: 'B',
+            limitPx: '80000',
+            sz: '0.001',
+            reduceOnly: false,
+            isTrigger: false,
+            orderType: 'Limit',
+          } as unknown as HLFrontendOpenOrder),
+      );
+      gateway()['modifyOrder'] = vi.fn(() =>
+        of({ status: 'err', response: 'Cannot modify canceled or filled order' }),
+      );
+
+      form.submit();
+
+      expect(form.error()).toBe(
+        'Refused by Hyperliquid: Cannot modify canceled or filled order. Check the open orders: the original may have been cancelled.',
+      );
+    });
   });
 });

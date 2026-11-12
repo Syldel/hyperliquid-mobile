@@ -45,7 +45,12 @@ import {
   HLTif,
   hlPerpDexOf,
 } from '@syldel/hl-shared-types';
-import { exchangeRefusal, extractErrorMessage, modifyRefusal } from '@utils/hl-error.utils';
+import {
+  asSentence,
+  exchangeRefusal,
+  extractErrorMessage,
+  modifyRefusal,
+} from '@utils/hl-error.utils';
 import { roundPrice, roundSize } from '@utils/hl-rounding.utils';
 import {
   buildProtectiveOrderDetails,
@@ -939,7 +944,7 @@ export class OrderFormComponent implements OnInit {
             // minimum. Pas toujours (un agent inconnu est refusé avant tout) :
             // on le dit comme une possibilité, à vérifier.
             this.error.set(
-              `${refusal ?? 'Failed to update order: unexpected reply.'} Check the open orders: the original may have been cancelled.`,
+              `${asSentence(refusal ?? 'Failed to update order: unexpected reply.')} Check the open orders: the original may have been cancelled.`,
             );
             this.availableCapitalService.invalidate();
           }

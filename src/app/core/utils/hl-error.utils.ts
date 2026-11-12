@@ -53,6 +53,18 @@ export function exchangeRefusal(reply: unknown): string | null {
 }
 
 /**
+ * Termine une phrase par un point si elle n'a pas déjà sa ponctuation finale.
+ *
+ * Les textes de Hyperliquid n'en ont pas toujours : « Cannot modify canceled or filled order » n'a pas de point, « …
+ * bbo was 73452@73453. » en a un. Collé tel quel devant une autre phrase, le premier a donné « … filled order Check the
+ * open orders » à l'écran (vu le 2026-11-12, mesure 7).
+ */
+export function asSentence(text: string): string {
+  const trimmed = text.trimEnd();
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
+/**
  * Le refus d'un `modify`, quel que soit le niveau où l'exchange le range.
  *
  * Mesuré sur le mainnet : un `modify` seul refusé répond par un refus d'ensemble (`status: 'err'`,

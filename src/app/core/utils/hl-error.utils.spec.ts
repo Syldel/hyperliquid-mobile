@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { exchangeRefusal, extractErrorMessage, modifyRefusal } from './hl-error.utils';
+import { asSentence, exchangeRefusal, extractErrorMessage, modifyRefusal } from './hl-error.utils';
 
 /**
  * ============================================================================
@@ -133,5 +133,24 @@ describe('modifyRefusal', () => {
     ['no reply', null],
   ])('finds no refusal in %s', (_label, reply) => {
     expect(modifyRefusal(reply)).toBeNull();
+  });
+});
+
+describe('asSentence', () => {
+  // Le texte mesuré le 2026-11-12, sans point : collé devant la phrase suivante, il donnait « … order Check … ».
+  it('ends an exchange text that has no final punctuation', () => {
+    expect(asSentence('Refused by Hyperliquid: Cannot modify canceled or filled order')).toBe(
+      'Refused by Hyperliquid: Cannot modify canceled or filled order.',
+    );
+  });
+
+  it('leaves a text that already ends a sentence alone', () => {
+    expect(asSentence('bbo was 73452@73453.')).toBe('bbo was 73452@73453.');
+    expect(asSentence('Refused!')).toBe('Refused!');
+    expect(asSentence('Why?')).toBe('Why?');
+  });
+
+  it('does not put the point after trailing spaces', () => {
+    expect(asSentence('Refused  ')).toBe('Refused.');
   });
 });
