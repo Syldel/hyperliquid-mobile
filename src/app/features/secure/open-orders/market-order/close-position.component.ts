@@ -39,6 +39,7 @@ import {
   CLOSE_PERCENTS,
   closeSize,
   describeProtectiveAfterClose,
+  partialCloseRefusal,
   protectiveOrdersOf,
 } from './close-position.util';
 import {
@@ -130,10 +131,22 @@ export class ClosePositionComponent implements OnInit {
     return remaining > 1e-12 ? Number(remaining.toFixed(this.szDecimals() ?? 8)) : 0;
   });
 
+  /** Une fermeture partielle sous 10 $ : Hyperliquid la refuse (mesuré le 2026-11-12). */
+  readonly closeRefusal = computed(() => {
+    const szi = Math.abs(Number(this.position().szi));
+    const value = Number(this.position().positionValue);
+    return partialCloseRefusal({
+      closeSz: Number(this.sz()),
+      positionSz: this.positionSz(),
+      markPx: szi > 0 && value > 0 ? value / szi : null,
+    });
+  });
+
   readonly canReview = computed(
     () =>
       this.szDecimals() !== null &&
       !this.isSizeInvalid() &&
+      this.closeRefusal() === null &&
       !this.isSlippageInvalid() &&
       !this.sending() &&
       !this.locked() &&

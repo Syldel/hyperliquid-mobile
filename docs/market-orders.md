@@ -77,8 +77,13 @@ confirmation. Les TP/SL de la paire sont **listés, jamais modifiés** (décidé
 ce que la fermeture leur fait. `Close › Limit` ouvre le formulaire d'ordre prérempli (sens de
 clôture, taille de la position, reduce-only), bouton « Close long » / « Close short ».
 
-## ⚠️ Ce qui n'est pas mesuré
+## Mesuré en réel, et ce qui reste ouvert
 
-Aucun ordre réel n'a été passé par l'agent. Voir [roadmap.md](roadmap.md#à-éprouver-en-réel--ce-quaucun-double-ne-peut-établir),
-points 6 à 8 : la forme d'un IOC rempli en partie, le délai de `reduceOnlyCanceled` après une
-fermeture totale, et le refus éventuel d'une fermeture sous 10 $.
+Mesuré le 2026-11-12 par l'utilisateur (l'agent ne passe jamais d'ordre) : l'achat au marché,
+les protections posées 0,89 s après l'exécution sur le prix moyen obtenu, le refus d'une
+fermeture partielle sous 10 $ (désormais bloquée), et l'annulation des stops à la milliseconde
+d'une fermeture totale. Voir [roadmap.md](roadmap.md#à-éprouver-en-réel--ce-quaucun-double-ne-peut-établir),
+points 7 à 10.
+
+⚠️ Reste ouvert : la forme d'un IOC rempli en partie (point 6), la fermeture à 100 % d'une
+position qui vaut déjà moins de 10 $, et les frais sur la marge isolée.

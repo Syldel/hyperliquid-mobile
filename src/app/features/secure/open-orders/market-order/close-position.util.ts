@@ -41,7 +41,8 @@ export function protectiveOrdersOf(
  *   (mesuré par le gateway le 2026-10-27, `position-level-orders.md`) ;
  * - un TP/SL de taille fixe « ne se redimensionne pas » (`take-profit-and-stop-loss-orders-tp-sl.md`) ;
  * - une fermeture totale laisse des reduce-only qui ne réduisent plus rien : statut
- *   `reduceOnlyCanceled` (`info-endpoint.md`). ⚠️ Le délai de cette annulation n'est pas mesuré.
+ *   `reduceOnlyCanceled` (`info-endpoint.md`). **Mesuré le 2026-11-12, deux fois** : à la même
+ *   milliseconde que l'exécution de la fermeture (oids 602705157250 et 602706369092).
  */
 export function describeProtectiveAfterClose(
   order: HLFrontendOpenOrder,
@@ -50,12 +51,40 @@ export function describeProtectiveAfterClose(
   if (order.isPositionTpsl) {
     return remainingSz > 0
       ? 'follows the position: it will close what remains'
-      : 'nothing left to close: Hyperliquid cancels it';
+      : 'nothing left to close: Hyperliquid cancels it at once';
   }
   if (remainingSz <= 0)
-    return 'nothing left to reduce: Hyperliquid cancels it (reduceOnlyCanceled)';
+    return 'nothing left to reduce: Hyperliquid cancels it at once (reduceOnlyCanceled)';
   const size = Number(order.sz);
   return size > remainingSz
     ? `keeps its size ${order.sz}, larger than the ${remainingSz} left`
     : `keeps its size ${order.sz}`;
+}
+
+/** Le minimum d'Hyperliquid pour un ordre, en dollars. */
+export const MIN_ORDER_VALUE_USD = 10;
+
+/**
+ * Le refus d'une fermeture PARTIELLE sous 10 $, ou `null`.
+ *
+ * Mesuré le 2026-11-12 : un IOC reduce-only de 0,00003 BTC (≈ 2,2 $), 25 % d'une position de
+ * 10,9 $, a fini `minTradeNtlRejected` (oid 602702312897). Hyperliquid n'exempte donc pas un
+ * reduce-only du minimum ; le bloquer ici n'est plus supposer, c'est éviter un refus connu.
+ *
+ * Une fermeture à 100 % n'est PAS bloquée : une position qui vaut déjà moins de 10 $ doit pouvoir
+ * se fermer, et ce cas-là n'a pas été mesuré — le verdict du serveur fait alors autorité.
+ *
+ * `markPx` : la valeur de la position divisée par sa taille (`positionValue / |szi|`).
+ */
+export function partialCloseRefusal(input: {
+  closeSz: number;
+  positionSz: number;
+  markPx: number | null;
+}): string | null {
+  const { closeSz, positionSz, markPx } = input;
+  if (!(closeSz > 0) || !(positionSz > 0) || markPx === null || !(markPx > 0)) return null;
+  if (closeSz >= positionSz - 1e-12) return null;
+  const value = closeSz * markPx;
+  if (value >= MIN_ORDER_VALUE_USD) return null;
+  return `≈ ${value.toFixed(2)} $: Hyperliquid refuses a partial close under ${MIN_ORDER_VALUE_USD} $, even reduce-only. Close more, or 100 %.`;
 }

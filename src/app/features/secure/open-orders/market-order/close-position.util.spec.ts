@@ -1,5 +1,10 @@
 import type { HLFrontendOpenOrder } from '@syldel/hl-shared-types';
-import { closeSize, describeProtectiveAfterClose, protectiveOrdersOf } from './close-position.util';
+import {
+  closeSize,
+  describeProtectiveAfterClose,
+  partialCloseRefusal,
+  protectiveOrdersOf,
+} from './close-position.util';
 
 function order(overrides: Partial<HLFrontendOpenOrder>): HLFrontendOpenOrder {
   return {
@@ -66,7 +71,31 @@ describe('describeProtectiveAfterClose', () => {
     );
   });
 
-  it('says a full close leaves the exchange to cancel it', () => {
-    expect(describeProtectiveAfterClose(order({}), 0)).toContain('reduceOnlyCanceled');
+  // Mesuré le 2026-11-12 : annulé à la milliseconde de la fermeture, deux fois.
+  it('says a full close makes the exchange cancel it at once', () => {
+    expect(describeProtectiveAfterClose(order({}), 0)).toBe(
+      'nothing left to reduce: Hyperliquid cancels it at once (reduceOnlyCanceled)',
+    );
+  });
+});
+
+describe('partialCloseRefusal', () => {
+  // La position mesurée le 2026-11-12 : 0,00015 BTC à ≈ 72 865.
+  const position = { positionSz: 0.00015, markPx: 72865 };
+
+  it('refuses a partial close under 10 $: Hyperliquid answered minTradeNtlRejected', () => {
+    expect(partialCloseRefusal({ ...position, closeSz: 0.00003 })).toContain('≈ 2.19 $');
+  });
+
+  it('lets a full close through, even under 10 $: that case is not measured', () => {
+    expect(partialCloseRefusal({ positionSz: 0.0001, markPx: 72865, closeSz: 0.0001 })).toBeNull();
+  });
+
+  it('lets a partial close of 10 $ or more through', () => {
+    expect(partialCloseRefusal({ positionSz: 0.001, markPx: 72865, closeSz: 0.0002 })).toBeNull();
+  });
+
+  it('says nothing without a price: the server decides', () => {
+    expect(partialCloseRefusal({ ...position, closeSz: 0.00003, markPx: null })).toBeNull();
   });
 });

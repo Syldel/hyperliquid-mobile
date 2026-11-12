@@ -6,6 +6,7 @@ import {
   limitFromTrigger,
   isPositivePrice,
   orderPricesReady,
+  notionalPrice,
   type LimitFromTriggerInput,
 } from './order-limit.util';
 
@@ -236,5 +237,39 @@ describe('isStopLimitTight', () => {
     expect(isStopLimitTight({ ...tight, orderKind: 'limit' })).toBe(false);
     expect(isStopLimitTight({ ...tight, limitPx: '' })).toBe(false);
     expect(isStopLimitTight({ ...tight, triggerPx: '' })).toBe(false);
+  });
+});
+
+describe('notionalPrice', () => {
+  const base = {
+    orderKind: 'trigger' as const,
+    isMarketTrigger: true,
+    limitPx: '64621',
+    triggerPx: '71800',
+    currentPrice: 72879,
+  };
+
+  // Mesuré le 2026-11-12 : jugé à la borne de 10 %, ce stop affichait 9,69 $ et était bloqué ; le
+  // même genre de stop (borne 9,65 $) a été accepté par Hyperliquid.
+  it('values a market trigger at its trigger, not at the 10 % slippage bound', () => {
+    expect(notionalPrice(base)).toBe(71800);
+    expect(0.00015 * notionalPrice(base)!).toBeGreaterThan(10);
+  });
+
+  it('values a limit trigger at its limit price: that is the price it may fill at', () => {
+    expect(notionalPrice({ ...base, isMarketTrigger: false, limitPx: '68210' })).toBe(68210);
+  });
+
+  it('values a limit order at its limit price, and falls back to the market without one', () => {
+    expect(notionalPrice({ ...base, orderKind: 'limit', limitPx: '72000' })).toBe(72000);
+    expect(notionalPrice({ ...base, orderKind: 'limit', limitPx: '' })).toBe(72879);
+  });
+
+  it('values a market order at the market', () => {
+    expect(notionalPrice({ ...base, orderKind: 'market' })).toBe(72879);
+  });
+
+  it('has no price when nothing is known', () => {
+    expect(notionalPrice({ ...base, triggerPx: '', currentPrice: null })).toBeNull();
   });
 });

@@ -38,10 +38,12 @@
 
   <ion-list inset class="fields">
     <ion-item lines="full">
-      <ion-label position="stacked">
+      <ion-label position="stacked" class="ion-text-wrap">
         <div>Size to close</div>
         @if (sz() && isSizeInvalid()) {
           <div class="hint notice--high">Between 0 and the position size</div>
+        } @else if (closeRefusal(); as refusal) {
+          <div class="hint notice--high">{{ refusal }}</div>
         }
       </ion-label>
       <ion-input

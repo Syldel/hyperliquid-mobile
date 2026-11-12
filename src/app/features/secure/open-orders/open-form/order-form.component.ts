@@ -90,6 +90,7 @@ import {
   isLimitOnWrongSide,
   isStopLimitTight,
   limitFromTrigger,
+  notionalPrice,
   orderPricesReady,
   stopLimitSpread,
   type OrderKind,
@@ -290,7 +291,13 @@ export class OrderFormComponent implements OnInit {
 
   sizeUsd = computed(() => {
     const sz = parseFloat(this.sz());
-    const price = parseFloat(this.limitPx()) || this.currentPrice() || 0;
+    const price = notionalPrice({
+      orderKind: this.orderKind(),
+      isMarketTrigger: this.isMarket(),
+      limitPx: this.limitPx(),
+      triggerPx: this.triggerPx(),
+      currentPrice: this.currentPrice(),
+    });
     if (!sz || isNaN(sz) || !price) return null;
     return sz * price;
   });

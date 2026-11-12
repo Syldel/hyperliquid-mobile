@@ -101,6 +101,31 @@ export function orderPricesReady(input: {
 }
 
 /**
+ * Le prix auquel la valeur d'un ordre se compare au minimum de 10 $ d'Hyperliquid.
+ *
+ * Un déclencheur AU MARCHÉ se juge à son déclencheur, pas à son prix limite : ce limite n'est que
+ * la borne de glissement de 10 % que l'exchange applique de toute façon. Le juger à la borne
+ * bloquait un stop valide — mesuré le 2026-11-12 : 0,00015 BTC, déclencheur 71 800, borne 64 621,
+ * « 9,69 $ » et bouton désactivé ; le même stop, posé après une exécution au marché (borne 64 360,
+ * 9,65 $), a été ACCEPTÉ par Hyperliquid (oid 602706369092). Un ordre au marché se juge au marché ;
+ * tout autre au prix limite saisi, sinon au marché.
+ */
+export function notionalPrice(input: {
+  orderKind: OrderKind;
+  isMarketTrigger: boolean;
+  limitPx: string;
+  triggerPx: string;
+  currentPrice: number | null;
+}): number | null {
+  const current = input.currentPrice && input.currentPrice > 0 ? input.currentPrice : null;
+  if (input.orderKind === 'market') return current;
+  if (input.orderKind === 'trigger' && input.isMarketTrigger) {
+    return isPositivePrice(input.triggerPx) ? parseFloat(input.triggerPx) : current;
+  }
+  return isPositivePrice(input.limitPx) ? parseFloat(input.limitPx) : current;
+}
+
+/**
  * Le prix limite d'un ordre déclencheur est du MAUVAIS côté du déclencheur : sous lui pour un
  * achat, au-dessus pour une vente. Le limite est le pire prix accepté, donc il se trouve
  * toujours du côté où l'on accepte de payer plus (achat) ou de recevoir moins (vente) que le
