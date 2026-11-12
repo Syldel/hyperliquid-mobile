@@ -106,6 +106,14 @@ import { buildMarketOrder, isValidMaxSlippage } from '../market-order/market-exe
 import type { MarketFillOutcome } from '../market-order/market-fill.util';
 import { MarketOrderService } from '../market-order/market-order.service';
 import { MIN_MAX_SLIPPAGE_PCT, MAX_MAX_SLIPPAGE_PCT } from '../market-order/market-execution.util';
+import {
+  crossingCloseLimitWarning,
+  marginShortfallWarning,
+  openingSize,
+  positionEffect,
+  wideSlippageWarning,
+  type OpenPosition,
+} from './order-guards.util';
 
 export type OrderFormMode = 'place' | 'modify';
 
@@ -353,6 +361,69 @@ export class OrderFormComponent implements OnInit {
     return `Limit is only ${(spread * 100).toFixed(2)}% from the trigger: this stop may trigger without filling and leave the position open.`;
   });
 
+  /**
+   * La position ouverte sur la paire, pour les garde-fous, quel que soit le type d'ordre.
+   * `activePosition` ne convient pas : elle n'est lue que pour un déclencheur, et sa lecture
+   * PRÉRÈGLE la taille et le sens de clôture. Sans celle-ci, un achat qui réduisait un short
+   * passait pour une ouverture, et G3 l'avertissait d'une marge qu'il ne demandait pas (mesuré le
+   * 2026-11-12 : short ETH 0,0343, achat de 0,006 annoncé « Needs ≈ 4.04 $ of margin »).
+   */
+  heldPosition = signal<OpenPosition | null>(null);
+
+  /**
+   * Les garde-fous (`order-guards.util.ts`) : des ordres valides, mais probablement pas voulus.
+   * Dits, jamais bloqués — `isFormInvalid` ne les lit pas. `info` : ce que l'ordre fera, sans
+   * surprise ; `warning` : ce qui en serait une.
+   */
+  guardNotices = computed(() => {
+    const notices: { tone: 'info' | 'warning'; text: string }[] = [];
+    if (this.isModify()) return notices;
+    const sz = parseFloat(this.sz());
+    const isBuy = this.isBuy();
+    const reduceOnly = this.reduceOnly();
+    const position = this.heldPosition();
+
+    const crossing = crossingCloseLimitWarning({
+      orderKind: this.orderKind(),
+      reduceOnly,
+      isBuy,
+      limitPx: this.limitPx(),
+      currentPrice: this.currentPrice(),
+    });
+    if (crossing) notices.push({ tone: 'warning', text: crossing });
+
+    // Un déclencheur ici est un TP/SL reduce-only : il ne retourne rien.
+    if (this.orderKind() !== 'trigger') {
+      const effect = positionEffect({
+        position,
+        isBuy,
+        sz,
+        reduceOnly,
+        usesBuySell: this.usesBuySell(),
+      });
+      if (effect) {
+        notices.push({ tone: effect.kind === 'flips' ? 'warning' : 'info', text: effect.text });
+      }
+
+      const opening = openingSize({ position, isBuy, sz, reduceOnly });
+      const usd = this.sizeUsd();
+      const shortfall = marginShortfallWarning({
+        openingSz: opening,
+        freedSz: position && position.isBuy !== isBuy && opening > 0 ? position.sz : 0,
+        price: usd !== null && sz > 0 ? usd / sz : null,
+        leverage: this.isPerpCoin() ? (this.leverage()?.value ?? null) : null,
+        available: this.capitalAmount(),
+      });
+      if (shortfall) notices.push({ tone: 'warning', text: shortfall });
+    }
+
+    if (this.orderKind() === 'market') {
+      const slippage = wideSlippageWarning(Number(this.slippageInput()));
+      if (slippage && !this.isSlippageInvalid()) notices.push({ tone: 'warning', text: slippage });
+    }
+    return notices;
+  });
+
   isFormInvalid = computed(() => {
     if (blocksPlacement(this.marketData())) return true;
     if (blocksOnMarketMeta(this.marketMeta())) return true;
@@ -535,6 +606,7 @@ export class OrderFormComponent implements OnInit {
           this.orderKind.set('limit');
         }
         this.activePosition.set(null);
+        this.heldPosition.set(null);
         // Le prix, le levier et l'état de marché étaient ceux de l'actif PRÉCÉDENT
         // jusqu'à la réponse suivante — et restaient tels quels si elle échouait
         // (le prix de BTC sous un ETH choisi, mesuré le 2026-10-16).
@@ -549,6 +621,7 @@ export class OrderFormComponent implements OnInit {
           return;
         }
         this.loadMarketMeta(coin);
+        this.loadHeldPosition(coin);
         if (this.orderKind() === 'trigger') {
           this.loadActivePosition();
         }
@@ -793,6 +866,26 @@ export class OrderFormComponent implements OnInit {
         return of(ACTIVE_ASSET_UNAVAILABLE);
       }),
     );
+  }
+
+  /**
+   * La position de la paire pour les garde-fous : une lecture par changement de paire (poids 2),
+   * sans rien prérégler. Une lecture en échec laisse `null` : les garde-fous qui en dépendent se
+   * taisent, ils n'inventent pas une position.
+   */
+  private loadHeldPosition(coin: string): void {
+    const dex = hlPerpDexOf(coin);
+    if (this.isModify() || dex === null) return;
+    this.hlInfo.getClearinghouseState(dex).subscribe({
+      next: (state) => {
+        // La réponse d'une paire précédente n'écrase pas celle de la paire choisie depuis.
+        if (this.selectedCoin() !== coin) return;
+        const position = state.assetPositions.find((ap) => ap.position?.coin === coin)?.position;
+        const szi = position ? Number(position.szi) : 0;
+        this.heldPosition.set(szi ? { isBuy: szi > 0, sz: Math.abs(szi) } : null);
+      },
+      error: () => this.heldPosition.set(null),
+    });
   }
 
   private loadActivePosition(): void {

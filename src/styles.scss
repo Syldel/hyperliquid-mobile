@@ -183,3 +183,29 @@ a[href*='tradingview.com'] {
 .canvas-pointer-events-none canvas {
   pointer-events: none;
 }
+
+/* Un spinner À CÔTÉ du libellé d'un bouton prend la taille du texte, pas la sienne.
+
+   `ion-spinner` mesure 28 × 28 px quel que soit son contenant : dans un bouton
+   `size="small"`, il dépassait la ligne de texte et le bouton grandissait à son
+   apparition, puis rétrécissait à sa disparition. Rien ne l'écartait non plus du
+   libellé qui le suit (« ⟳Refresh »). Une règle ici plutôt qu'un correctif par
+   bouton : le prochain bouton à spinner l'oublierait.
+
+   Seulement le spinner placé dans un slot (`start` / `end`) : celui qui REMPLACE
+   le libellé ou une icône seule (Login, Save, la coche d'un en-tête) garde sa
+   taille, qui est celle de ce qu'il remplace. */
+ion-button ion-spinner[slot='start'],
+ion-button ion-spinner[slot='end'] {
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+}
+
+ion-button ion-spinner[slot='start'] {
+  margin-inline-end: 0.4em;
+}
+
+ion-button ion-spinner[slot='end'] {
+  margin-inline-start: 0.4em;
+}

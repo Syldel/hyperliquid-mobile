@@ -34,6 +34,9 @@ describe('OrderFormComponent — market order', () => {
   let send: ReturnType<typeof vi.fn>;
   let placeOrders: ReturnType<typeof vi.fn>;
   let readPositionSize: ReturnType<typeof vi.fn>;
+  /** Les positions que `clearinghouseState` rend : la forme d'Hyperliquid, réduite à ce qui est lu. */
+  let heldPositions: { position: { coin: string; szi: string; entryPx: string } }[] = [];
+  afterEach(() => (heldPositions = []));
 
   function settle(): void {
     fixture.detectChanges();
@@ -94,7 +97,7 @@ describe('OrderFormComponent — market order', () => {
         {
           provide: HyperliquidInfoService,
           useValue: {
-            getClearinghouseState: () => of({ assetPositions: [] }),
+            getClearinghouseState: () => of({ assetPositions: heldPositions }),
             getActiveAssetData: () => of(null),
           },
         },
@@ -318,6 +321,21 @@ describe('OrderFormComponent — market order', () => {
 
     expect(form.marketOutcome()).toMatchObject({ tone: 'high' });
     expect(form.marketOutcome()?.text).toContain('check it on Hyperliquid');
+  });
+
+  // Mesuré le 2026-11-12 : short ETH 0,0343, un achat de 0,006 passait pour une ouverture — G2 se
+  // taisait et G3 annonçait une marge qu'un achat qui réduit ne demande pas.
+  it('reads the held position for a market order, so a buy against a short reads as a reduction', () => {
+    heldPositions = [{ position: { coin: 'BTC', szi: '-0.0003', entryPx: '100000' } }];
+    create();
+    form.currentPrice.set(100000);
+    form.orderKind.set('market');
+    form.isBuy.set(true);
+    form.sz.set('0.0001');
+    settle();
+    expect(form.guardNotices()).toEqual([
+      { tone: 'info', text: 'Reduces your short 0.0003 to 0.0002.' },
+    ]);
   });
 
   it('offers no market order on a spot market, and falls back to limit', () => {

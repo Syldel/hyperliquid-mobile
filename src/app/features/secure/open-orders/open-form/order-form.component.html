@@ -254,6 +254,18 @@
           </ion-item>
         }
       }
+      <!-- Les garde-fous : des ordres valides, probablement pas voulus. Dits, jamais bloqués. -->
+      @for (notice of guardNotices(); track notice.text) {
+        <ion-item
+          lines="none"
+          class="guard-notice"
+          [class.guard-notice--warning]="notice.tone === 'warning'"
+        >
+          <ion-label class="ion-text-wrap" [attr.role]="notice.tone === 'warning' ? 'alert' : null">
+            {{ notice.text }}
+          </ion-label>
+        </ion-item>
+      }
     </ion-list>
   </div>
 

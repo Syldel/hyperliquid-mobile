@@ -152,6 +152,18 @@
   font-weight: 500;
 }
 
+/* Les garde-fous (`guardNotices`) : l'information en gris, l'avertissement dans le jaune « texte »,
+   comme `stop-limit-warning`. */
+.guard-notice ion-label {
+  color: var(--ion-color-medium);
+  font-size: 0.85rem;
+}
+
+.guard-notice--warning ion-label {
+  color: var(--ion-color-warning-shade);
+  font-weight: 500;
+}
+
 /* Ce qu'il est advenu d'un ordre au marché. Texte dans la couleur « texte » du niveau, sans fond
    teinté (docs/theming.md, « Un fond teinté de la couleur de son propre texte »). */
 .market-outcome {

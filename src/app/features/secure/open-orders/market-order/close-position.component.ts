@@ -48,6 +48,7 @@ import {
   MAX_MAX_SLIPPAGE_PCT,
   MIN_MAX_SLIPPAGE_PCT,
 } from './market-execution.util';
+import { wideSlippageWarning } from '../open-form/order-guards.util';
 import type { MarketFillOutcome } from './market-fill.util';
 import {
   MarketOrderConfirmComponent,
@@ -122,6 +123,8 @@ export class ClosePositionComponent implements OnInit {
   readonly actionLabel = computed(() => (this.isLong() ? 'Close long' : 'Close short'));
 
   readonly isSlippageInvalid = computed(() => !isValidMaxSlippage(Number(this.slippageInput())));
+  /** G4 : un glissement maximal large, dit sans bloquer (`order-guards.util.ts`). */
+  readonly slippageWarning = computed(() => wideSlippageWarning(Number(this.slippageInput())));
   readonly isSizeInvalid = computed(() => {
     const sz = Number(this.sz());
     return !(sz > 0) || sz > this.positionSz() + 1e-12;

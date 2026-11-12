@@ -20,10 +20,12 @@ import type { AccountAbstractionMode, CollateralBalance } from '@syldel/hl-share
  * Le gateway interroge le mode (`userAbstraction`) et route en conséquence ;
  * l'app lit sa réponse. Le mode se lit, il ne se suppose pas.
  *
- * ⚠️ `parseFloat` est assumé ici, et nulle part ailleurs : cette valeur n'est
- * qu'**affichée**. Elle n'est comparée à rien et n'est jamais envoyée comme
- * taille d'ordre — le dimensionnement vit dans le bot, en `DecimalString`. Si
- * un jour elle sert à autre chose qu'à écrire « ≈ $X », ce choix se rouvre.
+ * ⚠️ `parseFloat` est assumé ici, et nulle part ailleurs : cette valeur est
+ * **affichée**, et depuis le 2026-11-12 comparée à la marge d'un ordre pour un
+ * AVERTISSEMENT du formulaire (`marginShortfallWarning`, jamais un blocage).
+ * Elle n'est jamais envoyée comme taille d'ordre — le dimensionnement vit dans
+ * le bot, en `DecimalString`. Si un jour elle décide de quelque chose, ce choix
+ * se rouvre.
  * ============================================================================
  */
 

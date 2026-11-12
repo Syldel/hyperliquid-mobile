@@ -34,7 +34,12 @@
 
   @if (snapshot(); as snap) {
     @if (risk(); as r) {
-      <div class="verdict" [class]="'verdict verdict--' + r.verdict" role="status">
+      <div
+        class="verdict"
+        [class]="'verdict verdict--' + r.verdict"
+        [class.changed]="changed().has('verdict')"
+        role="status"
+      >
         Execution risk:
         <strong>
           {{ r.verdict === 'ok' ? 'OK' : r.verdict === 'caution' ? 'Caution' : 'High' }}
@@ -47,7 +52,7 @@
       <dd>{{ snap.mid | number: '1.0-6' }}</dd>
 
       <dt>{{ isBuy() ? 'Worst price' : 'Lowest price' }}</dt>
-      <dd>
+      <dd [class.changed]="changed().has('worst-price')">
         <strong>{{ worstPx() }}</strong>
         <span class="muted">({{ isBuy() ? '+' : '−' }}{{ maxSlippagePct() }} %)</span>
       </dd>
@@ -123,12 +128,22 @@
       </ul>
     }
 
+    @if (changes().length) {
+      <p class="notice notice--high" role="alert">
+        Changed since you read it:
+        @for (c of changes(); track c.id) {
+          {{ c.text }}{{ $last ? '.' : ';' }}
+        }
+        Nothing was sent: check, then confirm again.
+      </p>
+    }
+
     <div class="freshness">
-      <span [class.notice--high]="stale()" class="small">
+      <span class="muted small">
+        Prices as of {{ snap.readAt | date: 'HH:mm:ss' }}
         @if (stale()) {
-          Market read {{ ageSeconds() }} s ago: refresh before sending.
-        } @else {
-          Market read {{ ageSeconds() }} s ago.
+          <br />
+          Re-read when you confirm.
         }
       </span>
       <ion-button size="small" fill="outline" [disabled]="loading()" (click)="refresh()">
@@ -150,7 +165,10 @@
     One immediate-or-cancel order at the price above: what the book cannot fill within it is
     cancelled, never retried.
   </p>
+</ion-content>
 
+<!-- Un pied fixe : les boutons ne bougent pas sous le doigt quand le contenu se charge ou change. -->
+<ion-footer>
   <div class="actions">
     <ion-button fill="outline" color="medium" (click)="dismiss()">Cancel</ion-button>
     <ion-button
@@ -158,7 +176,10 @@
       [disabled]="!canConfirm()"
       (click)="confirm()"
     >
+      @if (loading() && snapshot()) {
+        <ion-spinner name="crescent" slot="start" />
+      }
       Confirm {{ actionLabel() }}
     </ion-button>
   </div>
-</ion-content>
+</ion-footer>

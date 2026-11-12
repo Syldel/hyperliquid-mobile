@@ -123,11 +123,22 @@
   margin: 8px 0;
 }
 
+/* Un chiffre qui a changé depuis la lecture précédente : souligné, dans la couleur du texte qui
+   le porte — pas un fond teinté, qui mange le contraste (docs/theming.md). */
+.changed {
+  text-decoration: underline wavy var(--ion-color-danger);
+  text-underline-offset: 3px;
+}
+
+ion-footer {
+  background: var(--ion-background-color);
+}
+
 .actions {
   display: grid;
   grid-template-columns: 1fr 2fr;
   gap: 8px;
-  margin-top: 12px;
+  padding: 8px 16px calc(8px + var(--ion-safe-area-bottom, 0px));
 
   ion-button {
     margin: 0;

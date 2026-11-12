@@ -59,6 +59,8 @@
         <div>Max slippage %</div>
         @if (isSlippageInvalid()) {
           <div class="hint notice--high">{{ slippageBounds.min }} – {{ slippageBounds.max }} %</div>
+        } @else if (slippageWarning(); as warning) {
+          <div class="hint notice--caution ion-text-wrap" role="alert">{{ warning }}</div>
         }
       </ion-label>
       <ion-input

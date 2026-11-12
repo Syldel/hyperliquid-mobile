@@ -1,4 +1,4 @@
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -13,6 +13,7 @@ import {
   IonButton,
   IonButtons,
   IonContent,
+  IonFooter,
   IonHeader,
   IonIcon,
   IonSpinner,
@@ -27,6 +28,12 @@ import { closeOutline } from 'ionicons/icons';
 import { estimateLiquidation, type LiquidationEstimate } from './liquidation-estimate.util';
 import { walkBook, worstPrice } from './market-execution.util';
 import { MarketOrderService, type TakerRate } from './market-order.service';
+import {
+  CONFIRM_SETTLE_MS,
+  figureChanges,
+  type ConfirmedFigures,
+  type FigureChange,
+} from './market-recheck.util';
 import { assessMarketRisk, describeFunding, formatPct } from './market-risk.util';
 import {
   MARKET_SNAPSHOT_MAX_AGE_MS,
@@ -51,8 +58,13 @@ export interface MarketOrderTicket {
  * plafond qui partira, le coût estimé de CETTE taille dans le carnet, les frais, le verdict de
  * risque critère par critère, et — en ouverture, en isolé — le prix de liquidation estimé.
  *
- * Elle n'envoie rien : elle rend le plafond à l'appelant, qui envoie. Passé
- * `MARKET_SNAPSHOT_MAX_AGE_MS`, la confirmation exige une relecture.
+ * Elle n'envoie rien : elle rend le plafond à l'appelant, qui envoie.
+ *
+ * Elle ne presse pas (2026-11-12) : l'heure de la lecture s'affiche, pas un âge qui défile, et
+ * Confirm reste actif. Passé `MARKET_SNAPSHOT_MAX_AGE_MS`, Confirm RELIT le marché ; l'ordre ne
+ * part sans nouveau geste que si les chiffres lus tiennent encore (`figureChanges`), sinon les
+ * changements sont dits et il faut reconfirmer. Les boutons sont dans un pied fixe : ils ne
+ * bougent pas sous le doigt quand le contenu se charge.
  * ============================================================================
  */
 @Component({
@@ -60,6 +72,7 @@ export interface MarketOrderTicket {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DatePipe,
     DecimalPipe,
     IonHeader,
     IonToolbar,
@@ -68,6 +81,7 @@ export interface MarketOrderTicket {
     IonButton,
     IonIcon,
     IonContent,
+    IonFooter,
     IonSpinner,
   ],
   templateUrl: './market-order-confirm.component.html',
@@ -96,8 +110,13 @@ export class MarketOrderConfirmComponent implements OnInit {
   readonly loading = signal(false);
   readonly loadError = signal<string | null>(null);
   readonly takerRate = signal<TakerRate | null>(null);
-  /** L'horloge qui fait vieillir la photographie ; un signal pour que l'âge se recalcule. */
+  /** L'horloge qui fait vieillir la photographie ; un signal pour que `stale` se recalcule. */
   readonly now = signal(Date.now());
+  /** Les changements depuis la lecture précédente, qui obligent à reconfirmer. */
+  readonly changes = signal<FigureChange[]>([]);
+  /** Faux pendant `CONFIRM_SETTLE_MS` après chaque changement des chiffres. */
+  readonly settled = signal(false);
+  private settleTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly maxSlippagePct = this.marketOrders.maxSlippagePct;
   readonly formatPct = formatPct;
@@ -181,20 +200,17 @@ export class MarketOrderConfirmComponent implements OnInit {
     return describeFunding(this.snapshot()?.funding ?? null, this.isBuy());
   });
 
-  readonly ageSeconds = computed(() => {
-    const snap = this.snapshot();
-    if (!snap) return null;
-    return Math.max(0, Math.floor((this.now() - snap.readAt) / 1000));
-  });
-
   readonly stale = computed(() => {
     const snap = this.snapshot();
     return !!snap && this.now() - snap.readAt > MARKET_SNAPSHOT_MAX_AGE_MS;
   });
 
+  /** Une lecture trop vieille n'empêche pas de confirmer : Confirm la relit d'abord. */
   readonly canConfirm = computed(
-    () => !this.loading() && this.worstPx() !== null && !this.stale() && this.szNum() > 0,
+    () => !this.loading() && this.settled() && this.worstPx() !== null && this.szNum() > 0,
   );
+
+  readonly changed = computed(() => new Set(this.changes().map((c) => c.id)));
 
   constructor() {
     addIcons({ closeOutline });
@@ -202,12 +218,38 @@ export class MarketOrderConfirmComponent implements OnInit {
 
   ngOnInit(): void {
     const timer = setInterval(() => this.now.set(Date.now()), 1000);
-    this.destroyRef.onDestroy(() => clearInterval(timer));
+    this.destroyRef.onDestroy(() => {
+      clearInterval(timer);
+      if (this.settleTimer) clearTimeout(this.settleTimer);
+    });
     this.refresh();
   }
 
-  /** Relit le marché : à l'ouverture, et sur demande quand la photographie a vieilli. */
+  /** Les chiffres que l'utilisateur a sous les yeux, pour les comparer à la lecture suivante. */
+  private figures(): ConfirmedFigures | null {
+    const worst = this.worstPx();
+    const risk = this.risk();
+    return worst !== null && risk ? { worstPx: worst, verdict: risk.verdict } : null;
+  }
+
+  /** Confirm reste inactif un instant après chaque changement des chiffres. */
+  private unsettle(): void {
+    this.settled.set(false);
+    if (this.settleTimer) clearTimeout(this.settleTimer);
+    this.settleTimer = setTimeout(() => this.settled.set(true), CONFIRM_SETTLE_MS);
+  }
+
+  /** Relit le marché : à l'ouverture, et sur demande. */
   refresh(): void {
+    this.read(false);
+  }
+
+  /**
+   * Une lecture, une seule (2 requêtes, poids 22). `thenSend` : la relecture faite par Confirm ;
+   * l'ordre part si les chiffres tiennent, sinon les changements s'affichent et rien ne part.
+   */
+  private read(thenSend: boolean): void {
+    const before = this.figures();
     this.loading.set(true);
     this.loadError.set(null);
     this.marketOrders.readSnapshot(this.coin()).subscribe({
@@ -215,9 +257,19 @@ export class MarketOrderConfirmComponent implements OnInit {
         this.reading.set(reading);
         this.now.set(Date.now());
         this.loading.set(false);
+        const after = this.figures();
+        const changes = before && after ? figureChanges(before, after) : [];
+        this.changes.set(changes);
+        if (thenSend && after && changes.length === 0) {
+          this.settled.set(true);
+          this.send();
+          return;
+        }
+        this.unsettle();
       },
       error: (error: unknown) => {
         this.reading.set(null);
+        this.changes.set([]);
         this.loadError.set(`Could not read the market: ${extractErrorMessage(error as Error)}`);
         this.loading.set(false);
       },
@@ -226,10 +278,21 @@ export class MarketOrderConfirmComponent implements OnInit {
   }
 
   confirm(): void {
+    // Le bouton est désactivé dans ces cas ; `confirm()` est public, le refus ne dépend pas de lui.
+    if (!this.canConfirm()) return;
+    // L'horloge `now` avance par secondes : l'âge se relit ici, à la milliseconde.
+    const snap = this.snapshot();
+    if (!snap || Date.now() - snap.readAt > MARKET_SNAPSHOT_MAX_AGE_MS) {
+      this.read(true);
+      return;
+    }
+    this.send();
+  }
+
+  private send(): void {
     const worst = this.worstPx();
     const snap = this.snapshot();
-    // Le bouton est désactivé dans ces cas ; `confirm()` est public, le refus ne dépend pas de lui.
-    if (!this.canConfirm() || worst === null || !snap) return;
+    if (worst === null || !snap || this.szNum() <= 0) return;
     const ticket: MarketOrderTicket = { worstPx: worst, mid: snap.mid, readAt: snap.readAt };
     this.modalCtrl.dismiss(ticket, 'confirm');
   }
