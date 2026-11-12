@@ -987,19 +987,20 @@ Profit Limit"`, `triggerCondition: "Price above 81959"`.
    mid + 1 %, exécuté en une fois à 2 017,3, frais 0,031137 $ = 0,045 % du notionnel, le taux
    affiché). La feuille de fermeture dit « cancels it at once » pour eux. ⚠️ Pas mesuré pour un TP/SL « de position » : sa
    phrase dit « should cancel it ».
-8. **⚠️ Une fermeture partielle sous 10 $ : refusée à 2,2 $, seuil non mesuré.** Mesuré le
-   2026-11-12, **un seul point** : un IOC reduce-only de 0,00003 BTC (≈ 2,2 $) a fini
-   `minTradeNtlRejected` (oid 602702312897). Hyperliquid n'a donc pas exempté ce reduce-only du
-   minimum. La feuille de fermeture bloque une fermeture partielle sous 10 $
-   (`partialCloseRefusal`) : c'est une **supposition** que le seuil est le minimum ordinaire, choisie
-   pour échouer tôt (fermer davantage ou 100 % reste possible). Entre 2,2 et 10 $, elle peut bloquer
-   une fermeture qu'Hyperliquid accepterait. La mesure demande une position d'au moins 20 $ (le
-   compte n'en permettait pas le 2026-11-12). **La fermeture à 100 % d'une position sous 10 $, elle,
-   est acceptée** : mesuré le 2026-11-12 à 22:13:50.175 UTC, depuis le mobile (`Close › Market` à
-   100 %), un IOC reduce-only de 0,00001 BTC (≈ 0,71 $, plafond 70 740 = mid − 1 %) a été rempli à
-   71 459, frais 0,000321 $ (603233856328). Le minimum ne s'applique donc pas de la même façon à
-   une fermeture qui solde la position et à une fermeture partielle. La feuille ne bloque pas le
-   100 %, à raison.
+8. **✅ Une fermeture partielle sous 10 $ : refusée ; une fermeture à 100 % sous 10 $ : acceptée.**
+   Mesuré le 2026-11-12, deux refus `minTradeNtlRejected` pour un IOC reduce-only partiel :
+   0,00003 BTC (≈ 2,2 $, oid 602702312897) puis 0,00013 BTC (≈ 9,29 $ sur une position de 21,4 $,
+   oid 603242720281, 22:31:33.505 UTC), avec le texte « Order must have minimum value of $10.
+   asset=0 ». Le second a été envoyé depuis le mobile avec le blocage levé dans le worktree le
+   temps d'un envoi, puis remis en place. Le seuil est le minimum ordinaire de 10 $, et le
+   blocage de la feuille (`partialCloseRefusal`) évite un refus connu.
+
+   **La fermeture à 100 % d'une position sous 10 $, elle, est acceptée.** Mesuré le 2026-11-12 à
+   22:13:50.175 UTC, depuis le mobile (`Close › Market` à 100 %) : un IOC reduce-only de
+   0,00001 BTC (≈ 0,71 $, plafond 70 740 = mid − 1 %) a été rempli à 71 459, frais 0,000321 $
+   (603233856328). Le minimum ne s'applique donc pas de la même façon à une fermeture qui solde la
+   position et à une fermeture partielle. La feuille ne bloque pas le 100 %, à raison.
+
 9. **✅ Un stop au marché sous 10 $ à sa borne, mais pas à son déclencheur : accepté, déclenché,
    exécuté.** Mesuré le 2026-11-12, posé depuis le mobile. Ce matin, un Stop Market de 0,00015 BTC
    (déclencheur 71 510, borne 64 360, 9,65 $ à la borne) avait été **accepté à la pose**

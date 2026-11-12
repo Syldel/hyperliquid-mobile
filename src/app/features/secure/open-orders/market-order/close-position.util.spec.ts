@@ -85,7 +85,7 @@ describe('partialCloseRefusal', () => {
 
   it('blocks a partial close under 10 $, and says what was measured', () => {
     expect(partialCloseRefusal({ ...position, closeSz: 0.00003 })).toBe(
-      '≈ 2.19 $, under the 10 $ order minimum: Hyperliquid refused a 2.2 $ partial close (minTradeNtlRejected). Close more, or 100 %.',
+      '≈ 2.19 $, under the 10 $ order minimum: Hyperliquid refuses a partial close below it, even reduce-only. Close more, or 100 %.',
     );
   });
 

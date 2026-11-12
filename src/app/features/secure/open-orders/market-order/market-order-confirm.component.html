@@ -62,8 +62,9 @@
 
       <dt>{{ isBuy() ? 'Worst price' : 'Lowest price' }}</dt>
       <dd [class.changed]="changed().has('worst-price')">
+        <!-- `&nbsp;` : Angular retire l'espace entre deux éléments, « 0.04299(+1 %) » collait. -->
         <strong>{{ worstPx() }}</strong>
-        <span class="muted">({{ isBuy() ? '+' : '−' }}{{ maxSlippagePct() }} %)</span>
+        <span class="muted">&nbsp;({{ isBuy() ? '+' : '−' }}{{ maxSlippagePct() }} %)</span>
       </dd>
 
       <dt>Est. avg price</dt>

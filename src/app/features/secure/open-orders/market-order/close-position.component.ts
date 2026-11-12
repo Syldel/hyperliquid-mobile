@@ -135,8 +135,8 @@ export class ClosePositionComponent implements OnInit {
   });
 
   /**
-   * Une fermeture partielle sous 10 $ est bloquée. Hyperliquid en a refusé une à 2,2 $ (mesuré le
-   * 2026-11-12) ; ⚠️ le seuil exact n'est pas mesuré (voir `partialCloseRefusal`).
+   * Une fermeture partielle sous 10 $ est bloquée : Hyperliquid la refuse, mesuré à 2,2 $ et à
+   * 9,29 $ le 2026-11-12 (voir `partialCloseRefusal`).
    */
   readonly closeRefusal = computed(() => {
     const szi = Math.abs(Number(this.position().szi));

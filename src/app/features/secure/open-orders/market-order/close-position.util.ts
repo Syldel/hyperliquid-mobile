@@ -69,14 +69,14 @@ export const MIN_ORDER_VALUE_USD = 10;
 /**
  * Le blocage d'une fermeture PARTIELLE sous 10 $, ou `null`.
  *
- * Mesuré le 2026-11-12, **un seul point** : un IOC reduce-only de 0,00003 BTC (≈ 2,2 $), 25 % d'une
- * position de 10,9 $, a fini `minTradeNtlRejected` (oid 602702312897). Hyperliquid n'a donc pas
- * exempté CE reduce-only du minimum.
- *
- * ⚠️ Le seuil n'est pas mesuré : bloquer jusqu'à 10 $ SUPPOSE que le minimum d'une fermeture
- * partielle est le minimum ordinaire de 10 $. Entre 2,2 et 10 $, ce blocage peut refuser une
- * fermeture qu'Hyperliquid aurait acceptée. Le choix est d'échouer tôt : fermer davantage, ou 100 %,
- * reste possible. Le mesurer demande une position d'au moins 20 $.
+ * Mesuré le 2026-11-12, deux fois : Hyperliquid refuse une fermeture partielle reduce-only sous
+ * 10 $, avec `minTradeNtlRejected`.
+ * - 0,00003 BTC (≈ 2,2 $), 25 % d'une position de 10,9 $ (oid 602702312897) ;
+ * - 0,00013 BTC (≈ 9,29 $), sur une position de 21,4 $ (oid 603242720281), avec le texte « Order
+ *   must have minimum value of $10. asset=0 ». Ce point a été mesuré en levant ce blocage dans une
+ *   copie de travail, le temps d'un envoi.
+ * Le seuil est donc le minimum ordinaire de 10 $ : le texte le nomme, et 9,29 $ est refusé. Bloquer
+ * ici évite un refus connu.
  *
  * Une fermeture à 100 % n'est PAS bloquée : une position qui vaut déjà moins de 10 $ doit pouvoir
  * se fermer, et Hyperliquid l'accepte — mesuré le 2026-11-12, 0,00001 BTC (≈ 0,71 $) fermé à 100 %
@@ -94,5 +94,5 @@ export function partialCloseRefusal(input: {
   if (closeSz >= positionSz - 1e-12) return null;
   const value = closeSz * markPx;
   if (value >= MIN_ORDER_VALUE_USD) return null;
-  return `≈ ${value.toFixed(2)} $, under the ${MIN_ORDER_VALUE_USD} $ order minimum: Hyperliquid refused a 2.2 $ partial close (minTradeNtlRejected). Close more, or 100 %.`;
+  return `≈ ${value.toFixed(2)} $, under the ${MIN_ORDER_VALUE_USD} $ order minimum: Hyperliquid refuses a partial close below it, even reduce-only. Close more, or 100 %.`;
 }
