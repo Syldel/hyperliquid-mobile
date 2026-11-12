@@ -79,40 +79,63 @@
     <p class="section-label">Order details</p>
     <ion-list inset>
       <div class="two-col">
-        <ion-item lines="full">
-          <ion-label position="stacked">
-            <div>Limit price</div>
-            @if (currentPrice(); as price) {
-              <span class="current-price-hint">
-                Market: {{ price | number: '1.2-6' }}
-                @if (priceDiffPct(); as pct) {
-                  <span class="diff" [class]="priceDiffClass()">
-                    {{ pct >= 0 ? '+' : '' }}{{ pct | number: '1.2-2' }}%
-                  </span>
-                }
-              </span>
-            }
-            <!-- D'où vient ce prix et à combien du déclencheur : une valeur dérivée qui ne se
+        @if (orderKind() === 'market') {
+          <!-- Pas de prix saisi : le plafond se calcule à la confirmation, sur le mid relu alors. -->
+          <ion-item lines="full">
+            <ion-label position="stacked">
+              <div>Max slippage %</div>
+              @if (currentPrice(); as price) {
+                <span class="current-price-hint">Market: {{ price | number: '1.2-6' }}</span>
+              }
+              @if (isSlippageInvalid()) {
+                <div class="current-price-hint diff--danger">
+                  {{ slippageBounds.min }} – {{ slippageBounds.max }} %
+                </div>
+              }
+            </ion-label>
+            <ion-input
+              type="number"
+              inputmode="decimal"
+              [value]="slippageInput()"
+              (ionInput)="onSlippageInput($event.detail.value ?? '')"
+            />
+          </ion-item>
+        } @else {
+          <ion-item lines="full">
+            <ion-label position="stacked">
+              <div>Limit price</div>
+              @if (currentPrice(); as price) {
+                <span class="current-price-hint">
+                  Market: {{ price | number: '1.2-6' }}
+                  @if (priceDiffPct(); as pct) {
+                    <span class="diff" [class]="priceDiffClass()">
+                      {{ pct >= 0 ? '+' : '' }}{{ pct | number: '1.2-2' }}%
+                    </span>
+                  }
+                </span>
+              }
+              <!-- D'où vient ce prix et à combien du déclencheur : une valeur dérivée qui ne se
                  dit pas est une valeur dont on ne sait pas qui l'a choisie. Deux lignes
                  courtes : sur une seule, la colonne (150 px à 360) la tronquait. -->
-            @if (limitOrigin(); as origin) {
-              <div class="limit-origin">
-                <div class="current-price-hint" [class.diff--danger]="isLimitSideInvalid()">
-                  {{ origin.pct >= 0 ? '+' : '' }}{{ origin.pct | number: '1.2-2' }}% from trigger
+              @if (limitOrigin(); as origin) {
+                <div class="limit-origin">
+                  <div class="current-price-hint" [class.diff--danger]="isLimitSideInvalid()">
+                    {{ origin.pct >= 0 ? '+' : '' }}{{ origin.pct | number: '1.2-2' }}% from trigger
+                  </div>
+                  <div class="current-price-hint">({{ origin.label }})</div>
                 </div>
-                <div class="current-price-hint">({{ origin.label }})</div>
-              </div>
-            }
-          </ion-label>
-          <ion-input
-            type="number"
-            inputmode="decimal"
-            placeholder="{{ currentPrice() ?? '0.00' }}"
-            [value]="limitPx()"
-            [disabled]="limitLocked()"
-            (ionInput)="onLimitInput($event.detail.value ?? '')"
-          />
-        </ion-item>
+              }
+            </ion-label>
+            <ion-input
+              type="number"
+              inputmode="decimal"
+              placeholder="{{ currentPrice() ?? '0.00' }}"
+              [value]="limitPx()"
+              [disabled]="limitLocked()"
+              (ionInput)="onLimitInput($event.detail.value ?? '')"
+            />
+          </ion-item>
+        }
         <ion-item lines="full">
           <ion-label position="stacked">
             <div>Size</div>
@@ -160,6 +183,9 @@
           interface="popover"
         >
           <ion-select-option value="limit">Limit</ion-select-option>
+          @if (isPerpCoin() && !isModify()) {
+            <ion-select-option value="market">Market</ion-select-option>
+          }
           <ion-select-option value="trigger">Trigger (TP/SL)</ion-select-option>
         </ion-select>
       </ion-item>
@@ -256,6 +282,13 @@
         </ion-button>
       </div>
 
+      @if (orderKind() === 'market') {
+        <p class="current-price-hint protective-note">
+          Placed right after the fill: sized on what filled, priced from its average. The prices
+          below are indicative, from the current market.
+        </p>
+      }
+
       @if (protectiveOrders().length > 0) {
         <ion-list inset>
           @for (p of protectiveOrders(); track p.id) {
@@ -291,6 +324,44 @@
     </div>
   }
 
+  @if (marketOutcome(); as outcome) {
+    <p
+      class="market-outcome"
+      [class]="'market-outcome market-outcome--' + outcome.tone"
+      role="status"
+    >
+      {{ outcome.text }}
+    </p>
+  }
+
+  @if (checkingPosition()) {
+    <p class="market-outcome">
+      <ion-spinner name="crescent" />
+      Re-reading the position…
+    </p>
+  }
+
+  @if (unprotected(); as pending) {
+    <div class="unprotected" role="alert">
+      <p>
+        <strong>Position open — not protected</strong>
+        ({{ pending.items.length }} of the protective orders): {{ pending.message }}
+      </p>
+      <ion-button
+        size="small"
+        fill="outline"
+        color="danger"
+        [disabled]="retryingProtection()"
+        (click)="retryProtection()"
+      >
+        @if (retryingProtection()) {
+          <ion-spinner name="crescent" slot="start" />
+        }
+        Retry protection
+      </ion-button>
+    </div>
+  }
+
   @if (error()) {
     <p class="error-message error-message--small error-message--padded">
       {{ error() }}
@@ -312,13 +383,17 @@
           ? 'Sending…'
           : isModify()
             ? 'Update order'
-            : isBuy()
-              ? usesBuySell()
-                ? 'Place Buy'
-                : 'Place Long'
-              : usesBuySell()
-                ? 'Place Sell'
-                : 'Place Short'
+            : closeLabel()
+              ? closeLabel()
+              : orderKind() === 'market'
+                ? 'Review market ' + sideLabel(isBuy())
+                : isBuy()
+                  ? usesBuySell()
+                    ? 'Place Buy'
+                    : 'Place Long'
+                  : usesBuySell()
+                    ? 'Place Sell'
+                    : 'Place Short'
       }}
     </ion-button>
   </div>

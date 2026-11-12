@@ -1,0 +1,164 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Confirm market order</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="dismiss()" aria-label="Cancel">
+        <ion-icon slot="icon-only" name="close-outline" />
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <p class="summary">
+    <strong [class]="isBuy() ? 'side--buy' : 'side--sell'">{{ actionLabel() }}</strong>
+    {{ sz() }} {{ coinTitle() || coin() }}
+    <span class="muted">· market (IOC){{ reduceOnly() ? ' · reduce only' : '' }}</span>
+  </p>
+
+  @if (loading() && !snapshot()) {
+    <div class="loading">
+      <ion-spinner name="crescent" />
+      Reading the order book…
+    </div>
+  }
+
+  @if (loadError(); as message) {
+    <p class="notice notice--high" role="alert">{{ message }}</p>
+  }
+  @if (unavailableReason(); as reason) {
+    <p class="notice notice--high" role="alert">
+      No price to bound the order: {{ reason }} Nothing can be sent.
+    </p>
+  }
+
+  @if (snapshot(); as snap) {
+    @if (risk(); as r) {
+      <div class="verdict" [class]="'verdict verdict--' + r.verdict" role="status">
+        Execution risk:
+        <strong>
+          {{ r.verdict === 'ok' ? 'OK' : r.verdict === 'caution' ? 'Caution' : 'High' }}
+        </strong>
+      </div>
+    }
+
+    <dl class="rows">
+      <dt>Mid</dt>
+      <dd>{{ snap.mid | number: '1.0-6' }}</dd>
+
+      <dt>{{ isBuy() ? 'Worst price' : 'Lowest price' }}</dt>
+      <dd>
+        <strong>{{ worstPx() }}</strong>
+        <span class="muted">({{ isBuy() ? '+' : '−' }}{{ maxSlippagePct() }} %)</span>
+      </dd>
+
+      <dt>Est. avg price</dt>
+      <dd>
+        @if (walk()?.avgPx; as avg) {
+          {{ avg | number: '1.0-6' }}
+        } @else {
+          —
+        }
+      </dd>
+
+      <dt>Est. value</dt>
+      <dd>
+        @if (estNotional(); as notional) {
+          ≈ {{ notional | number: '1.2-2' }} $
+        } @else {
+          —
+        }
+      </dd>
+
+      <dt>Est. taker fees</dt>
+      <dd>
+        @if (estFees(); as fees) {
+          ≈ {{ fees | number: '1.2-4' }} $
+        } @else {
+          —
+        }
+        @if (takerRate(); as rate) {
+          <span class="muted">
+            ({{ rate.rate * 100 | number: '1.3-4' }} %{{
+              rate.status === 'fallback' ? ', tier 0: account fees unreadable' : ''
+            }})
+          </span>
+        }
+      </dd>
+
+      @if (liquidation(); as liq) {
+        <dt>Est. liquidation</dt>
+        <dd>
+          @switch (liq.status) {
+            @case ('estimated') {
+              {{ liq.px | number: '1.0-2' }}
+            }
+            @case ('none') {
+              none
+              <span class="muted">({{ liq.reason }})</span>
+            }
+            @default {
+              not estimated
+              <span class="muted">({{ liq.reason }})</span>
+            }
+          }
+        </dd>
+      }
+    </dl>
+
+    @if (funding(); as fundingText) {
+      <p class="muted small">{{ fundingText }}</p>
+    }
+
+    @if (risk(); as r) {
+      <ul class="criteria">
+        @for (c of r.criteria; track c.id) {
+          <li>
+            <span class="criteria__label">{{ c.label }}</span>
+            <span class="criteria__value" [class]="'criteria__value level--' + c.level">
+              {{ c.value }}
+            </span>
+          </li>
+        }
+      </ul>
+    }
+
+    <div class="freshness">
+      <span [class.notice--high]="stale()" class="small">
+        @if (stale()) {
+          Market read {{ ageSeconds() }} s ago: refresh before sending.
+        } @else {
+          Market read {{ ageSeconds() }} s ago.
+        }
+      </span>
+      <ion-button size="small" fill="outline" [disabled]="loading()" (click)="refresh()">
+        @if (loading()) {
+          <ion-spinner name="crescent" slot="start" />
+        }
+        Refresh
+      </ion-button>
+    </div>
+  }
+
+  @if (loadError() || unavailableReason()) {
+    <ion-button size="small" fill="outline" [disabled]="loading()" (click)="refresh()">
+      Retry
+    </ion-button>
+  }
+
+  <p class="muted small">
+    One immediate-or-cancel order at the price above: what the book cannot fill within it is
+    cancelled, never retried.
+  </p>
+
+  <div class="actions">
+    <ion-button fill="outline" color="medium" (click)="dismiss()">Cancel</ion-button>
+    <ion-button
+      [color]="isBuy() ? 'success' : 'danger'"
+      [disabled]="!canConfirm()"
+      (click)="confirm()"
+    >
+      Confirm {{ actionLabel() }}
+    </ion-button>
+  </div>
+</ion-content>

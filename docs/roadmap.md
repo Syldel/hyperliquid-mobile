@@ -974,6 +974,14 @@ Profit Limit"`, `triggerCondition: "Price above 81959"`.
    **bloque** déjà un déclencheur du mauvais côté du marché (rouge, bouton désactivé) : il ne se
    teste donc pas depuis l'app. Il concerne les chemins sans ce garde — le bot, le gateway appelé
    directement — où le côté est calculé et non saisi. Valeur faible, laissé ouvert.
+6. **⚠️ Un IOC au marché rempli en partie** ([market-orders.md](market-orders.md)). On suppose la
+   forme `filled: { totalSz < taille demandée }` ; toute autre forme tombe en état inconnu, jamais
+   en succès (`market-fill.util.ts`). La mesure : un ordre plus gros que le premier niveau du
+   carnet, avec un glissement très faible.
+7. **⚠️ Le délai de `reduceOnlyCanceled` après une fermeture totale.** La doc définit le statut,
+   pas le moment. La feuille de fermeture dit que l'exchange annule ces ordres, sans dire quand.
+8. **⚠️ Une fermeture sous 10 $.** Le mobile ne la bloque pas (le verdict du serveur fait
+   autorité) ; on ne sait pas si Hyperliquid exempte un reduce-only du minimum.
 
 ## Précédent
 

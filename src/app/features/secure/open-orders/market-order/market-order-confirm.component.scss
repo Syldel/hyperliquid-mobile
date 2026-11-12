@@ -1,0 +1,135 @@
+/* Couleurs de texte par rôle, jamais la base d'Ionic pour un texte jaune : `warning-shade` est le
+   jaune « texte » (docs/theming.md, « Le jaune a deux rôles »). `danger` et `success` sont
+   surchargés par thème dans `variables.scss`. */
+
+.summary {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+.side--buy {
+  color: var(--ion-color-success);
+}
+
+.side--sell {
+  color: var(--ion-color-danger);
+}
+
+.muted {
+  color: var(--ion-color-medium);
+}
+
+.small {
+  font-size: 13px;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ion-color-medium);
+}
+
+.notice {
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.notice--high {
+  color: var(--ion-color-danger);
+}
+
+/* Le verdict : une bordure de la couleur du niveau, le texte dans la couleur « texte » du niveau,
+   sans fond teinté (un fond teinté de la couleur du texte mange le contraste, docs/theming.md). */
+.verdict {
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+.verdict--ok {
+  color: var(--ion-color-success);
+}
+
+.verdict--caution {
+  color: var(--ion-color-warning-shade);
+}
+
+.verdict--high {
+  color: var(--ion-color-danger);
+}
+
+.rows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  margin: 0 0 8px;
+  font-size: 14px;
+
+  dt {
+    color: var(--ion-color-medium);
+  }
+
+  dd {
+    margin: 0;
+    text-align: end;
+    overflow-wrap: anywhere;
+  }
+}
+
+.criteria {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+  font-size: 13px;
+
+  li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--ion-background-color-step-150);
+  }
+}
+
+.criteria__label {
+  color: var(--ion-color-medium);
+}
+
+.criteria__value {
+  text-align: end;
+}
+
+.level--ok {
+  color: var(--ion-text-color);
+}
+
+.level--caution,
+.level--unknown {
+  color: var(--ion-color-warning-shade);
+}
+
+.level--high {
+  color: var(--ion-color-danger);
+}
+
+.freshness {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 8px;
+  margin-top: 12px;
+
+  ion-button {
+    margin: 0;
+  }
+}

@@ -1,9 +1,21 @@
 import { DecimalPipe, PercentPipe } from '@angular/common';
-import { Component, computed, input, output, signal } from '@angular/core';
-import { IonBadge, IonItem, IonLabel, IonText } from '@ionic/angular/standalone';
+import { Component, computed, inject, input, output, signal } from '@angular/core';
+import {
+  IonBadge,
+  IonButton,
+  IonItem,
+  IonLabel,
+  IonText,
+  ModalController,
+} from '@ionic/angular/standalone';
 import { SmartDecimalPipe } from '@pipes/smart-decimal.pipe';
 import { MiniChartComponent } from '@shared/components/mini-chart/mini-chart.component';
 import { HLPerpPositionDetail } from '@syldel/hl-shared-types';
+import { ClosePositionComponent } from '../../../open-orders/market-order/close-position.component';
+import {
+  OrderFormComponent,
+  type ClosePreset,
+} from '../../../open-orders/open-form/order-form.component';
 
 @Component({
   selector: 'app-position-item',
@@ -13,6 +25,7 @@ import { HLPerpPositionDetail } from '@syldel/hl-shared-types';
     IonLabel,
     IonBadge,
     IonText,
+    IonButton,
     MiniChartComponent,
     DecimalPipe,
     SmartDecimalPipe,
@@ -22,9 +35,13 @@ import { HLPerpPositionDetail } from '@syldel/hl-shared-types';
   styleUrls: ['./position-item.component.scss'],
 })
 export class PositionItemComponent {
+  private readonly modalCtrl = inject(ModalController);
+
   position = input.required<HLPerpPositionDetail>();
 
   readonly clicked = output<string>();
+  /** Une action a peut-être changé la position : la page relit le compte. */
+  readonly changed = output<void>();
 
   isLong = () => parseFloat(this.position().szi) > 0;
 
@@ -43,6 +60,42 @@ export class PositionItemComponent {
 
   onClick(): void {
     this.clicked.emit(this.position().coin);
+  }
+
+  /** « Close market » : une part de la position, au marché, après confirmation. */
+  async closeMarket(event: Event): Promise<void> {
+    event.stopPropagation();
+    const position = this.position();
+    const modal = await this.modalCtrl.create({
+      component: ClosePositionComponent,
+      componentProps: { position: () => position },
+      breakpoints: [0, 1],
+      initialBreakpoint: 1,
+    });
+    await modal.present();
+    const { role } = await modal.onDidDismiss();
+    if (role === 'confirm') this.changed.emit();
+  }
+
+  /**
+   * « Close limit » : le formulaire d'ordre, prérempli en reduce-only, du côté de clôture, à la
+   * taille de la position. Le prix limite reste à choisir (le marché le pré-remplit).
+   */
+  async closeLimit(event: Event): Promise<void> {
+    event.stopPropagation();
+    const position = this.position();
+    const preset: ClosePreset = {
+      coin: position.coin,
+      isBuy: !this.isLong(),
+      sz: String(Math.abs(Number(position.szi))),
+    };
+    const modal = await this.modalCtrl.create({
+      component: OrderFormComponent,
+      componentProps: { existingOrder: null, defaultCoin: position.coin, closePreset: preset },
+    });
+    await modal.present();
+    const { role } = await modal.onDidDismiss();
+    if (role === 'confirm') this.changed.emit();
   }
 
   fundingDisplay(value: string): string {

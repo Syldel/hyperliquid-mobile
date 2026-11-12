@@ -63,7 +63,7 @@ import {
   closeOutline,
   shieldCheckmarkOutline,
 } from 'ionicons/icons';
-import { catchError, map, Observable, of, tap } from 'rxjs';
+import { catchError, map, Observable, of } from 'rxjs';
 import {
   ProtectiveOrderFormComponent,
   ProtectiveOrderResult,
@@ -92,12 +92,46 @@ import {
   limitFromTrigger,
   orderPricesReady,
   stopLimitSpread,
+  type OrderKind,
   type OriginalTriggerOrder,
   type TriggerOrderState,
 } from './order-limit.util';
 import { AgentExpiryNoticeComponent } from '@shared/components/agent-expiry-notice/agent-expiry-notice.component';
+import {
+  MarketOrderConfirmComponent,
+  type MarketOrderTicket,
+} from '../market-order/market-order-confirm.component';
+import { buildMarketOrder, isValidMaxSlippage } from '../market-order/market-execution.util';
+import type { MarketFillOutcome } from '../market-order/market-fill.util';
+import { MarketOrderService } from '../market-order/market-order.service';
+import { MIN_MAX_SLIPPAGE_PCT, MAX_MAX_SLIPPAGE_PCT } from '../market-order/market-execution.util';
 
 export type OrderFormMode = 'place' | 'modify';
+
+/**
+ * Une fermeture préparée depuis la carte d'une position (« Close limit ») : le sens de clôture et
+ * la taille de la position, en reduce-only. Une propriété ordinaire comme `existingOrder` et
+ * `defaultCoin`, lue une fois.
+ */
+export interface ClosePreset {
+  coin: string;
+  isBuy: boolean;
+  sz: string;
+}
+
+/** Le contexte d'un ordre exécuté, et les protections qu'il reste à poser dessus. */
+interface UnprotectedFill {
+  context: {
+    assetName: string;
+    isBuy: boolean;
+    limitPx: string;
+    sz: string;
+    szDecimals: number;
+    isSpot: boolean;
+  };
+  items: ProtectiveOrderResult[];
+  message: string;
+}
 
 @Component({
   selector: 'app-order-form',
@@ -129,9 +163,11 @@ export class OrderFormComponent implements OnInit {
   private readonly hlInfo = inject(HyperliquidInfoService);
   private readonly toastCtrl = inject(ToastController);
   private readonly availableCapitalService = inject(AvailableCapitalService);
+  private readonly marketOrders = inject(MarketOrderService);
 
   existingOrder: HLFrontendOpenOrder | null = null;
   defaultCoin: string = '';
+  closePreset: ClosePreset | null = null;
 
   mode = signal<OrderFormMode>('place');
 
@@ -164,8 +200,46 @@ export class OrderFormComponent implements OnInit {
   activePosition = signal<{ isBuy: boolean; sz: string; entryPx: string } | null>(null);
 
   protectiveOrders = signal<ProtectiveOrderResult[]>([]);
-  showProtectiveSection = computed(() => this.orderKind() === 'limit' && !this.isModify());
-  canAddProtectiveOrder = computed(() => !!this.limitPx() && parseFloat(this.sz()) > 0);
+  showProtectiveSection = computed(
+    () => (this.orderKind() === 'limit' || this.orderKind() === 'market') && !this.isModify(),
+  );
+
+  /**
+   * Le prix depuis lequel les protections s'affichent pendant la saisie. Limite : le prix limite.
+   * Marché : le prix du marché, à titre INDICATIF — les protections partent après l'exécution,
+   * ancrées sur le prix moyen obtenu et dimensionnées sur la taille remplie (décidé le 2026-11-12,
+   * comme Freqtrade, « placed on the exchange immediately after buy order fills », et comme le bot,
+   * `hl-protection.service.ts`).
+   */
+  protectiveRefPx = computed(() => {
+    if (this.orderKind() !== 'market') return this.limitPx();
+    const price = this.currentPrice();
+    return price ? roundPrice(price, this.szDecimals(), false) : '';
+  });
+  canAddProtectiveOrder = computed(() => !!this.protectiveRefPx() && parseFloat(this.sz()) > 0);
+
+  // ── Ordre au marché ────────────────────────────────────────────────────────
+
+  /** Le glissement saisi, en texte : la saisie en cours n'est pas encore un nombre valide. */
+  slippageInput = signal(String(this.marketOrders.maxSlippagePct()));
+  readonly slippageBounds = { min: MIN_MAX_SLIPPAGE_PCT, max: MAX_MAX_SLIPPAGE_PCT };
+  isSlippageInvalid = computed(() => !isValidMaxSlippage(Number(this.slippageInput())));
+
+  /** Un perp : l'ordre au marché ne se propose que là (décidé le 2026-11-12). */
+  isPerpCoin = computed(() => isPerpMarket(this.selectedCoin() ?? ''));
+
+  /**
+   * Un ordre au marché est parti et a été exécuté, en tout ou en partie : le formulaire ne renvoie
+   * plus rien. Le même bouton renverrait le même ordre, une seconde fois.
+   */
+  marketLocked = signal(false);
+  /** Ce qu'il est advenu de l'ordre, quand le formulaire reste ouvert pour le dire. */
+  marketOutcome = signal<{ tone: 'ok' | 'caution' | 'high'; text: string } | null>(null);
+  /** L'ordre est exécuté, une partie de ses protections n'a pas été posée. */
+  unprotected = signal<UnprotectedFill | null>(null);
+  retryingProtection = signal(false);
+  /** Après un état inconnu : la position relue une fois, tant qu'elle n'est pas affichée. */
+  checkingPosition = signal(false);
 
   priceDiffPct = computed(() => {
     const current = this.currentPrice();
@@ -174,6 +248,8 @@ export class OrderFormComponent implements OnInit {
     return ((limit - current) / current) * 100;
   });
   isPriceInvalid = computed(() => {
+    // Un ordre au marché n'a pas de prix saisi : son plafond est calculé, du bon côté par construction.
+    if (this.orderKind() === 'market') return false;
     const current = this.currentPrice();
     if (!current) return false;
     const isBuy = this.isBuy();
@@ -277,6 +353,10 @@ export class OrderFormComponent implements OnInit {
     if (!order.assetName || !order.sz) return true;
     if (!this.pricesReady()) return true;
     if (parseFloat(order.sz) <= 0) return true;
+    if (this.orderKind() === 'market') {
+      if (!this.isPerpCoin() || this.isSlippageInvalid()) return true;
+      if (this.marketLocked() || this.checkingPosition()) return true;
+    }
     return this.isPriceInvalid() || this.isLimitSideInvalid() || this.isSizeInvalid();
   });
 
@@ -298,7 +378,7 @@ export class OrderFormComponent implements OnInit {
   sz = signal('');
   reduceOnly = signal(false);
   tif = signal<HLTif>('Alo');
-  orderKind = signal<'limit' | 'trigger'>('limit');
+  orderKind = signal<OrderKind>('limit');
   triggerPx = signal('');
   isMarket = signal(true);
   tpsl = signal<'tp' | 'sl'>('sl');
@@ -322,7 +402,7 @@ export class OrderFormComponent implements OnInit {
 
   fetchFn = signal(this.buildFetchFn());
 
-  previousKind = signal<'limit' | 'trigger'>(this.orderKind());
+  previousKind = signal<OrderKind>(this.orderKind());
 
   private defaultSizeApplied = false;
   /**
@@ -400,6 +480,8 @@ export class OrderFormComponent implements OnInit {
       // Une position ouverte (ordre de clôture) fait autorité sur la taille : si elle est
       // arrivée avant le prix, ne pas l'écraser par la taille par défaut.
       if (!price || this.isModify() || this.defaultSizeApplied || this.activePosition()) return;
+      // Une fermeture préparée porte la taille de la position : la taille par défaut ne l'écrase pas.
+      if (this.closePreset) return;
       untracked(() => {
         this.sz.set((10 / price).toFixed(6));
         this.defaultSizeApplied = true;
@@ -438,7 +520,12 @@ export class OrderFormComponent implements OnInit {
         if (!this.isModify()) {
           this.limitPx.set('');
           this.triggerPx.set('');
-          this.sz.set('');
+          const preset = this.closePreset;
+          this.sz.set(preset && preset.coin === coin ? preset.sz : '');
+        }
+        // L'ordre au marché ne vaut que pour un perp : un spot repasse en limite.
+        if (this.orderKind() === 'market' && coin && !isPerpMarket(coin)) {
+          this.orderKind.set('limit');
         }
         this.activePosition.set(null);
         // Le prix, le levier et l'état de marché étaient ceux de l'actif PRÉCÉDENT
@@ -467,10 +554,13 @@ export class OrderFormComponent implements OnInit {
       untracked(() => {
         if (this.isModify()) return;
         const kindChanged = kind !== this.previousKind();
+        // Le sens ne bascule qu'en entrant dans un déclencheur ou en en sortant : un déclencheur
+        // ferme, un limite ou un marché ouvre. Passer de limite à marché garde le sens choisi.
+        const crossesTrigger = (kind === 'trigger') !== (this.previousKind() === 'trigger');
         this.previousKind.set(kind);
-        this.reduceOnly.set(kind === 'trigger');
+        this.reduceOnly.set(kind === 'trigger' || this.closePreset !== null);
         if (kindChanged) {
-          this.isBuy.set(!isBuy);
+          if (crossesTrigger) this.isBuy.set(!isBuy);
           this.loadActivePosition();
           // Un limite et un déclencheur sont deux ordres de nature différente : le prix saisi
           // pour l'un n'a pas de sens pour l'autre (un déclencheur dérivé d'un prix d'entrée
@@ -545,12 +635,29 @@ export class OrderFormComponent implements OnInit {
       this.hlMarket.resolveCoin(existing.coin).subscribe((name) => this.coinTitle.set(name));
     } else {
       this.mode.set('place');
-      const coin = this.defaultCoin;
+      const preset = this.closePreset;
+      const coin = preset?.coin ?? this.defaultCoin;
+      if (preset) {
+        // Le sens de clôture et la taille de la position, en reduce-only : l'effet du changement
+        // d'actif reprend la taille du préréglage au lieu de vider le champ.
+        this.isBuy.set(preset.isBuy);
+        this.reduceOnly.set(true);
+      }
       if (coin) {
         this.selectedCoin.set(coin);
         this.hlMarket.resolveCoin(coin).subscribe((name) => this.coinTitle.set(name));
       }
+      this.marketOrders.loadMaxSlippage().then(() => {
+        this.slippageInput.set(String(this.marketOrders.maxSlippagePct()));
+      });
     }
+  }
+
+  /** Saisie du glissement maximal : mémorisé dès qu'il est valide. */
+  onSlippageInput(value: string): void {
+    this.slippageInput.set(value);
+    const pct = Number(value);
+    if (isValidMaxSlippage(pct)) this.marketOrders.setMaxSlippage(pct);
   }
 
   /**
@@ -748,7 +855,7 @@ export class OrderFormComponent implements OnInit {
         coin: this.selectedCoin(),
         coinTitle: this.coinTitle(),
         mainIsBuy: this.isBuy(),
-        mainLimitPx: this.limitPx(),
+        mainLimitPx: this.protectiveRefPx(),
         mainSz: this.sz(),
         szDecimals: this.szDecimals(),
         isSpotAsset: this.isSpot(),
@@ -769,14 +876,15 @@ export class OrderFormComponent implements OnInit {
   }
 
   dismiss(): void {
-    this.modalCtrl.dismiss(null, 'cancel');
+    // Un ordre au marché exécuté a changé le compte : l'appelant doit relire, même si on ferme ici.
+    this.modalCtrl.dismiss(null, this.marketLocked() ? 'confirm' : 'cancel');
   }
 
   getProtectiveTriggerPx(p: ProtectiveOrderResult): string {
     return computeProtectiveTriggerPx(
       {
         isBuy: this.isBuy(),
-        limitPx: this.limitPx(),
+        limitPx: this.protectiveRefPx(),
         szDecimals: this.szDecimals(),
         isSpot: this.isSpot(),
       },
@@ -825,36 +933,49 @@ export class OrderFormComponent implements OnInit {
       .then((t) => t.present());
   }
 
-  private submitProtectiveOrders$(mainContext: {
-    assetName: string;
-    isBuy: boolean;
-    limitPx: string;
-    sz: string;
-    szDecimals: number;
-    isSpot: boolean;
-  }): Observable<void> {
-    const items = this.protectiveOrders();
-    if (items.length === 0) return of(undefined);
+  /**
+   * Pose les protections en un seul envoi, et rend celles qui n'ont PAS été posées, avec la raison.
+   * L'ordre limite les ignore (il ferme le formulaire comme avant, les toasts disent l'échec) ;
+   * l'ordre au marché, lui, ne se ferme pas sur une position exécutée sans protection.
+   */
+  private submitProtectiveOrders$(
+    mainContext: UnprotectedFill['context'],
+    items: ProtectiveOrderResult[] = this.protectiveOrders(),
+  ): Observable<{ failed: ProtectiveOrderResult[]; message: string | null }> {
+    if (items.length === 0) return of({ failed: [], message: null });
 
     const orders = items.map((p) => buildProtectiveOrderDetails(mainContext, p));
     const labels = items.map((p) => p.label);
 
     return this.hlGateway.placeOrders(orders).pipe(
-      tap((res) => {
+      map((res) => {
         const refusal = exchangeRefusal(res);
         if (refusal) {
           labels.forEach((label) => this.presentToast(`${label} failed: ${refusal}`, 'danger'));
-          return;
+          return { failed: items, message: `${refusal} None was placed.` };
         }
         const statuses: HLPlaceOrderStatus[] = res?.response?.data?.statuses ?? [];
         labels.forEach((label, i) => this.showOrderStatusToast(statuses[i], label));
         this.availableCapitalService.invalidate();
+        const failed = items.filter((_, i) => !statuses[i] || !!statuses[i].error);
+        const reasons = items
+          .map((p, i) =>
+            failed.includes(p) ? `${p.label}: ${statuses[i]?.error ?? 'no status'}` : null,
+          )
+          .filter((r): r is string => r !== null);
+        return { failed, message: failed.length ? reasons.join(' · ') : null };
       }),
-      map(() => undefined),
       catchError((err: HttpErrorResponse) => {
         const message = extractErrorMessage(err);
         labels.forEach((label) => this.presentToast(`${label} failed: ${message}`, 'danger'));
-        return of(undefined); // on avale l'erreur pour ne pas bloquer le dismiss
+        // Un réseau coupé ou un 5xx ne dit pas si les protections sont posées : on le dit.
+        const uncertain = err.status === 0 || err.status >= 500;
+        return of({
+          failed: items,
+          message: uncertain
+            ? `${message} They may have been placed: check the open orders before retrying.`
+            : message,
+        });
       }),
     );
   }
@@ -862,16 +983,20 @@ export class OrderFormComponent implements OnInit {
   buildOrderDetails(): HLOrderDetails {
     const szDec = this.szDecimals();
 
+    // Un ordre au marché ne part pas d'ici (voir `submitMarket`) : ce qui suit ne sert alors qu'aux
+    // contrôles du formulaire, actif et taille.
     const orderType =
       this.orderKind() === 'limit'
         ? { limit: { tif: this.tif() } }
-        : {
-            trigger: {
-              isMarket: this.isMarket(),
-              triggerPx: this.triggerPx(),
-              tpsl: this.tpsl(),
-            },
-          };
+        : this.orderKind() === 'market'
+          ? { limit: { tif: 'Ioc' as HLTif } }
+          : {
+              trigger: {
+                isMarket: this.isMarket(),
+                triggerPx: this.triggerPx(),
+                tpsl: this.tpsl(),
+              },
+            };
 
     return {
       assetName: this.selectedCoin(),
@@ -898,6 +1023,11 @@ export class OrderFormComponent implements OnInit {
       this.error.set(
         this.marketMetaMessage() ?? 'The market grid is still loading: try again in a moment.',
       );
+      return;
+    }
+
+    if (this.orderKind() === 'market' && !this.isModify()) {
+      void this.submitMarket();
       return;
     }
 
@@ -987,6 +1117,206 @@ export class OrderFormComponent implements OnInit {
       error: (err: HttpErrorResponse) => {
         this.submitting.set(false);
         this.error.set(extractErrorMessage(err));
+      },
+    });
+  }
+
+  // ── Ordre au marché ────────────────────────────────────────────────────────
+
+  /**
+   * L'ordre au marché : la confirmation (toujours), puis UN envoi, puis les protections sur ce qui
+   * a été rempli. Aucune étape n'est relancée d'elle-même.
+   */
+  private async submitMarket(): Promise<void> {
+    const coin = this.selectedCoin();
+    if (!coin || !this.isPerpCoin()) {
+      this.error.set('A market order is only available on a perp market.');
+      return;
+    }
+    if (this.isSlippageInvalid()) {
+      this.error.set(
+        `The max slippage must be between ${MIN_MAX_SLIPPAGE_PCT} % and ${MAX_MAX_SLIPPAGE_PCT} %.`,
+      );
+      return;
+    }
+    if (this.marketLocked() || this.checkingPosition()) return;
+    const szDecimals = this.szDecimals();
+    const sz = roundSize(parseFloat(this.sz()), szDecimals);
+    if (!(parseFloat(sz) > 0)) {
+      this.error.set('Please fill in the size.');
+      return;
+    }
+    if (this.isSizeInvalid()) {
+      this.error.set('Hyperliquid refuses an order under 10 $.');
+      return;
+    }
+
+    const isBuy = this.isBuy();
+    const reduceOnly = this.reduceOnly();
+    const actionLabel = this.sideLabel(isBuy);
+
+    // Y a-t-il déjà une position ? Seul le prix de liquidation en dépend (« not estimated » sinon).
+    const hasPosition = await new Promise<boolean | null>((resolve) => {
+      this.marketOrders.readPositionSize(coin).subscribe({
+        next: (szi) => resolve(szi !== null),
+        error: () => resolve(null),
+      });
+    });
+
+    const modal = await this.modalCtrl.create({
+      component: MarketOrderConfirmComponent,
+      componentProps: {
+        coin: () => coin,
+        coinTitle: () => (this.coinTitle() !== '—' ? this.coinTitle() : coin),
+        isBuy: () => isBuy,
+        sz: () => sz,
+        szDecimals: () => szDecimals,
+        reduceOnly: () => reduceOnly,
+        purpose: () => (reduceOnly ? 'close' : 'open'),
+        actionLabel: () => actionLabel,
+        leverage: () => this.leverage(),
+        hasPosition: () => hasPosition,
+      },
+      breakpoints: [0, 1],
+      initialBreakpoint: 1,
+    });
+    await modal.present();
+    const { data, role } = await modal.onDidDismiss<MarketOrderTicket>();
+    if (role !== 'confirm' || !data) return;
+
+    this.error.set(null);
+    this.marketOutcome.set(null);
+    this.submitting.set(true);
+    const order = buildMarketOrder({
+      assetName: coin,
+      isBuy,
+      sz,
+      worstPx: data.worstPx,
+      reduceOnly,
+    });
+    this.marketOrders.send(order).subscribe((outcome) => {
+      this.submitting.set(false);
+      this.onMarketOutcome(outcome, { coin, isBuy, szDecimals, reduceOnly });
+    });
+  }
+
+  /**
+   * Le libellé d'une fermeture préparée : « Place Short » pour fermer un long disait l'inverse de ce
+   * que fait l'ordre (vu à l'écran le 2026-11-12). Tant que le sens et le reduce-only du préréglage
+   * tiennent ; sinon le libellé ordinaire revient.
+   */
+  closeLabel(): string | null {
+    const preset = this.closePreset;
+    if (!preset || this.isModify() || !this.reduceOnly() || this.isBuy() !== preset.isBuy)
+      return null;
+    return preset.isBuy ? 'Close short' : 'Close long';
+  }
+
+  /** Le mot du sens : Long / Short pour un perp, Buy / Sell sinon. */
+  sideLabel(isBuy: boolean): string {
+    if (this.usesBuySell()) return isBuy ? 'Buy' : 'Sell';
+    return isBuy ? 'Long' : 'Short';
+  }
+
+  private onMarketOutcome(
+    outcome: MarketFillOutcome,
+    sent: { coin: string; isBuy: boolean; szDecimals: number; reduceOnly: boolean },
+  ): void {
+    switch (outcome.kind) {
+      case 'not-filled':
+      case 'refused':
+        // Rien n'a été exécuté : le formulaire reste tel quel, on peut corriger et réessayer.
+        this.error.set(outcome.message);
+        return;
+
+      case 'unknown':
+        this.error.set(outcome.message);
+        this.availableCapitalService.invalidate();
+        this.readPositionAfterUnknown(sent.coin);
+        return;
+
+      case 'filled':
+      case 'partial': {
+        this.marketLocked.set(true);
+        this.availableCapitalService.invalidate();
+        const partial = outcome.kind === 'partial';
+        if (outcome.kind === 'partial') {
+          this.marketOutcome.set({
+            tone: 'caution',
+            text: `Partially filled: ${outcome.totalSz} of ${outcome.requestedSz} @ ${outcome.avgPx}. The rest was cancelled: the book did not hold it within the max slippage.`,
+          });
+        } else {
+          this.presentToast(
+            `Market order filled · ${outcome.totalSz} @ ${outcome.avgPx}`,
+            'success',
+          );
+        }
+
+        const items = sent.reduceOnly ? [] : this.protectiveOrders();
+        if (items.length === 0) {
+          if (!partial) this.modalCtrl.dismiss(null, 'confirm');
+          return;
+        }
+        // Les protections portent sur ce qui a été rempli, au prix moyen obtenu.
+        const context: UnprotectedFill['context'] = {
+          assetName: sent.coin,
+          isBuy: sent.isBuy,
+          limitPx: outcome.avgPx,
+          sz: outcome.totalSz,
+          szDecimals: sent.szDecimals,
+          isSpot: false,
+        };
+        this.placeProtectionsAfterFill(context, items, !partial);
+        return;
+      }
+    }
+  }
+
+  /** Pose les protections après une exécution ; ne ferme le formulaire que si tout est posé. */
+  private placeProtectionsAfterFill(
+    context: UnprotectedFill['context'],
+    items: ProtectiveOrderResult[],
+    closeWhenDone: boolean,
+  ): void {
+    this.retryingProtection.set(true);
+    this.submitProtectiveOrders$(context, items).subscribe(({ failed, message }) => {
+      this.retryingProtection.set(false);
+      if (failed.length === 0) {
+        this.unprotected.set(null);
+        if (closeWhenDone) this.modalCtrl.dismiss(null, 'confirm');
+        return;
+      }
+      this.unprotected.set({ context, items: failed, message: message ?? 'Not placed.' });
+    });
+  }
+
+  /** « Retry protection » : seulement celles qui manquent, une fois par appui. */
+  retryProtection(): void {
+    const pending = this.unprotected();
+    if (!pending || this.retryingProtection()) return;
+    this.placeProtectionsAfterFill(pending.context, pending.items, this.marketOutcome() === null);
+  }
+
+  /** Après un état inconnu : la position relue UNE fois, et montrée. Jamais de relance d'ordre. */
+  private readPositionAfterUnknown(coin: string): void {
+    this.checkingPosition.set(true);
+    this.marketOrders.readPositionSize(coin).subscribe({
+      next: (szi) => {
+        this.checkingPosition.set(false);
+        this.marketOutcome.set({
+          tone: 'caution',
+          text:
+            szi === null
+              ? `Position re-read: no open position on ${coin}.`
+              : `Position re-read: ${szi > 0 ? 'long' : 'short'} ${Math.abs(szi)} on ${coin}. Compare with what you had before sending again.`,
+        });
+      },
+      error: (error: unknown) => {
+        this.checkingPosition.set(false);
+        this.marketOutcome.set({
+          tone: 'high',
+          text: `The position could not be re-read (${extractErrorMessage(error as Error)}): check it on Hyperliquid before sending again.`,
+        });
       },
     });
   }

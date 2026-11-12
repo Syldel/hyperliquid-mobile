@@ -127,6 +127,11 @@ export class PerpSummaryPage extends MenuBasePage {
     this.fetchFn.set(this.buildFetchFn());
   }
 
+  /** Après une fermeture : relit les positions. */
+  reload(): void {
+    this.fetchFn.set(this.buildFetchFn());
+  }
+
   openWatchlist(coin: string): void {
     this.router.navigate(['/secure/watchlist/detail', coin], {
       state: { backHref: '/secure/perp-summary' },

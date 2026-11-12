@@ -245,6 +245,7 @@ plus. Si un diff de fins de ligne réapparaît, vérifier `git config core.autoc
 | [docs/conventions.md](docs/conventions.md)                           | exigence, usages, tests, pièges d'outillage          |
 | [docs/angular.md](docs/angular.md)                                   | quelle primitive choisir, et l'état réel du dépôt    |
 | [docs/theming.md](docs/theming.md)                                   | les deux thèmes, les paliers, les contrastes mesurés |
+| [docs/market-orders.md](docs/market-orders.md)                       | ordre au marché, verdict de risque, fermeture        |
 | [docs/roadmap.md](docs/roadmap.md)                                   | ce qui est remis à plus tard, et pourquoi            |
 
 ## Où vivent les choses

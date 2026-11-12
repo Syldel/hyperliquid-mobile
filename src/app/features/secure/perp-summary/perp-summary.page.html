@@ -18,7 +18,11 @@
   @if (activeSegment() === 'positions') {
   <ion-list>
     @for (position of positions(); track position.coin) {
-    <app-position-item [position]="position" (clicked)="openWatchlist($event)" />
+    <app-position-item
+      [position]="position"
+      (clicked)="openWatchlist($event)"
+      (changed)="reload()"
+    />
     } @empty {
     <ion-item class="ion-text-center">
       <ion-label color="medium">No open position</ion-label>

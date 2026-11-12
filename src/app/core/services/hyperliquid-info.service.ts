@@ -8,7 +8,9 @@ import type {
   HlUserFees,
   HLClearinghouseState,
   HLFrontendOpenOrder,
+  HLL2BookResponse,
   HLOpenOrder,
+  HLPerpMetaAndCtx,
   HLOrderStatusData,
   HLSpotBalance,
   HLSpotClearinghouseState,
@@ -121,6 +123,19 @@ export class HyperliquidInfoService {
       type: 'userFees',
       user: this.auth.currentAddress(),
     });
+  }
+
+  /** Le carnet, 20 niveaux au plus par côté (`info-endpoint.md`). Poids 2. */
+  getL2Book(coin: string): Observable<HLL2BookResponse> {
+    return this.post<HLL2BookResponse>({ type: 'l2Book', coin });
+  }
+
+  /**
+   * La méta et le contexte de chaque marché d'un dex (`''` : le dex principal). Poids 20 : lu à la
+   * demande, jamais en boucle.
+   */
+  getMetaAndAssetCtxs(dex = ''): Observable<HLPerpMetaAndCtx> {
+    return this.post<HLPerpMetaAndCtx>({ type: 'metaAndAssetCtxs', ...(dex && { dex }) });
   }
 
   getActiveAssetData(coin: string): Observable<HlActiveAssetData> {

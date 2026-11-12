@@ -151,3 +151,45 @@
   font-size: 0.85rem;
   font-weight: 500;
 }
+
+/* Ce qu'il est advenu d'un ordre au marché. Texte dans la couleur « texte » du niveau, sans fond
+   teinté (docs/theming.md, « Un fond teinté de la couleur de son propre texte »). */
+.market-outcome {
+  margin: 12px 16px 0;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.market-outcome--ok {
+  color: var(--ion-color-success);
+}
+
+.market-outcome--caution {
+  color: var(--ion-color-warning-shade);
+}
+
+.market-outcome--high {
+  color: var(--ion-color-danger);
+}
+
+/* Une position exécutée sans protection : le cas grave, qui ne se ferme pas tout seul. */
+.unprotected {
+  margin: 12px 16px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--ion-color-danger);
+  border-radius: 8px;
+  color: var(--ion-color-danger);
+  font-size: 14px;
+
+  p {
+    margin: 0 0 8px;
+  }
+}
+
+.protective-note {
+  margin: 0 4px 8px;
+  /* `.current-price-hint` est sur une ligne ; cette note-ci est une phrase (coupée à 360 px, mesuré). */
+  white-space: normal;
+}

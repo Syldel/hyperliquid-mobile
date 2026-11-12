@@ -6,6 +6,22 @@ h2 {
   margin-bottom: 4px;
 }
 
+.position-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+
+  ion-button {
+    margin: 0;
+  }
+}
+
+.position-actions__label {
+  font-size: 13px;
+  color: var(--ion-color-medium);
+}
+
 .mini-chart-wrapper {
   width: 80px;
   height: 44px;

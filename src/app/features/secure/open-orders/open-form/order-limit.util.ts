@@ -2,6 +2,9 @@ import { roundPrice } from '@utils/hl-rounding.utils';
 import { limitSpread, marketTriggerBound, type TriggerKind } from '@utils/limit-spread.util';
 
 /** Ce qui, dans un ordre déclencheur, détermine le prix limite proposé. */
+/** Les types d'ordre du formulaire. `market` : un IOC au prix plafond, voir `market-order/`. */
+export type OrderKind = 'limit' | 'trigger' | 'market';
+
 export interface TriggerOrderState {
   triggerPx: string;
   isMarket: boolean;
@@ -20,7 +23,7 @@ export interface LimitFromTriggerInput extends TriggerOrderState {
    * son limite est celui qu'il porte.
    */
   original: OriginalTriggerOrder | null;
-  orderKind: 'limit' | 'trigger';
+  orderKind: OrderKind;
   isBuy: boolean;
   szDecimals: number;
   isSpot: boolean;
@@ -86,10 +89,13 @@ export function isPositivePrice(text: string): boolean {
  * déclencheur a besoin des DEUX : le déclencheur, et le limite qui en est dérivé ou saisi.
  */
 export function orderPricesReady(input: {
-  orderKind: 'limit' | 'trigger';
+  orderKind: OrderKind;
   limitPx: string;
   triggerPx: string;
 }): boolean {
+  // Un ordre au marché n'a pas de prix saisi : son plafond se calcule à la confirmation, sur le mid
+  // relu à ce moment-là (`market-order/market-execution.util.ts`).
+  if (input.orderKind === 'market') return true;
   if (!isPositivePrice(input.limitPx)) return false;
   return input.orderKind !== 'trigger' || isPositivePrice(input.triggerPx);
 }
@@ -153,7 +159,7 @@ export function stopLimitSpread(input: {
  * déclencheur au marché non plus : l'exchange applique sa propre borne de 10 % et ignore `p`.
  */
 export function isStopLimitTight(input: {
-  orderKind: 'limit' | 'trigger';
+  orderKind: OrderKind;
   tpsl: TriggerKind;
   isMarket: boolean;
   isBuy: boolean;

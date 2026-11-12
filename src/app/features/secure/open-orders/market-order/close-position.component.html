@@ -1,0 +1,118 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Close {{ coin() }}</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="dismiss()" aria-label="Close">
+        <ion-icon slot="icon-only" name="close-outline" />
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <p class="summary">
+    <strong [class]="isLong() ? 'side--buy' : 'side--sell'">
+      {{ isLong() ? 'Long' : 'Short' }}
+    </strong>
+    {{ positionSz() }} {{ coin() }}
+    <span class="muted">· entry {{ position().entryPx | number: '1.0-6' }}</span>
+  </p>
+
+  @if (metaError(); as message) {
+    <p class="notice notice--high" role="alert">{{ message }}</p>
+  }
+
+  <div class="percents" role="group" aria-label="Share of the position">
+    @for (p of percents; track p) {
+      <ion-button
+        size="small"
+        [fill]="percent() === p ? 'solid' : 'outline'"
+        color="medium"
+        [disabled]="szDecimals() === null || locked()"
+        (click)="selectPercent(p)"
+      >
+        {{ p }} %
+      </ion-button>
+    }
+  </div>
+
+  <ion-list inset class="fields">
+    <ion-item lines="full">
+      <ion-label position="stacked">
+        <div>Size to close</div>
+        @if (sz() && isSizeInvalid()) {
+          <div class="hint notice--high">Between 0 and the position size</div>
+        }
+      </ion-label>
+      <ion-input
+        type="number"
+        inputmode="decimal"
+        [value]="sz()"
+        [disabled]="locked()"
+        (ionInput)="onSizeInput($event.detail.value ?? '')"
+      />
+    </ion-item>
+    <ion-item lines="none">
+      <ion-label position="stacked">
+        <div>Max slippage %</div>
+        @if (isSlippageInvalid()) {
+          <div class="hint notice--high">{{ slippageBounds.min }} – {{ slippageBounds.max }} %</div>
+        }
+      </ion-label>
+      <ion-input
+        type="number"
+        inputmode="decimal"
+        [value]="slippageInput()"
+        [disabled]="locked()"
+        (ionInput)="onSlippageInput($event.detail.value ?? '')"
+      />
+    </ion-item>
+  </ion-list>
+
+  <p class="section-label">TP / SL on {{ coin() }}</p>
+  @if (protectiveError(); as message) {
+    <p class="notice notice--caution">{{ message }}</p>
+  } @else if (protective() === null) {
+    <p class="muted small">
+      <ion-spinner name="crescent" />
+      Reading the open orders…
+    </p>
+  } @else if (protective()!.length === 0) {
+    <p class="muted small">None: nothing protects this position.</p>
+  } @else {
+    <ul class="protective">
+      @for (o of protective()!; track o.oid) {
+        <li>
+          <span>{{ o.orderType }} · trigger {{ o.triggerPx | number: '1.0-6' }}</span>
+          <span class="muted small">{{ describe(o, remainingSz()) }}</span>
+        </li>
+      }
+    </ul>
+    <p class="muted small">These orders are not changed by this close.</p>
+  }
+
+  @if (checkingPosition()) {
+    <p class="muted">
+      <ion-spinner name="crescent" />
+      Re-reading the position…
+    </p>
+  }
+  @if (outcome(); as o) {
+    <p class="notice" [class]="'notice notice--' + o.tone" role="status">{{ o.text }}</p>
+  }
+  @if (error(); as message) {
+    <p class="notice notice--high" role="alert">{{ message }}</p>
+  }
+
+  <div class="actions">
+    <ion-button fill="outline" color="medium" (click)="dismiss()">
+      {{ locked() ? 'Done' : 'Cancel' }}
+    </ion-button>
+    <ion-button color="danger" [disabled]="!canReview()" (click)="review()">
+      @if (sending()) {
+        <ion-spinner name="crescent" slot="start" />
+      }
+      Review {{ actionLabel().toLowerCase() }}
+    </ion-button>
+  </div>
+</ion-content>

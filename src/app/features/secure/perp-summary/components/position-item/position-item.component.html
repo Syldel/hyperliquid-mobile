@@ -29,6 +29,30 @@
       <p>
         Liq.: {{ position().liquidationPx | smartDecimal }} · Lev.: {{ position().leverage.type }}
       </p>
+      <!-- Les actions d'une position, comme le tableau des positions d'Hyperliquid. Le clic ne
+           replie pas la carte. « Close » puis deux mots courts : « Close market » passait sur deux
+           lignes à 360 px, à côté du mini-graphique (mesuré le 2026-11-12). -->
+      <div class="position-actions">
+        <span class="position-actions__label">Close</span>
+        <ion-button
+          size="small"
+          fill="outline"
+          color="danger"
+          aria-label="Close at market"
+          (click)="closeMarket($event)"
+        >
+          Market
+        </ion-button>
+        <ion-button
+          size="small"
+          fill="outline"
+          color="medium"
+          aria-label="Close with a limit order"
+          (click)="closeLimit($event)"
+        >
+          Limit
+        </ion-button>
+      </div>
     }
   </ion-label>
 
