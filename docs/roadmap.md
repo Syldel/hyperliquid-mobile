@@ -317,6 +317,24 @@ Le jour où plusieurs appareils ou plusieurs utilisateurs entrent en jeu. Cela p
 le service utilisateur, et demandera de décider à qui appartient une stratégie — à
 l'appareil ou au compte. Ce n'est pas un chantier de code, c'est une décision d'abord.
 
+## Plus tard : le mode de marge et le levier depuis le mobile
+
+**Non prioritaire.** Le formulaire d'ordre affiche le mode et le levier d'une paire
+(« Cross · 3x / 25x ») mais ne sait pas les changer : `updateLeverage` reste un `TODO` dans
+`core/services/hyperliquid-gateway.service.ts`. Mesurer la marge isolée le 2026-11-13 (point 15
+de « À éprouver en réel ») a demandé de passer ETH en isolé 3x sur l'interface web
+d'Hyperliquid. Or l'estimation de liquidation de la confirmation ne vaut **qu'en isolé** : sans
+ce réglage, elle n'est accessible qu'en passant par le web.
+
+Ce que ça demandera :
+
+- le contrat du gateway (`nest-hyperliquid-gateway`) et des types partagés ;
+- la doc d'Hyperliquid lue en brut : `updateLeverage`, et le mode de marge qui ne change pas
+  avec une position ouverte sur la paire ;
+- un refus d'Hyperliquid montré, jamais muet.
+
+Dans l'app, une petite feuille ouverte depuis la ligne du levier.
+
 ---
 
 # Limites acceptées
