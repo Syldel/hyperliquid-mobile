@@ -71,9 +71,17 @@ describe('describeProtectiveAfterClose', () => {
     );
   });
 
-  // Mesuré le 2026-11-12 : annulé à la milliseconde de la fermeture, deux fois.
+  // Mesuré le 2026-11-12 : annulé à la milliseconde de la fermeture, trois fois.
   it('says a full close makes the exchange cancel it at once', () => {
     expect(describeProtectiveAfterClose(order({}), 0)).toBe(
+      'nothing left to reduce: Hyperliquid cancels it at once (reduceOnlyCanceled)',
+    );
+  });
+
+  // Mesuré le 2026-11-13 (oid 603932533273) : un TP/SL de position, taille 0, est annulé de même,
+  // à la milliseconde de la fermeture. Il ne « suit » pas une position qui n'existe plus.
+  it('says a full close cancels a position TP/SL at once too', () => {
+    expect(describeProtectiveAfterClose(order({ isPositionTpsl: true, sz: '0.0' }), 0)).toBe(
       'nothing left to reduce: Hyperliquid cancels it at once (reduceOnlyCanceled)',
     );
   });

@@ -44,20 +44,17 @@ export function protectiveOrdersOf(
  * - une fermeture totale laisse des reduce-only qui ne réduisent plus rien : statut
  *   `reduceOnlyCanceled` (`info-endpoint.md`). **Mesuré le 2026-11-12, trois fois sur trois**, pour
  *   des stops de taille fixe (BTC long, ETH short) : à la même milliseconde que l'exécution de la
- *   fermeture (oids 602705157250, 602706369092, 602789574942). ⚠️ Pas mesuré pour un TP/SL « de
- *   position » : sa phrase dit « should », pas « cancels ».
+ *   fermeture (oids 602705157250, 602706369092, 602789574942). **Et pour un TP/SL « de
+ *   position »** le 2026-11-13 : `reduceOnlyCanceled` à la même milliseconde (oid 603932533273,
+ *   à côté d'un stop de taille fixe annulé au même instant). D'où une seule phrase pour les deux.
  */
 export function describeProtectiveAfterClose(
   order: HLFrontendOpenOrder,
   remainingSz: number,
 ): string {
-  if (order.isPositionTpsl) {
-    return remainingSz > 0
-      ? 'follows the position: it will close what remains'
-      : 'nothing left to close: Hyperliquid should cancel it';
-  }
   if (remainingSz <= 0)
     return 'nothing left to reduce: Hyperliquid cancels it at once (reduceOnlyCanceled)';
+  if (order.isPositionTpsl) return 'follows the position: it will close what remains';
   const size = Number(order.sz);
   return size > remainingSz
     ? `keeps its size ${order.sz}, larger than the ${remainingSz} left`

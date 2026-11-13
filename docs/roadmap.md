@@ -990,8 +990,8 @@ Profit Limit"`, `triggerCondition: "Price above 81959"`.
    **short**, le stop est un achat) : Stop Market 602789574942 à 21:57:32.974, fermé par
    `Close › Market` à 100 % depuis le mobile (IOC reduce-only 603225380721, plafond 2 037,4 =
    mid + 1 %, exécuté en une fois à 2 017,3, frais 0,031137 $ = 0,045 % du notionnel, le taux
-   affiché). La feuille de fermeture dit « cancels it at once » pour eux. ⚠️ Pas mesuré pour un TP/SL « de position » : sa
-   phrase dit « should cancel it ».
+   affiché). La feuille de fermeture dit « cancels it at once » pour eux, et pour un TP/SL « de
+   position » depuis la mesure du point 12.
 8. **✅ Une fermeture partielle sous 10 $ : refusée ; une fermeture à 100 % sous 10 $ : acceptée.**
    Mesuré le 2026-11-12, deux refus `minTradeNtlRejected` pour un IOC reduce-only partiel :
    0,00003 BTC (≈ 2,2 $, oid 602702312897) puis 0,00013 BTC (≈ 9,29 $ sur une position de 21,4 $,
@@ -1037,6 +1037,15 @@ Profit Limit"`, `triggerCondition: "Price above 81959"`.
     position, IOC comme limite, pas une fermeture partielle. Le formulaire bloquait ce cas ; il le
     laisse passer depuis (`isBelowOrderMinimum`). ⚠️ Pas mesuré pour un déclencheur, qui reste
     bloqué.
+
+12. **✅ Un TP/SL « de position » est annulé, comme un stop de taille fixe, par une fermeture
+    totale.** Mesuré le 2026-11-13 sur un short ETH de 0,008 : un SL de position posé depuis
+    l'interface web d'Hyperliquid (le mobile n'en pose pas, il envoie en groupement `na`), Stop
+    Market déclenché au-dessus de 2 100, `isPositionTpsl: true`, taille 0 (603932533273), à côté
+    d'un Stop Market de taille fixe 0,008 (603925007022). Fermeture par `Close › Market` à 100 %
+    depuis le mobile : IOC 603933829890 exécuté à 1 958,4 à 13:10:55.791 UTC, et **les deux**
+    stops `reduceOnlyCanceled` à la même milliseconde. La feuille de fermeture disait « should
+    cancel it » pour le premier ; elle dit depuis « cancels it at once » pour les deux.
 
 ## Précédent
 

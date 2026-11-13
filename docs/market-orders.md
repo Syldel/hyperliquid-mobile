@@ -150,7 +150,8 @@ Mesuré le 2026-11-12 par l'utilisateur (l'agent ne passe jamais d'ordre) :
 
 - l'achat au marché, et les protections posées 0,89 s après l'exécution sur le prix moyen obtenu ;
 - l'annulation des stops de taille fixe à la milliseconde d'une fermeture totale, trois fois (BTC
-  long deux fois, ETH short une fois, par `Close › Market` à 100 %) ;
+  long deux fois, ETH short une fois, par `Close › Market` à 100 %), et celle d'un TP/SL « de
+  position » de la même façon (le 2026-11-13) ;
 - le refus d'une fermeture partielle reduce-only **à 2,2 $ et à 9,29 $** (« Order must have minimum
   value of $10 »), et l'acceptation d'une fermeture **à 100 %** d'une position sous 10 $, par
   un IOC (0,71 $) comme par un limite qui attend au carnet (9,28 $, rempli en maker) ;
@@ -158,12 +159,11 @@ Mesuré le 2026-11-12 par l'utilisateur (l'agent ne passe jamais d'ordre) :
   **déclenchement et l'exécution** d'un autre qui vaut 9,01 $ à sa borne et 10,01 $ à son
   déclencheur.
 
-Voir [roadmap.md](roadmap.md#à-éprouver-en-réel--ce-quaucun-double-ne-peut-établir), points 7 à 11.
+Voir [roadmap.md](roadmap.md#à-éprouver-en-réel--ce-quaucun-double-ne-peut-établir), points 7 à 12.
 
 ⚠️ Reste ouvert :
 
 - la forme d'un IOC rempli en partie (point 6) ;
 - un stop au marché sous 10 $ **à son déclencheur** (le formulaire le bloque) et un stop exécuté
   sous 10 $ de valeur après un gap (point 9) ;
-- l'annulation d'un TP/SL « de position » par une fermeture totale ;
 - les frais sur la marge isolée.
