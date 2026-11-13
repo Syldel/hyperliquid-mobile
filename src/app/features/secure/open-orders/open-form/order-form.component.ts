@@ -92,8 +92,10 @@ import {
   isLimitOnWrongSide,
   isStopLimitTight,
   limitFromTrigger,
+  minimumOrderSize,
   notionalPrice,
   orderPricesReady,
+  sentSize,
   stopLimitSpread,
   type OrderKind,
   type OriginalTriggerOrder,
@@ -322,8 +324,19 @@ export class OrderFormComponent implements OnInit {
     this.triggerDiffPct() === null ? '' : this.isPriceInvalid() ? 'diff--danger' : '',
   );
 
+  /** La taille qui partira, arrondie à la précision de la paire (`sentSize`). */
+  sentSz = computed(() => sentSize(this.sz(), this.szDecimals()));
+
+  /** La saisie a plus de décimales que la paire n'en prend : dire ce qui partira. */
+  sizeRoundingNote = computed(() => {
+    const typed = parseFloat(this.sz());
+    const sent = this.sentSz();
+    if (Number.isNaN(typed) || Number.isNaN(sent) || Math.abs(typed - sent) < 1e-12) return null;
+    return `Sent as ${roundSize(sent, this.szDecimals())}: ${this.szDecimals()} decimals on this pair.`;
+  });
+
   sizeUsd = computed(() => {
-    const sz = parseFloat(this.sz());
+    const sz = this.sentSz();
     const price = notionalPrice({
       orderKind: this.orderKind(),
       limitPx: this.limitPx(),
@@ -340,7 +353,7 @@ export class OrderFormComponent implements OnInit {
       orderKind: this.orderKind(),
       reduceOnly: this.reduceOnly(),
       isBuy: this.isBuy(),
-      sz: parseFloat(this.sz()),
+      sz: this.sentSz(),
       position: this.heldPosition(),
     }),
   );
@@ -592,8 +605,10 @@ export class OrderFormComponent implements OnInit {
       if (!price || this.isModify() || this.defaultSizeApplied || this.activePosition()) return;
       // Une fermeture préparée porte la taille de la position : la taille par défaut ne l'écrase pas.
       if (this.closePreset) return;
+      // La précision de la paire d'abord : la taille par défaut se calcule à elle (`minimumOrderSize`).
+      if (!this.szDecimalsKnown()) return;
       untracked(() => {
-        this.sz.set((10 / price).toFixed(6));
+        this.sz.set(minimumOrderSize(price, this.szDecimals()));
         this.defaultSizeApplied = true;
       });
     });

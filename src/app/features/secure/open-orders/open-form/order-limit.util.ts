@@ -1,4 +1,4 @@
-import { roundPrice } from '@utils/hl-rounding.utils';
+import { roundPrice, roundSize } from '@utils/hl-rounding.utils';
 import { limitSpread, marketTriggerBound, type TriggerKind } from '@utils/limit-spread.util';
 import { MIN_ORDER_VALUE_USD } from '@utils/order-minimum.utils';
 
@@ -136,6 +136,30 @@ export function isBelowOrderMinimum(input: {
     position.isBuy !== isBuy &&
     Math.abs(sz - position.sz) <= 1e-12;
   return !closesWholePosition;
+}
+
+/**
+ * La taille qui part réellement : la saisie arrondie à la précision de la paire, comme
+ * `buildOrderDetails` l'envoie. `NaN` si la saisie n'est pas un nombre.
+ *
+ * C'est elle que le minimum de 10 $ doit juger, pas la saisie : « 0.005045 » ETH (4 décimales)
+ * part en 0,0050, soit 9,91 $ à 1 982, alors que la saisie affichait 10,00 $ (relevé le 2026-11-13).
+ */
+export function sentSize(sz: string, szDecimals: number): number {
+  const typed = parseFloat(sz);
+  return Number.isNaN(typed) ? NaN : parseFloat(roundSize(typed, szDecimals));
+}
+
+/**
+ * La taille par défaut : la plus petite qui atteint `MIN_ORDER_VALUE_USD` au prix donné, à la
+ * précision de la paire, donc arrondie AU-DESSUS. L'ancienne, `(10 / prix).toFixed(6)`, partait
+ * arrondie au plus proche et pouvait tomber sous 10 $.
+ */
+export function minimumOrderSize(price: number, szDecimals: number): string {
+  const factor = 10 ** szDecimals;
+  // La marge absorbe l'erreur des flottants : 10 / 2000 × 10⁴ ne doit pas monter de 50 à 51.
+  const units = Math.ceil((MIN_ORDER_VALUE_USD / price) * factor - 1e-9);
+  return (units / factor).toFixed(szDecimals);
 }
 
 /**

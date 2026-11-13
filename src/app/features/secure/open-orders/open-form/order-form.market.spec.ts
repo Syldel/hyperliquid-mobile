@@ -471,6 +471,35 @@ describe('OrderFormComponent — market order', () => {
     });
   });
 
+  describe('the size that is sent', () => {
+    it('fills the default size at the pair precision, rounded up to reach 10 $', () => {
+      create();
+      form.currentPrice.set(72000); // 10 / 72 000 = 0,000138… : 0,00014 à 5 décimales.
+      settle();
+      expect(form.sz()).toBe('0.00014');
+    });
+
+    // Relevé le 2026-11-13 : la saisie valait 10 $, la taille envoyée, arrondie, moins.
+    it('judges the 10 $ minimum on the rounded size, and says what will be sent', () => {
+      create();
+      form.currentPrice.set(71000);
+      settle(); // la taille par défaut d'abord : elle écraserait la saisie.
+      form.limitPx.set('71000');
+      form.sz.set('0.000144'); // saisi : 10,22 $ ; envoyé : 0,00014, soit 9,94 $.
+      settle();
+      expect(form.sizeUsd()).toBeCloseTo(9.94, 10);
+      expect(form.isSizeInvalid()).toBe(true);
+      expect(form.sizeRoundingNote()).toBe('Sent as 0.00014: 5 decimals on this pair.');
+    });
+
+    it('says nothing about rounding when the size fits the pair precision', () => {
+      create();
+      form.sz.set('0.00015');
+      settle();
+      expect(form.sizeRoundingNote()).toBeNull();
+    });
+  });
+
   describe('a protection worth under 10 $ when it triggers', () => {
     // Un long limite de 0,0001 BTC à 100 000 (10 $) : son Stop Loss à 2 % vaut 9,80 $ à 98 000.
     function limitBuyWithStop(): void {

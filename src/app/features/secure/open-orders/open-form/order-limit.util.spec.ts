@@ -7,7 +7,9 @@ import {
   isBelowOrderMinimum,
   isPositivePrice,
   orderPricesReady,
+  minimumOrderSize,
   notionalPrice,
+  sentSize,
   type LimitFromTriggerInput,
 } from './order-limit.util';
 
@@ -325,5 +327,35 @@ describe('isBelowOrderMinimum', () => {
 
   it('says nothing without a value', () => {
     expect(isBelowOrderMinimum({ ...fullClose, usd: null })).toBe(false);
+  });
+});
+
+describe('sentSize', () => {
+  // Relevé le 2026-11-13 : la saisie 0.005045 ETH (4 décimales) part en 0,0050, soit 9,91 $ à 1 982.
+  it('is the typed size rounded to the pair precision, as it is sent', () => {
+    expect(sentSize('0.005045', 4)).toBe(0.005);
+    expect(sentSize('0.005084', 4)).toBe(0.0051);
+    expect(sentSize('0.00014', 5)).toBe(0.00014);
+  });
+
+  it('is not a number when nothing readable was typed', () => {
+    expect(sentSize('', 4)).toBeNaN();
+  });
+});
+
+describe('minimumOrderSize', () => {
+  it('rounds up, so the default never falls under 10 $ once sent', () => {
+    // 10 / 1982 = 0,0050454… : au plus proche 0,0050 (9,91 $), au-dessus 0,0051 (10,11 $).
+    expect(minimumOrderSize(1982, 4)).toBe('0.0051');
+    expect(0.0051 * 1982).toBeGreaterThanOrEqual(10);
+  });
+
+  it('does not round up an exact size through float noise', () => {
+    expect(minimumOrderSize(2000, 4)).toBe('0.0050');
+    expect(minimumOrderSize(100000, 5)).toBe('0.00010');
+  });
+
+  it('works for a whole-unit pair', () => {
+    expect(minimumOrderSize(3.7, 0)).toBe('3');
   });
 });
