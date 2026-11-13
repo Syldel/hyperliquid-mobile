@@ -12,18 +12,19 @@ export const MIN_ORDER_VALUE_USD = 10;
 
 /**
  * La valeur d'un déclencheur au moment où Hyperliquid juge le minimum : sa taille × son
- * déclencheur s'il est au marché (sa borne de 10 % n'est qu'un garde-fou), × son prix limite sinon.
- * `null` pour un ordre qui n'est pas un déclencheur, ou des nombres illisibles.
+ * déclencheur, au marché comme limite. Ni la borne de 10 % d'un stop au marché ni le prix limite
+ * d'un stop limite n'entrent dans le calcul. `null` pour un ordre qui n'est pas un déclencheur, ou
+ * des nombres illisibles.
  *
  * Mesuré, au marché : 10,01 $ au déclencheur (9,01 $ à la borne) exécuté le 2026-11-12 ; 9,86 $ au
- * déclencheur accepté à la pose puis `minTradeNtlRejected` au déclenchement le 2026-11-13. ⚠️ Un
- * déclencheur LIMITE n'est pas mesuré : son prix limite est celui auquel il entre au carnet, le même
- * jugement que pour un ordre limite.
+ * déclencheur accepté à la pose puis `minTradeNtlRejected` au déclenchement le 2026-11-13. En
+ * limite, le 2026-11-13 : 10,18 $ au déclencheur et 9,67 $ au prix limite, exécuté (604013908327).
+ * ⚠️ Rempli aussitôt, en taker ; un stop limite resté au carnet après un gap n'est pas mesuré.
  */
 export function triggerOrderValueUsd(order: HLOrderDetails): number | null {
   const trigger = 'trigger' in order.orderType ? order.orderType.trigger : null;
   if (!trigger) return null;
-  const price = Number(trigger.isMarket ? trigger.triggerPx : order.limitPx);
+  const price = Number(trigger.triggerPx);
   const sz = Number(order.sz);
   if (!Number.isFinite(price) || !Number.isFinite(sz) || price <= 0) return null;
   return sz * price;

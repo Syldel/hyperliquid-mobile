@@ -326,7 +326,6 @@ export class OrderFormComponent implements OnInit {
     const sz = parseFloat(this.sz());
     const price = notionalPrice({
       orderKind: this.orderKind(),
-      isMarketTrigger: this.isMarket(),
       limitPx: this.limitPx(),
       triggerPx: this.triggerPx(),
       currentPrice: this.currentPrice(),

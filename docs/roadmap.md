@@ -1065,6 +1065,21 @@ Profit Limit"`, `triggerCondition: "Price above 81959"`.
     sont depuis le même jour (`protectiveMinimumRefusal`, `core/utils/order-minimum.utils.ts`), à
     l'ajout, dans le formulaire et à l'envoi.
 
+14. **✅ Un stop LIMITE se juge aussi à son déclencheur, pas à son prix limite.** Mesuré le
+    2026-11-13 depuis le mobile, le blocage du formulaire levé pour les déclencheurs le temps de la
+    mesure, puis remis en place. Long ETH 0,006 à 1 965,1 ; Stop Limit reduce-only de **0,0052**,
+    déclencheur 1 958, prix limite 1 860,1 — **10,18 $ au déclencheur, 9,67 $ au prix limite**
+    (604013908327). `open` à 14:34:31.035 UTC, `triggered` puis **`filled`** à 14:35:48.778, en
+    une exécution taker à 1 957 (10,18 $), frais 0,004579 $. Le stop ne couvrait pas toute la
+    position (0,0052 sur 0,006) : l'exemption d'une fermeture totale ne joue pas.
+
+    Le formulaire et les protections jugeaient un stop limite à son prix limite, une hypothèse
+    jamais mesurée : ils bloquaient à tort ce cas, soit, pour un Stop Loss limite à 5 %, toute
+    protection entre 10 et 10,53 $ au déclencheur. Ils le jugent depuis à son déclencheur, comme un
+    stop au marché (`notionalPrice`, `triggerOrderValueUsd`). ⚠️ Exécuté aussitôt, en taker : un
+    stop limite qui, après un gap, resterait au carnet à son prix limite (sous 10 $) n'est pas
+    mesuré.
+
 ## Précédent
 
 Le dernier risque refermé — une expression malformée faisant rejeter toute la requête

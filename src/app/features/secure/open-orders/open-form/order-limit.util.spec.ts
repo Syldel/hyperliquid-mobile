@@ -244,7 +244,6 @@ describe('isStopLimitTight', () => {
 describe('notionalPrice', () => {
   const base = {
     orderKind: 'trigger' as const,
-    isMarketTrigger: true,
     limitPx: '64621',
     triggerPx: '71800',
     currentPrice: 72879,
@@ -258,8 +257,12 @@ describe('notionalPrice', () => {
     expect(0.00015 * notionalPrice(base)!).toBeGreaterThan(10);
   });
 
-  it('values a limit trigger at its limit price: that is the price it may fill at', () => {
-    expect(notionalPrice({ ...base, isMarketTrigger: false, limitPx: '68210' })).toBe(68210);
+  // Mesuré le 2026-11-13 (604013908327) : un Stop Limit de 10,18 $ à son déclencheur et 9,67 $ à
+  // son prix limite s'est déclenché et a été rempli. Hyperliquid ne le juge pas à son prix limite.
+  it('values a limit trigger at its trigger too, not at its limit price', () => {
+    const stopLimit = { ...base, limitPx: '1860.1', triggerPx: '1958' };
+    expect(notionalPrice(stopLimit)).toBe(1958);
+    expect(0.0052 * notionalPrice(stopLimit)!).toBeGreaterThan(10);
   });
 
   it('values a limit order at its limit price, and falls back to the market without one', () => {

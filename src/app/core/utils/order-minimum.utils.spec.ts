@@ -27,12 +27,13 @@ describe('triggerOrderValueUsd', () => {
     ).toBeCloseTo(9.86, 10);
   });
 
-  it('values a limit trigger at its limit price, where it enters the book', () => {
+  // Mesuré le 2026-11-13 (604013908327) : 10,18 $ au déclencheur, 9,67 $ au prix limite, exécuté.
+  it('values a limit trigger at its trigger too, not at its limit price', () => {
     expect(
       triggerOrderValueUsd(
-        stop({ sz: '0.005', triggerPx: '2100', limitPx: '1995', isMarket: false }),
+        stop({ sz: '0.0052', triggerPx: '1958', limitPx: '1860.1', isMarket: false }),
       ),
-    ).toBeCloseTo(9.975, 10);
+    ).toBeCloseTo(10.1816, 10);
   });
 
   it('has no trigger value for an ordinary limit order, or for unreadable numbers', () => {
@@ -61,6 +62,15 @@ describe('protectiveMinimumRefusal', () => {
     ).toBe(
       '≈ 9.86 $ when it triggers, under the 10 $ minimum: Hyperliquid accepts it now but refuses it when it triggers, and nothing is closed.',
     );
+  });
+
+  // Mesuré le 2026-11-13 (604013908327) : un Stop Limit à 9,67 $ à son prix limite, exécuté.
+  it('lets a limit stop through at 10 $ or more at its trigger, whatever its limit is worth', () => {
+    expect(
+      protectiveMinimumRefusal(
+        stop({ sz: '0.0052', triggerPx: '1958', limitPx: '1860.1', isMarket: false }),
+      ),
+    ).toBeNull();
   });
 
   // Mesuré le 2026-11-12 (603229340180) : 10,01 $ au déclencheur, 9,01 $ à la borne, exécuté.

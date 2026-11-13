@@ -154,18 +154,23 @@ export function isBelowOrderMinimum(input: {
  * déclenchement (`isBelowOrderMinimum`). Le minimum se juge donc bien au déclencheur, ce que fait
  * cette règle. ⚠️ Un stop exécuté sous 10 $ après un gap n'est pas mesuré (roadmap, point 9).
  *
- * Un ordre au marché se juge au marché ; tout autre au prix limite saisi, sinon au marché.
+ * Un déclencheur LIMITE aussi, mesuré le 2026-11-13 : un Stop Limit de 0,0052 ETH, 10,18 $ à son
+ * déclencheur (1 958) et 9,67 $ à son prix limite (1 860,1), s'est déclenché et a été REMPLI à
+ * 1 957 (604013908327). Le juger à son prix limite, comme avant, bloquait à tort. ⚠️ Rempli au
+ * déclenchement, en taker ; un stop limite resté au carnet à son prix limite après un gap n'est pas
+ * mesuré.
+ *
+ * Un ordre au marché se juge au marché ; un ordre limite au prix limite saisi, sinon au marché.
  */
 export function notionalPrice(input: {
   orderKind: OrderKind;
-  isMarketTrigger: boolean;
   limitPx: string;
   triggerPx: string;
   currentPrice: number | null;
 }): number | null {
   const current = input.currentPrice && input.currentPrice > 0 ? input.currentPrice : null;
   if (input.orderKind === 'market') return current;
-  if (input.orderKind === 'trigger' && input.isMarketTrigger) {
+  if (input.orderKind === 'trigger') {
     return isPositivePrice(input.triggerPx) ? parseFloat(input.triggerPx) : current;
   }
   return isPositivePrice(input.limitPx) ? parseFloat(input.limitPx) : current;

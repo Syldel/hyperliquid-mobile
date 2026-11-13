@@ -125,13 +125,13 @@ clair, 8,68:1 et 6,0:1 en sombre.
 Hyperliquid refuse un ordre de moins de 10 $ (« Order must have minimum value of $10 »,
 `minTradeNtlRejected`). Une seule constante, `MIN_ORDER_VALUE_USD` (`core/utils/order-minimum.utils.ts`).
 
-| Où                   | Ce que l'app fait                                                                                                                                                | Mesuré                                                                               |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| formulaire           | bloque sous 10 $ ; un limite se juge à son prix, un ordre au marché au mid, un déclencheur au marché à son **déclencheur** (`notionalPrice`)                     | un stop de 9,01 $ à sa borne et 10,01 $ à son déclencheur s'est déclenché et exécuté |
-| formulaire           | laisse passer un ordre reduce-only, limite ou au marché, qui ferme **exactement toute la position** (`isBelowOrderMinimum`) : c'est `Close › Limit` à 100 %      | un limite ALO de 9,28 $ accepté au carnet, puis rempli en maker 5,6 s plus tard      |
-| feuille de fermeture | bloque une fermeture **partielle** sous 10 $ (`partialCloseRefusal`)                                                                                             | refusée à 2,2 $ et à 9,29 $, même reduce-only                                        |
-| feuille de fermeture | laisse passer une fermeture **à 100 %**, quelle que soit sa valeur                                                                                               | acceptée à 0,71 $ (IOC)                                                              |
-| protections          | bloque une protection sous 10 $ **à son déclenchement**, à l'ajout, dans la liste du formulaire, et à l'envoi sur la taille remplie (`protectiveMinimumRefusal`) | un stop de 9,86 $ au déclencheur accepté à la pose, refusé au déclenchement          |
+| Où                   | Ce que l'app fait                                                                                                                                                | Mesuré                                                                                                                                                      |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| formulaire           | bloque sous 10 $ ; un limite se juge à son prix, un ordre au marché au mid, un déclencheur — au marché comme limite — à son **déclencheur** (`notionalPrice`)    | un stop de 9,01 $ à sa borne et 10,01 $ à son déclencheur s'est déclenché et exécuté                                                                        |
+| formulaire           | laisse passer un ordre reduce-only, limite ou au marché, qui ferme **exactement toute la position** (`isBelowOrderMinimum`) : c'est `Close › Limit` à 100 %      | un limite ALO de 9,28 $ accepté au carnet, puis rempli en maker 5,6 s plus tard                                                                             |
+| feuille de fermeture | bloque une fermeture **partielle** sous 10 $ (`partialCloseRefusal`)                                                                                             | refusée à 2,2 $ et à 9,29 $, même reduce-only                                                                                                               |
+| feuille de fermeture | laisse passer une fermeture **à 100 %**, quelle que soit sa valeur                                                                                               | acceptée à 0,71 $ (IOC)                                                                                                                                     |
+| protections          | bloque une protection sous 10 $ **à son déclenchement**, à l'ajout, dans la liste du formulaire, et à l'envoi sur la taille remplie (`protectiveMinimumRefusal`) | un stop de 9,86 $ au déclencheur accepté à la pose, refusé au déclenchement ; un stop limite de 10,18 $ au déclencheur et 9,67 $ à son prix limite, exécuté |
 
 Un **déclencheur** (TP/SL) reste bloqué sous 10 $ à son déclencheur, et ce blocage est
 **indispensable** — mesuré le 2026-11-13 : un Stop Market reduce-only de 9,86 $ à son déclencheur
@@ -170,9 +170,11 @@ Mesuré le 2026-11-12 par l'utilisateur (l'agent ne passe jamais d'ordre) :
   **déclenchement et l'exécution** d'un autre qui vaut 9,01 $ à sa borne et 10,01 $ à son
   déclencheur ;
 - l'acceptation **à la pose** d'un Stop Market qui vaut 9,86 $ **à son déclencheur**, puis son
-  **refus au déclenchement** (`minTradeNtlRejected`), sans exécution (le 2026-11-13).
+  **refus au déclenchement** (`minTradeNtlRejected`), sans exécution (le 2026-11-13) ;
+- le **déclenchement et l'exécution** d'un Stop Limit qui vaut 10,18 $ à son déclencheur et 9,67 $
+  à son prix limite (le 2026-11-13) : un stop limite se juge lui aussi à son déclencheur.
 
-Voir [roadmap.md](roadmap.md#à-éprouver-en-réel--ce-quaucun-double-ne-peut-établir), points 7 à 13.
+Voir [roadmap.md](roadmap.md#à-éprouver-en-réel--ce-quaucun-double-ne-peut-établir), points 7 à 14.
 
 ⚠️ Reste ouvert :
 
