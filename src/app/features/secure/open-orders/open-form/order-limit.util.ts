@@ -118,8 +118,10 @@ export const MIN_ORDER_VALUE_USD = 10;
  *   maker (603249193381).
  * Une fermeture PARTIELLE sous 10 $ est refusée (2,2 $ et 9,29 $, voir `partialCloseRefusal`).
  *
- * Un déclencheur (TP/SL) n'en profite pas : qu'un stop qui vaut moins de 10 $ à son déclencheur
- * s'exécute n'est pas mesuré.
+ * Un déclencheur (TP/SL) n'en profite pas, et c'est mesuré : le 2026-11-13, un Stop Market
+ * reduce-only de 0,005 ETH (9,86 $ à son déclencheur) a été ACCEPTÉ à la pose, puis `triggered` et
+ * `minTradeNtlRejected` à la même milliseconde, sans exécution (603956585419). Le laisser passer
+ * poserait un stop qui disparaît au moment où il devait protéger.
  *
  * `position` : la position lue sur la paire, ou `null`. Si elle a changé depuis, l'ordre n'est plus
  * une fermeture totale et le serveur le refuse : un refus visible, pas un ordre faux.
@@ -155,8 +157,9 @@ export function isBelowOrderMinimum(input: {
  * Et son EXÉCUTION, mesurée le 2026-11-12 au soir : un Stop Market de 0,00014 BTC, 9,01 $ à sa
  * borne (64 349) et 10,01 $ à son déclencheur (71 498), s'est déclenché et a été REMPLI à 71 493
  * (603229340180). Hyperliquid ne juge donc pas le minimum à la borne au déclenchement, ce que
- * cette règle suppose. ⚠️ Un seul cas ; un stop sous 10 $ à son déclencheur reste bloqué ici, et
- * n'est pas mesuré (roadmap, « À éprouver en réel », point 9).
+ * cette règle suppose. Et l'inverse, mesuré le 2026-11-13 : 9,86 $ à son déclencheur, refusé au
+ * déclenchement (`isBelowOrderMinimum`). Le minimum se juge donc bien au déclencheur, ce que fait
+ * cette règle. ⚠️ Un stop exécuté sous 10 $ après un gap n'est pas mesuré (roadmap, point 9).
  *
  * Un ordre au marché se juge au marché ; tout autre au prix limite saisi, sinon au marché.
  */

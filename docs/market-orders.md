@@ -132,8 +132,13 @@ Hyperliquid refuse un ordre de moins de 10 $ (« Order must have minimum value o
 | feuille de fermeture | bloque une fermeture **partielle** sous 10 $ (`partialCloseRefusal`)                                                                                        | refusée à 2,2 $ et à 9,29 $, même reduce-only                                        |
 | feuille de fermeture | laisse passer une fermeture **à 100 %**, quelle que soit sa valeur                                                                                          | acceptée à 0,71 $ (IOC)                                                              |
 
-Un **déclencheur** (TP/SL) sur toute la position reste bloqué sous 10 $ : son exécution sous 10 $ à
-son déclencheur n'est pas mesurée. ⚠️ L'exemption se fonde sur la position lue au choix de la
+Un **déclencheur** (TP/SL) reste bloqué sous 10 $ à son déclencheur, et ce blocage est
+**indispensable** — mesuré le 2026-11-13 : un Stop Market reduce-only de 9,86 $ à son déclencheur
+est **accepté à la pose**, puis, au déclenchement, `triggered` et **`minTradeNtlRejected` à la même
+milliseconde**, sans rien exécuter. Un stop sous 10 $ disparaît donc au moment où il devait
+protéger, et la position reste ouverte sans lui. ⚠️ Les protections posées **avec** une ouverture
+(Stop Loss / Take Profit du formulaire) ne passent pas par ce contrôle : un SL sur une position
+proche de 10 $ peut valoir moins de 10 $ à son déclencheur (roadmap, point 13). ⚠️ L'exemption se fonde sur la position lue au choix de la
 paire ; si elle a changé depuis, l'ordre n'est plus une fermeture totale et Hyperliquid le refuse,
 un refus visible.
 
@@ -157,13 +162,15 @@ Mesuré le 2026-11-12 par l'utilisateur (l'agent ne passe jamais d'ordre) :
   un IOC (0,71 $) comme par un limite qui attend au carnet (9,28 $, rempli en maker) ;
 - l'acceptation **à la pose** d'un Stop Market qui vaut 9,65 $ à sa borne, puis le
   **déclenchement et l'exécution** d'un autre qui vaut 9,01 $ à sa borne et 10,01 $ à son
-  déclencheur.
+  déclencheur ;
+- l'acceptation **à la pose** d'un Stop Market qui vaut 9,86 $ **à son déclencheur**, puis son
+  **refus au déclenchement** (`minTradeNtlRejected`), sans exécution (le 2026-11-13).
 
-Voir [roadmap.md](roadmap.md#à-éprouver-en-réel--ce-quaucun-double-ne-peut-établir), points 7 à 12.
+Voir [roadmap.md](roadmap.md#à-éprouver-en-réel--ce-quaucun-double-ne-peut-établir), points 7 à 13.
 
 ⚠️ Reste ouvert :
 
 - la forme d'un IOC rempli en partie (point 6) ;
-- un stop au marché sous 10 $ **à son déclencheur** (le formulaire le bloque) et un stop exécuté
-  sous 10 $ de valeur après un gap (point 9) ;
+- un stop exécuté sous 10 $ de valeur après un gap, alors qu'il valait 10 $ ou plus à son
+  déclencheur (point 9) ;
 - les frais sur la marge isolée.

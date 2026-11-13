@@ -1020,8 +1020,8 @@ Profit Limit"`, `triggerCondition: "Price above 81959"`.
    La mesure prévue (0,00013, ≈ 9,3 $ **au déclencheur**) était mal conçue : le formulaire bloque à
    juste titre un stop sous 10 $ à son déclencheur, c'est ce que l'utilisateur a constaté (« ≈ 9.29
    $ », bouton désactivé), et 0,00014 était le bon cas — sous 10 $ à la borne, au-dessus au
-   déclencheur. ⚠️ Reste non mesuré, et toujours bloqué par le formulaire : un stop sous 10 $ à son
-   déclencheur. ⚠️ Un seul cas, exécuté 5 $ sous le déclencheur ; un gap qui exécuterait sous
+   déclencheur. Un stop sous 10 $ à son déclencheur : refusé au déclenchement, voir le point 13.
+   ⚠️ Un seul cas, exécuté 5 $ sous le déclencheur ; un gap qui exécuterait sous
    10 $ de valeur n'est pas mesuré.
 
 10. **✅ Un ordre au marché et ses protections, en réel (2026-11-12).** Achat 0,00015 BTC, plafond
@@ -1046,6 +1046,24 @@ Profit Limit"`, `triggerCondition: "Price above 81959"`.
     depuis le mobile : IOC 603933829890 exécuté à 1 958,4 à 13:10:55.791 UTC, et **les deux**
     stops `reduceOnlyCanceled` à la même milliseconde. La feuille de fermeture disait « should
     cancel it » pour le premier ; elle dit depuis « cancels it at once » pour les deux.
+
+13. **✅ Un stop sous 10 $ à son déclencheur : accepté à la pose, REFUSÉ au déclenchement.**
+    Mesuré le 2026-11-13 depuis le mobile, le blocage du formulaire levé dans le worktree pour les
+    seuls déclencheurs le temps de la mesure, puis remis en place. Long ETH 0,0056 à 1 975,2 ;
+    Stop Market reduce-only de **0,005**, déclencheur 1 972, borne 1 774,9 — **9,86 $ au
+    déclencheur** (603956585419). `open` à 13:36:09.860 UTC, puis `triggered` **et**
+    `minTradeNtlRejected` à 13:52:35.538, à la même milliseconde : **aucune exécution**, la
+    position est restée ouverte, sans ce stop. Un premier essai (603939512856, 9,76 $) avait été
+    accepté à la pose, puis annulé par une fermeture manuelle avant tout déclenchement.
+
+    Conséquence : le blocage du formulaire **n'est pas une prudence mais une nécessité**. Hyperliquid
+    ne refuse pas ce stop quand on le pose, il le refuse quand il devrait protéger — une défaillance
+    muette au pire moment. Avec le point 9 (10,01 $ au déclencheur, exécuté), le minimum se juge
+    au déclencheur, comme le fait `notionalPrice`. ⚠️ Un stop posé hors de l'app (interface web)
+    n'est pas contrôlé. ⚠️ **Les protections posées avec une ouverture non plus** : ni
+    `protective-order-form` ni `protective-order.utils.ts` ne comparent taille × déclencheur au
+    minimum (relevé le 2026-11-13). Un long de 10,05 $ avec un Stop Loss à 2 % pose un stop de
+    9,85 $ à son déclencheur — accepté, puis refusé quand il devrait couper la perte. À traiter.
 
 ## Précédent
 
