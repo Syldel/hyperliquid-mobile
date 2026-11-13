@@ -13,8 +13,14 @@ import type { HlActiveAssetLeverage, HLPerpMarginTableEntry } from '@syldel/hl-s
  *     l = 1 / MAINTENANCE_LEVERAGE
  *
  * et la maintenance est « la moitié de la marge initiale au levier maximal » du palier
- * (`margin-tiers.md`), donc `MAINTENANCE_LEVERAGE = 2 × levier max du palier`. La marge isolée
- * d'ouverture est `taille × mark / levier` (`margining.md`).
+ * (`margin-tiers.md`), donc `MAINTENANCE_LEVERAGE = 2 × levier max du palier`.
+ *
+ * La marge isolée d'ouverture est `taille × prix d'ENTRÉE / levier`, MOINS les frais taker :
+ * mesuré le 2026-11-13 sur un long ETH isolé 3x de 0,0056 à 1 925,2 (oid 604105843891). Hyperliquid
+ * a rendu `rawUsd` −7,192265, soit une marge de 3,588855 = 3,593707 (taille × entrée / 3) −
+ * 0,004851 (les frais de l'exécution), et `liquidationPx` 1 310,5439139942 : cette formule, avec
+ * cette marge, le redonne à 10⁻¹⁰ près. L'ancienne marge (`taille × mark / levier`, sans frais)
+ * donnait 1 309,66, l'estimation affichée 1 309,83.
  *
  * Ce qui la rend simple, et donc ce qui est EXIGÉ ici — sinon « not estimated », avec la raison :
  * - **isolé** : en croisé, la liquidation dépend de tout le compte (les autres positions, leur PnL) ;
@@ -22,9 +28,8 @@ import type { HlActiveAssetLeverage, HLPerpMarginTableEntry } from '@syldel/hl-s
  * - **premier palier** de marge : au-delà, la maintenance dépend du palier AU prix de liquidation ;
  * - **un ordre d'ouverture** : un reduce-only n'engage pas de marge.
  *
- * ⚠️ Non vérifié (2026-11-12) : si les frais taker se prélèvent sur la marge isolée. L'écart serait
- * de l'ordre du taux taker (0,045 % au palier 0) rapporté au notionnel. La doc prévient aussi
- * qu'une estimation d'entrée diffère du prix réel quand la liquidité bouge.
+ * L'estimation reste une estimation : le prix d'entrée est celui du parcours du carnet, et la doc
+ * prévient qu'il diffère du prix réel quand la liquidité bouge.
  * ============================================================================
  */
 
@@ -39,7 +44,8 @@ export interface LiquidationInput {
   sz: number;
   /** Le prix moyen d'exécution estimé (parcours du carnet). */
   entryPx: number | null;
-  markPx: number | null;
+  /** Le taux taker du compte (0,00045 au palier 0) : les frais sortent de la marge isolée. */
+  takerRate: number | null;
   leverage: HlActiveAssetLeverage | null;
   /** `null` : on ne sait pas s'il y a une position. */
   hasPosition: boolean | null;
@@ -98,8 +104,8 @@ export function estimateLiquidation(input: LiquidationInput): LiquidationEstimat
   if (input.entryPx === null || !(input.entryPx > 0)) {
     return { status: 'not-estimated', reason: 'no estimated fill price' };
   }
-  if (input.markPx === null || !(input.markPx > 0)) {
-    return { status: 'not-estimated', reason: 'no mark price' };
+  if (input.takerRate === null || !(input.takerRate >= 0)) {
+    return { status: 'not-estimated', reason: 'the taker fee rate is unknown' };
   }
   if (!(input.sz > 0) || !(input.leverage.value > 0)) {
     return { status: 'not-estimated', reason: 'no size or leverage' };
@@ -108,17 +114,14 @@ export function estimateLiquidation(input: LiquidationInput): LiquidationEstimat
     return { status: 'not-estimated', reason: 'the margin table is unknown' };
   }
 
-  const tier = firstTierMaxLeverage(
-    input.marginTableId,
-    input.marginTables,
-    input.sz * input.entryPx,
-  );
+  const notional = input.sz * input.entryPx;
+  const tier = firstTierMaxLeverage(input.marginTableId, input.marginTables, notional);
   if ('reason' in tier) return { status: 'not-estimated', reason: tier.reason };
 
   const side = input.isBuy ? 1 : -1;
   const l = 1 / (2 * tier.maxLeverage);
-  const isolatedMargin = (input.sz * input.markPx) / input.leverage.value;
-  const maintenance = l * input.sz * input.entryPx;
+  const isolatedMargin = notional / input.leverage.value - notional * input.takerRate;
+  const maintenance = l * notional;
   const marginAvailable = isolatedMargin - maintenance;
   const px = input.entryPx - (side * marginAvailable) / input.sz / (1 - l * side);
 

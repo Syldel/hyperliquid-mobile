@@ -8,7 +8,8 @@ function isolatedLong(overrides: Partial<LiquidationInput> = {}): LiquidationInp
     isBuy: true,
     sz: 0.001,
     entryPx: 100000,
-    markPx: 100000,
+    // Sans frais, pour garder les calculs de la doc lisibles ; les frais ont leur test.
+    takerRate: 0,
     leverage: { type: 'isolated', value: 10 },
     hasPosition: false,
     marginTableId: 40,
@@ -40,6 +41,27 @@ describe('estimateLiquidation', () => {
     if (estimate.status !== 'estimated') throw new Error('expected an estimate');
     const equity = 20 + 0.001 * (estimate.px - 100000);
     expect(equity).toBeCloseTo((1 / 80) * 0.001 * estimate.px, 9);
+  });
+
+  // Mesuré le 2026-11-13 (604105843891) : long ETH isolé 3x, 0,0056 à 1 925,2, frais 0,004851 $.
+  // Hyperliquid a rendu `liquidationPx` 1 310,5439139942 ; sans les frais, on trouvait 1 309,66.
+  it('takes the taker fees out of the isolated margin, priced at the entry', () => {
+    const measured = isolatedLong({
+      sz: 0.0056,
+      entryPx: 1925.2,
+      takerRate: 0.00045,
+      leverage: { type: 'isolated', value: 3 },
+      marginTableId: 25, // ETH : premier palier, levier max 25.
+    });
+    const estimate = estimateLiquidation(measured);
+    expect(estimate.status === 'estimated' && estimate.px).toBeCloseTo(1310.5439, 3);
+  });
+
+  it('is not estimated without the taker fee rate', () => {
+    expect(estimateLiquidation(isolatedLong({ takerRate: null }))).toEqual({
+      status: 'not-estimated',
+      reason: 'the taker fee rate is unknown',
+    });
   });
 
   it('is not estimated in cross margin, and says why', () => {

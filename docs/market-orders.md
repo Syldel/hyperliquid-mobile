@@ -83,7 +83,10 @@ La volatilité n'y est pas : elle juge un stop, pas une exécution d'une seconde
 
 La formule de `trading/liquidations.md`, en **marge isolée seulement**, sans position déjà
 ouverte sur la paire, dans le premier palier de marge. Sinon « not estimated », avec la raison.
-⚠️ Non vérifié : si les frais taker se prélèvent sur la marge isolée.
+La marge isolée est `taille × prix d'entrée / levier` **moins les frais taker** : mesuré le
+2026-11-13 sur un long ETH isolé 3x, où cette marge redonne le `liquidationPx` d'Hyperliquid à
+10⁻¹⁰ près (roadmap, point 15). L'app la calculait sur le mark et sans frais : 0,9 $ d'écart sur
+ETH, 0,07 %.
 
 ## Les protections d'un ordre au marché
 
@@ -172,13 +175,14 @@ Mesuré le 2026-11-12 par l'utilisateur (l'agent ne passe jamais d'ordre) :
 - l'acceptation **à la pose** d'un Stop Market qui vaut 9,86 $ **à son déclencheur**, puis son
   **refus au déclenchement** (`minTradeNtlRejected`), sans exécution (le 2026-11-13) ;
 - le **déclenchement et l'exécution** d'un Stop Limit qui vaut 10,18 $ à son déclencheur et 9,67 $
-  à son prix limite (le 2026-11-13) : un stop limite se juge lui aussi à son déclencheur.
+  à son prix limite (le 2026-11-13) : un stop limite se juge lui aussi à son déclencheur ;
+- le prélèvement des frais taker sur la **marge isolée**, et le calcul de cette marge au prix
+  d'entrée (le 2026-11-13).
 
-Voir [roadmap.md](roadmap.md#à-éprouver-en-réel--ce-quaucun-double-ne-peut-établir), points 7 à 14.
+Voir [roadmap.md](roadmap.md#à-éprouver-en-réel--ce-quaucun-double-ne-peut-établir), points 7 à 15.
 
 ⚠️ Reste ouvert :
 
 - la forme d'un IOC rempli en partie (point 6) ;
 - un stop exécuté sous 10 $ de valeur après un gap, alors qu'il valait 10 $ ou plus à son
   déclencheur (point 9) ;
-- les frais sur la marge isolée.

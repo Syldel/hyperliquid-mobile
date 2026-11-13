@@ -193,7 +193,8 @@ export class MarketOrderConfirmComponent implements OnInit {
       isBuy: this.isBuy(),
       sz: this.szNum(),
       entryPx: this.walk()?.avgPx ?? null,
-      markPx: snap.markPx,
+      // Le taux du compte, ou celui du palier 0 si illisible (dit sur la ligne des frais).
+      takerRate: this.takerRate()?.rate ?? null,
       leverage: this.leverage(),
       hasPosition: this.hasPosition(),
       marginTableId: snap.marginTableId,

@@ -1080,6 +1080,17 @@ Profit Limit"`, `triggerCondition: "Price above 81959"`.
     stop limite qui, après un gap, resterait au carnet à son prix limite (sous 10 $) n'est pas
     mesuré.
 
+15. **✅ Les frais taker sortent de la marge isolée, calculée au prix d'entrée.** Mesuré le
+    2026-11-13 depuis le mobile, ETH passé en isolé 3x sur l'interface web (le mobile ne change
+    pas le mode de marge). Long au marché de 0,0056, exécuté à 1 925,2, frais 0,004851 $
+    (604105843891). `clearinghouseState` : `rawUsd` −7,192265, donc une marge isolée de 3,588855 =
+    0,0056 × 1 925,2 / 3 (3,593707) − les frais ; `liquidationPx` 1 310,5439139942, que la formule
+    de `liquidations.md` redonne avec cette marge à 10⁻¹⁰ près. L'estimation de la confirmation
+    prenait `taille × mark / levier`, sans frais, et affichait 1 309,83 : elle prend depuis le prix
+    d'entrée estimé et retire les frais au taux du compte (`estimateLiquidation`, `takerRate`).
+    Au passage, la relecture de la confirmation a refusé deux fois d'envoyer : le plafond avait
+    bougé de 0,27 % et 0,17 % pendant la lecture, au-delà des 0,1 % tolérés.
+
 ## Précédent
 
 Le dernier risque refermé — une expression malformée faisant rejeter toute la requête
