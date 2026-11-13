@@ -52,6 +52,7 @@ import {
   modifyRefusal,
 } from '@utils/hl-error.utils';
 import { roundPrice, roundSize } from '@utils/hl-rounding.utils';
+import { MIN_ORDER_VALUE_USD, protectiveMinimumRefusal } from '@utils/order-minimum.utils';
 import {
   buildProtectiveOrderDetails,
   computeProtectiveTriggerPx,
@@ -91,7 +92,6 @@ import {
   isLimitOnWrongSide,
   isStopLimitTight,
   limitFromTrigger,
-  MIN_ORDER_VALUE_USD,
   notionalPrice,
   orderPricesReady,
   stopLimitSpread,
@@ -232,6 +232,25 @@ export class OrderFormComponent implements OnInit {
     return price ? roundPrice(price, this.szDecimals(), false) : '';
   });
   canAddProtectiveOrder = computed(() => !!this.protectiveRefPx() && parseFloat(this.sz()) > 0);
+
+  /**
+   * Les protections qui vaudraient moins de 10 $ à leur déclenchement, par id, avec la raison.
+   * Recalculé à chaque changement de taille ou de prix : une protection valable à l'ajout peut
+   * cesser de l'être. Au marché, c'est une estimation (prix courant) ; l'envoi refait le contrôle
+   * sur la taille remplie et le prix moyen (`submitProtectiveOrders$`).
+   */
+  protectiveRefusals = computed(() => {
+    const refusals = new Map<string, string>();
+    const sz = this.sz();
+    const refPx = this.protectiveRefPx();
+    if (!(parseFloat(sz) > 0) || !refPx) return refusals;
+    const context = this.protectiveContext(refPx, sz);
+    for (const p of this.protectiveOrders()) {
+      const refusal = protectiveMinimumRefusal(buildProtectiveOrderDetails(context, p));
+      if (refusal) refusals.set(p.id, refusal);
+    }
+    return refusals;
+  });
 
   // ── Ordre au marché ────────────────────────────────────────────────────────
 
@@ -448,6 +467,7 @@ export class OrderFormComponent implements OnInit {
       if (!this.isPerpCoin() || this.isSlippageInvalid()) return true;
       if (this.marketLocked() || this.checkingPosition()) return true;
     }
+    if (this.showProtectiveSection() && this.protectiveRefusals().size > 0) return true;
     return this.isPriceInvalid() || this.isLimitSideInvalid() || this.isSizeInvalid();
   });
 
@@ -1005,6 +1025,17 @@ export class OrderFormComponent implements OnInit {
     );
   }
 
+  private protectiveContext(limitPx: string, sz: string): UnprotectedFill['context'] {
+    return {
+      assetName: this.selectedCoin() ?? '',
+      isBuy: this.isBuy(),
+      limitPx,
+      sz,
+      szDecimals: this.szDecimals(),
+      isSpot: this.isSpot(),
+    };
+  }
+
   getProtectiveSize(p: ProtectiveOrderResult): string {
     const mainSz = parseFloat(this.sz()) || 0;
     return roundSize((mainSz * p.sizePercent) / 100, this.szDecimals());
@@ -1057,38 +1088,58 @@ export class OrderFormComponent implements OnInit {
   ): Observable<{ failed: ProtectiveOrderResult[]; message: string | null }> {
     if (items.length === 0) return of({ failed: [], message: null });
 
-    const orders = items.map((p) => buildProtectiveOrderDetails(mainContext, p));
-    const labels = items.map((p) => p.label);
+    // Le dernier contrôle, sur la taille et le prix réels (au marché : ce qui a été rempli, au prix
+    // moyen). Une protection sous 10 $ à son déclenchement serait acceptée, puis refusée quand elle
+    // doit protéger (mesuré le 2026-11-13) : elle ne part pas, et son absence se voit.
+    const built = items.map((p) => ({ p, order: buildProtectiveOrderDetails(mainContext, p) }));
+    const tooSmall = built
+      .map(({ p, order }) => ({ p, refusal: protectiveMinimumRefusal(order) }))
+      .filter((x): x is { p: ProtectiveOrderResult; refusal: string } => x.refusal !== null);
+    const sendable = built.filter(({ p }) => !tooSmall.some((t) => t.p === p));
+    const tooSmallReasons = tooSmall.map(({ p, refusal }) => `${p.label}: not sent, ${refusal}`);
+    tooSmallReasons.forEach((reason) => this.presentToast(reason, 'danger'));
+    if (sendable.length === 0) {
+      return of({ failed: tooSmall.map((t) => t.p), message: tooSmallReasons.join(' · ') });
+    }
+    const sentItems = sendable.map(({ p }) => p);
+    const orders = sendable.map(({ order }) => order);
+    const labels = sentItems.map((p) => p.label);
+    const withTooSmall = (failed: ProtectiveOrderResult[], message: string | null) => ({
+      failed: [...tooSmall.map((t) => t.p), ...failed],
+      message: [...tooSmallReasons, ...(message ? [message] : [])].join(' · ') || null,
+    });
 
     return this.hlGateway.placeOrders(orders).pipe(
       map((res) => {
         const refusal = exchangeRefusal(res);
         if (refusal) {
           labels.forEach((label) => this.presentToast(`${label} failed: ${refusal}`, 'danger'));
-          return { failed: items, message: `${refusal} None was placed.` };
+          return withTooSmall(sentItems, `${refusal} None was placed.`);
         }
         const statuses: HLPlaceOrderStatus[] = res?.response?.data?.statuses ?? [];
         labels.forEach((label, i) => this.showOrderStatusToast(statuses[i], label));
         this.availableCapitalService.invalidate();
-        const failed = items.filter((_, i) => !statuses[i] || !!statuses[i].error);
-        const reasons = items
+        const failed = sentItems.filter((_, i) => !statuses[i] || !!statuses[i].error);
+        const reasons = sentItems
           .map((p, i) =>
             failed.includes(p) ? `${p.label}: ${statuses[i]?.error ?? 'no status'}` : null,
           )
           .filter((r): r is string => r !== null);
-        return { failed, message: failed.length ? reasons.join(' · ') : null };
+        return withTooSmall(failed, failed.length ? reasons.join(' · ') : null);
       }),
       catchError((err: HttpErrorResponse) => {
         const message = extractErrorMessage(err);
         labels.forEach((label) => this.presentToast(`${label} failed: ${message}`, 'danger'));
         // Un réseau coupé ou un 5xx ne dit pas si les protections sont posées : on le dit.
         const uncertain = err.status === 0 || err.status >= 500;
-        return of({
-          failed: items,
-          message: uncertain
-            ? `${message} They may have been placed: check the open orders before retrying.`
-            : message,
-        });
+        return of(
+          withTooSmall(
+            sentItems,
+            uncertain
+              ? `${message} They may have been placed: check the open orders before retrying.`
+              : message,
+          ),
+        );
       }),
     );
   }

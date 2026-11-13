@@ -40,3 +40,11 @@
   font-weight: 500;
   white-space: nowrap;
 }
+
+/* La protection vaudrait moins de 10 $ à son déclenchement : une phrase, à la ligne. */
+.minimum-refusal {
+  color: var(--ion-color-danger);
+  font-size: 0.8rem;
+  font-weight: 500;
+  margin: 8px 4px 0;
+}

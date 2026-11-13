@@ -248,6 +248,30 @@ describe('OrderFormComponent — market order', () => {
 
   it('sizes the protections on the filled part of a partial fill, and stays open to say it', async () => {
     startMarketBuy();
+    form.sz.set('0.0003');
+    settle();
+    answer({
+      kind: 'partial',
+      totalSz: '0.00012',
+      avgPx: '100000.0',
+      oid: 1,
+      requestedSz: '0.0003',
+    });
+
+    form.submit();
+    await flush();
+
+    const [orders] = placeOrders.mock.calls[0] as [Array<Record<string, unknown>>];
+    expect(orders[0]['sz']).toBe('0.00012');
+    expect(form.marketOutcome()?.text).toContain('Partially filled: 0.00012 of 0.0003');
+    expect(dismiss).not.toHaveBeenCalled();
+    expect(form.isFormInvalid()).toBe(true);
+  });
+
+  // Mesuré le 2026-11-13 : un stop sous 10 $ à son déclenchement est accepté à la pose, puis refusé
+  // quand il se déclenche. Un remplissage partiel peut y mener : 0,00005 × 98 000 = 4,90 $.
+  it('sends no protection worth under 10 $ at its trigger, and says the position is unprotected', async () => {
+    startMarketBuy();
     answer({
       kind: 'partial',
       totalSz: '0.00005',
@@ -259,11 +283,36 @@ describe('OrderFormComponent — market order', () => {
     form.submit();
     await flush();
 
+    expect(placeOrders).not.toHaveBeenCalled();
+    expect(form.unprotected()?.items.map((p) => p.id)).toEqual(['sl']);
+    expect(form.unprotected()?.message).toBe(
+      'Stop Loss: not sent, ≈ 4.90 $ when it triggers, under the 10 $ minimum: Hyperliquid accepts it now but refuses it when it triggers, and nothing is closed.',
+    );
+  });
+
+  it('still sends the protections that clear the minimum beside one that does not', async () => {
+    startMarketBuy();
+    form.protectiveOrders.update((list) => [
+      ...list,
+      {
+        id: 'sl-half',
+        kind: 'sl',
+        label: 'Half stop',
+        sizePercent: 50,
+        priceOffsetPercent: 2,
+        isMarket: true,
+      },
+    ]);
+    answer({ kind: 'filled', totalSz: '0.00011', avgPx: '100000.0', oid: 1 });
+
+    form.submit();
+    await flush();
+
     const [orders] = placeOrders.mock.calls[0] as [Array<Record<string, unknown>>];
-    expect(orders[0]['sz']).toBe('0.00005');
-    expect(form.marketOutcome()?.text).toContain('Partially filled: 0.00005 of 0.00011');
+    expect(orders).toHaveLength(1);
+    expect(orders[0]['sz']).toBe('0.00011');
+    expect(form.unprotected()?.items.map((p) => p.id)).toEqual(['sl-half']);
     expect(dismiss).not.toHaveBeenCalled();
-    expect(form.isFormInvalid()).toBe(true);
   });
 
   it('does not close on an open position left unprotected, and retries only what failed', async () => {
@@ -419,6 +468,46 @@ describe('OrderFormComponent — market order', () => {
       form.sz.set('0.0001');
       settle();
       expect(form.isSizeInvalid()).toBe(true);
+    });
+  });
+
+  describe('a protection worth under 10 $ when it triggers', () => {
+    // Un long limite de 0,0001 BTC à 100 000 (10 $) : son Stop Loss à 2 % vaut 9,80 $ à 98 000.
+    function limitBuyWithStop(): void {
+      create();
+      form.isBuy.set(true);
+      form.currentPrice.set(100000);
+      form.limitPx.set('100000');
+      form.sz.set('0.0001');
+      form.protectiveOrders.set([
+        {
+          id: 'sl',
+          kind: 'sl',
+          label: 'Stop Loss',
+          sizePercent: 100,
+          priceOffsetPercent: 2,
+          isMarket: true,
+        },
+      ]);
+      settle();
+    }
+
+    it('blocks the order and says why on that protection', () => {
+      limitBuyWithStop();
+      expect(form.protectiveRefusals().get('sl')).toContain('≈ 9.80 $ when it triggers');
+      expect(form.isFormInvalid()).toBe(true);
+
+      form.removeProtectiveOrder('sl');
+      settle();
+      expect(form.isFormInvalid()).toBe(false);
+    });
+
+    it('clears once the size makes the protection worth 10 $ or more at its trigger', () => {
+      limitBuyWithStop();
+      form.sz.set('0.00011'); // 0,00011 × 98 000 = 10,78 $.
+      settle();
+      expect(form.protectiveRefusals().size).toBe(0);
+      expect(form.isFormInvalid()).toBe(false);
     });
   });
 });

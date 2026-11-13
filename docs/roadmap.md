@@ -1060,10 +1060,10 @@ Profit Limit"`, `triggerCondition: "Price above 81959"`.
     ne refuse pas ce stop quand on le pose, il le refuse quand il devrait protéger — une défaillance
     muette au pire moment. Avec le point 9 (10,01 $ au déclencheur, exécuté), le minimum se juge
     au déclencheur, comme le fait `notionalPrice`. ⚠️ Un stop posé hors de l'app (interface web)
-    n'est pas contrôlé. ⚠️ **Les protections posées avec une ouverture non plus** : ni
-    `protective-order-form` ni `protective-order.utils.ts` ne comparent taille × déclencheur au
-    minimum (relevé le 2026-11-13). Un long de 10,05 $ avec un Stop Loss à 2 % pose un stop de
-    9,85 $ à son déclencheur — accepté, puis refusé quand il devrait couper la perte. À traiter.
+    n'est pas contrôlé. Les protections posées avec une ouverture ne l'étaient pas non plus (un
+    long de 10,05 $ avec un Stop Loss à 2 % posait un stop de 9,85 $ à son déclencheur) : elles le
+    sont depuis le même jour (`protectiveMinimumRefusal`, `core/utils/order-minimum.utils.ts`), à
+    l'ajout, dans le formulaire et à l'envoi.
 
 ## Précédent
 

@@ -205,3 +205,13 @@
   /* `.current-price-hint` est sur une ligne ; cette note-ci est une phrase (coupée à 360 px, mesuré). */
   white-space: normal;
 }
+
+/* Une protection sous 10 $ à son déclenchement : refusée par Hyperliquid quand elle se déclenche
+   (mesuré le 2026-11-13). Elle bloque l'envoi, d'où le rouge ; une phrase, donc pas de nowrap. */
+.protective-refusal {
+  color: var(--ion-color-danger);
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: normal;
+  margin-top: 2px;
+}

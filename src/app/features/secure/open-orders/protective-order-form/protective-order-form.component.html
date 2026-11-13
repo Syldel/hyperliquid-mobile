@@ -96,6 +96,9 @@
     <span></span>
     <p class="entry-price-hint">Entry (limit) price: {{ mainLimitPx | number: '1.2-6' }}</p>
   </div>
+  @if (minimumRefusal(); as refusal) {
+    <p class="minimum-refusal" role="alert">{{ refusal }}</p>
+  }
 </ion-content>
 
 <ion-footer>

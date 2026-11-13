@@ -319,6 +319,9 @@
                   {{ getProtectiveSize(p) }}
                   <span class="sub-hint">({{ p.sizePercent }}% of size)</span>
                 </div>
+                @if (protectiveRefusals().get(p.id); as refusal) {
+                  <div class="protective-refusal" role="alert">{{ refusal }}</div>
+                }
               </ion-label>
               <ion-button
                 slot="end"

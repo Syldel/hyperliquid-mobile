@@ -28,7 +28,12 @@ import {
   SegmentValue,
 } from '@ionic/angular/standalone';
 import { roundSize } from '@utils/hl-rounding.utils';
-import { computeProtectiveTriggerPx, ProtectiveOrderKind } from '@utils/protective-order.utils';
+import { protectiveMinimumRefusal } from '@utils/order-minimum.utils';
+import {
+  buildProtectiveOrderDetails,
+  computeProtectiveTriggerPx,
+  ProtectiveOrderKind,
+} from '@utils/protective-order.utils';
 import { addIcons } from 'ionicons';
 import { closeOutline } from 'ionicons/icons';
 
@@ -136,9 +141,36 @@ export class ProtectiveOrderFormComponent implements OnInit {
 
   sizeClass = computed(() => (this.sz() && !this.isSizeValid() ? 'diff--danger' : ''));
 
+  /**
+   * La protection telle qu'elle partira (taille en %, déclencheur en % d'écart : ce que garde le
+   * résultat), comparée au minimum de 10 $ à son déclenchement. Hyperliquid l'accepterait à la pose
+   * et la refuserait au déclenchement (mesuré le 2026-11-13) : ça se dit ici, avant.
+   */
+  minimumRefusal = computed(() => {
+    if (!this.isSizeValid() || !this.isTriggerValid()) return null;
+    const order = buildProtectiveOrderDetails(
+      {
+        assetName: this.coin,
+        isBuy: this.mainIsBuy,
+        limitPx: this.mainLimitPx,
+        sz: this.mainSz,
+        szDecimals: this.szDecimals,
+        isSpot: this.isSpotAsset,
+      },
+      {
+        kind: this.kind(),
+        sizePercent: this.sizePercent(),
+        priceOffsetPercent: parseFloat(this.priceOffsetPercent()) || 0,
+        isMarket: this.isMarket(),
+      },
+    );
+    return protectiveMinimumRefusal(order);
+  });
+
   isFormInvalid = computed(() => {
     if (!this.isSizeValid()) return true;
-    return !this.isTriggerValid();
+    if (!this.isTriggerValid()) return true;
+    return this.minimumRefusal() !== null;
   });
 
   constructor() {

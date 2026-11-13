@@ -1,5 +1,6 @@
 import { roundPrice } from '@utils/hl-rounding.utils';
 import { limitSpread, marketTriggerBound, type TriggerKind } from '@utils/limit-spread.util';
+import { MIN_ORDER_VALUE_USD } from '@utils/order-minimum.utils';
 
 /** Ce qui, dans un ordre déclencheur, détermine le prix limite proposé. */
 /** Les types d'ordre du formulaire. `market` : un IOC au prix plafond, voir `market-order/`. */
@@ -99,14 +100,6 @@ export function orderPricesReady(input: {
   if (!isPositivePrice(input.limitPx)) return false;
   return input.orderKind !== 'trigger' || isPositivePrice(input.triggerPx);
 }
-
-/**
- * Le minimum d'Hyperliquid pour la valeur d'un ordre, en dollars. Le texte du refus le nomme :
- * « Order must have minimum value of $10 » (mesuré le 2026-11-12). Une fermeture qui SOLDE la
- * position y échappe (mesuré le même jour, IOC et limite : `isBelowOrderMinimum`), pas une
- * fermeture partielle.
- */
-export const MIN_ORDER_VALUE_USD = 10;
 
 /**
  * L'ordre est sous le minimum de 10 $, et Hyperliquid le refusera.

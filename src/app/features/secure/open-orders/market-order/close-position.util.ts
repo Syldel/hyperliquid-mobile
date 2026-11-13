@@ -1,6 +1,6 @@
 import type { HLFrontendOpenOrder } from '@syldel/hl-shared-types';
 import { roundSize } from '@utils/hl-rounding.utils';
-import { MIN_ORDER_VALUE_USD } from '../open-form/order-limit.util';
+import { MIN_ORDER_VALUE_USD } from '@utils/order-minimum.utils';
 
 /**
  * ============================================================================

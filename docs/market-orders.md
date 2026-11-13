@@ -123,22 +123,28 @@ clair, 8,68:1 et 6,0:1 en sombre.
 ## Le minimum de 10 $
 
 Hyperliquid refuse un ordre de moins de 10 $ (« Order must have minimum value of $10 »,
-`minTradeNtlRejected`). Une seule constante, `MIN_ORDER_VALUE_USD` (`open-form/order-limit.util.ts`).
+`minTradeNtlRejected`). Une seule constante, `MIN_ORDER_VALUE_USD` (`core/utils/order-minimum.utils.ts`).
 
-| Où                   | Ce que l'app fait                                                                                                                                           | Mesuré                                                                               |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| formulaire           | bloque sous 10 $ ; un limite se juge à son prix, un ordre au marché au mid, un déclencheur au marché à son **déclencheur** (`notionalPrice`)                | un stop de 9,01 $ à sa borne et 10,01 $ à son déclencheur s'est déclenché et exécuté |
-| formulaire           | laisse passer un ordre reduce-only, limite ou au marché, qui ferme **exactement toute la position** (`isBelowOrderMinimum`) : c'est `Close › Limit` à 100 % | un limite ALO de 9,28 $ accepté au carnet, puis rempli en maker 5,6 s plus tard      |
-| feuille de fermeture | bloque une fermeture **partielle** sous 10 $ (`partialCloseRefusal`)                                                                                        | refusée à 2,2 $ et à 9,29 $, même reduce-only                                        |
-| feuille de fermeture | laisse passer une fermeture **à 100 %**, quelle que soit sa valeur                                                                                          | acceptée à 0,71 $ (IOC)                                                              |
+| Où                   | Ce que l'app fait                                                                                                                                                | Mesuré                                                                               |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| formulaire           | bloque sous 10 $ ; un limite se juge à son prix, un ordre au marché au mid, un déclencheur au marché à son **déclencheur** (`notionalPrice`)                     | un stop de 9,01 $ à sa borne et 10,01 $ à son déclencheur s'est déclenché et exécuté |
+| formulaire           | laisse passer un ordre reduce-only, limite ou au marché, qui ferme **exactement toute la position** (`isBelowOrderMinimum`) : c'est `Close › Limit` à 100 %      | un limite ALO de 9,28 $ accepté au carnet, puis rempli en maker 5,6 s plus tard      |
+| feuille de fermeture | bloque une fermeture **partielle** sous 10 $ (`partialCloseRefusal`)                                                                                             | refusée à 2,2 $ et à 9,29 $, même reduce-only                                        |
+| feuille de fermeture | laisse passer une fermeture **à 100 %**, quelle que soit sa valeur                                                                                               | acceptée à 0,71 $ (IOC)                                                              |
+| protections          | bloque une protection sous 10 $ **à son déclenchement**, à l'ajout, dans la liste du formulaire, et à l'envoi sur la taille remplie (`protectiveMinimumRefusal`) | un stop de 9,86 $ au déclencheur accepté à la pose, refusé au déclenchement          |
 
 Un **déclencheur** (TP/SL) reste bloqué sous 10 $ à son déclencheur, et ce blocage est
 **indispensable** — mesuré le 2026-11-13 : un Stop Market reduce-only de 9,86 $ à son déclencheur
 est **accepté à la pose**, puis, au déclenchement, `triggered` et **`minTradeNtlRejected` à la même
 milliseconde**, sans rien exécuter. Un stop sous 10 $ disparaît donc au moment où il devait
-protéger, et la position reste ouverte sans lui. ⚠️ Les protections posées **avec** une ouverture
-(Stop Loss / Take Profit du formulaire) ne passent pas par ce contrôle : un SL sur une position
-proche de 10 $ peut valoir moins de 10 $ à son déclencheur (roadmap, point 13). ⚠️ L'exemption se fonde sur la position lue au choix de la
+protéger, et la position reste ouverte sans lui.
+
+Les protections posées **avec** une ouverture (Stop Loss / Take Profit du formulaire) passent par
+le même contrôle depuis le 2026-11-13 : un SL sur une position proche de 10 $ peut valoir moins de
+10 $ à son déclencheur. La fenêtre d'ajout le refuse, la liste du formulaire le marque en rouge et
+bloque l'envoi, et l'envoi refait le contrôle sur ce qui a été rempli : après un remplissage
+partiel, une protection devenue trop petite ne part pas, et la position s'affiche « not
+protected » avec la raison. ⚠️ L'exemption se fonde sur la position lue au choix de la
 paire ; si elle a changé depuis, l'ordre n'est plus une fermeture totale et Hyperliquid le refuse,
 un refus visible.
 
