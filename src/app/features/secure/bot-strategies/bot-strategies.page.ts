@@ -61,6 +61,12 @@ import {
   pairStrategyStatus,
   type PairStrategyStatus,
 } from './domain/pair-strategy-status.util';
+import {
+  pairValidationStatus,
+  refusalConcernsProtections,
+  refusalSummary,
+  type PairValidationStatus,
+} from './domain/pair-validation-status.util';
 import { AgentExpiryNoticeComponent } from '@shared/components/agent-expiry-notice/agent-expiry-notice.component';
 
 @Component({
@@ -106,6 +112,7 @@ export class BotStrategiesPage extends MenuBasePage {
 
   readonly exitBehaviorLabels = this.botService.exitBehaviorLabels;
   readonly protectiveDistanceLabel = protectiveDistanceLabel;
+  readonly refusalSummary = refusalSummary;
 
   constructor() {
     super();
@@ -180,8 +187,73 @@ export class BotStrategiesPage extends MenuBasePage {
   notRunnable(exchangeKey: string, pair: TradingPair): boolean {
     return (
       isKnownUnexecutableMarket(this.marketStatus(pair)) ||
-      isKnownUnexecutable(this.strategyStatus(exchangeKey, pair))
+      isKnownUnexecutable(this.strategyStatus(exchangeKey, pair)) ||
+      this.validationStatus(exchangeKey, pair).kind === 'refused'
     );
+  }
+
+  // ------------------------------------------------------------------ //
+  //  The bot's verdict on each saved strategy
+  // ------------------------------------------------------------------ //
+
+  /**
+   * Les stratégies à faire juger, une par paire qui en porte une.
+   *
+   * L'`equal` compare les stratégies elles-mêmes : basculer l'interrupteur d'une paire recalcule `botEntries` sans
+   * rien changer à ce que le bot jugerait, et ne doit pas relancer une validation par paire à chaque clic. Une
+   * stratégie réenregistrée, elle, change — et se fait juger de nouveau.
+   */
+  private readonly validationRequests = computed(
+    () =>
+      this.botEntries().flatMap((entry) =>
+        entry.value.pairs.flatMap((pair) =>
+          pair.strategy ? [{ key: pairKey(entry.key, pair), strategy: pair.strategy }] : [],
+        ),
+      ),
+    { equal: (a, b) => JSON.stringify(a) === JSON.stringify(b) },
+  );
+
+  /**
+   * Le verdict du bot sur chaque stratégie enregistrée (`POST /exchanges/strategies/validate`, la fonction même que
+   * son moteur applique avant de trader une paire). Voir `pair-validation-status.util.ts`.
+   *
+   * Lecture seule, donc un `resource()`. Un appel en échec rend `null` pour **sa** paire, sans faire tomber les
+   * autres : un verdict manquant ne signale rien.
+   */
+  private readonly validations = resource({
+    params: computed(
+      () => {
+        const requests = this.validationRequests();
+        return requests.length ? { requests } : undefined;
+      },
+      { equal: (a, b) => a?.requests === b?.requests },
+    ),
+    loader: async ({ params }) =>
+      new Map(
+        await Promise.all(
+          params.requests.map(async ({ key, strategy }) => {
+            try {
+              return [
+                key,
+                await firstValueFrom(this.botService.validateStrategy(strategy)),
+              ] as const;
+            } catch {
+              return [key, null] as const;
+            }
+          }),
+        ),
+      ),
+  });
+
+  /** Le bot accepte-t-il la stratégie enregistrée sur cette paire, et le sait-on ? */
+  validationStatus(exchangeKey: string, pair: TradingPair): PairValidationStatus {
+    return pairValidationStatus(this.validations.value()?.get(pairKey(exchangeKey, pair)) ?? null);
+  }
+
+  /** `true` quand la seule chose à corriger est l'une des protections de la paire. */
+  refusalIsProtective(exchangeKey: string, pair: TradingPair): boolean {
+    const verdict = this.validationStatus(exchangeKey, pair);
+    return verdict.kind === 'refused' && refusalConcernsProtections(verdict.issues);
   }
 
   // ------------------------------------------------------------------ //
@@ -266,7 +338,16 @@ export class BotStrategiesPage extends MenuBasePage {
    */
   fixPair(exchangeKey: string, pair: TradingPair, event: Event): void {
     event.stopPropagation();
-    void this.openEditModal(exchangeKey, pair);
+    // Une stratégie refusée pour ses protections se corrige dans leur modale ; tout le reste — marché, stratégie
+    // inconnue, règles refusées — dans celle de la paire. Un marché ou une stratégie inexécutable prime : sans eux, les
+    // protections ne servent à rien.
+    const fixesProtections =
+      !isKnownUnexecutableMarket(this.marketStatus(pair)) &&
+      !isKnownUnexecutable(this.strategyStatus(exchangeKey, pair)) &&
+      this.refusalIsProtective(exchangeKey, pair);
+    void (fixesProtections
+      ? this.openProtectiveStrategyModal(exchangeKey, pair)
+      : this.openEditModal(exchangeKey, pair));
   }
 
   // ------------------------------------------------------------------ //
@@ -448,4 +529,9 @@ export class BotStrategiesPage extends MenuBasePage {
     const tradingSettings = this.user()?.tradingSettings;
     if (tradingSettings) this.save$.next(tradingSettings);
   }
+}
+
+/** La clé d'une paire dans les verdicts : l'exchange et le nom, comme le `track` de la liste. */
+function pairKey(exchangeKey: string, pair: TradingPair): string {
+  return `${exchangeKey}|${pair.name}`;
 }

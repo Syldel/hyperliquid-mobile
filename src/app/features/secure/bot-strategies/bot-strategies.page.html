@@ -21,7 +21,9 @@
       @for (pair of entry.value.pairs; track pair.name) { @let status = strategyStatus(entry.key,
       pair); @let notRunning = notRunnable(entry.key, pair); @let market = marketStatus(pair); @let
       deadMarket = market === 'delisted' || market === 'unknown-market'; @let dexName =
-      marketDexLabel(pair);
+      marketDexLabel(pair); @let verdict = validationStatus(entry.key, pair); @let fixesProtections
+      = !deadMarket && status !== 'missing-shortname' && status !== 'unknown-shortname' &&
+      refusalIsProtective(entry.key, pair);
       <ion-item-sliding>
         <ion-item [class.pair--stalled]="notRunning">
           <ion-label>
@@ -38,7 +40,7 @@
               type="button"
               class="stalled"
               (click)="fixPair(entry.key, pair, $event)"
-              [attr.aria-label]="(deadMarket ? 'Fix the market of ' : 'Fix the strategy of ') + pair.name"
+              [attr.aria-label]="(deadMarket ? 'Fix the market of ' : fixesProtections ? 'Fix the protections of ' : 'Fix the strategy of ') + pair.name"
             >
               <ion-icon name="alert-circle-outline" aria-hidden="true" />
               <span class="stalled__text">
@@ -60,13 +62,15 @@
                   pair.name }}”. } This pair is skipped on every cycle — no entry, no exit, no
                   signal. } @else { @if (status === 'missing-shortname') { @if (pair.strategy?.name)
                   { Its saved strategy “{{ pair.strategy?.name }}” carries no identifier the bot can
-                  route on. } @else { No strategy is saved on this pair. } } @else { “{{
-                  pair.strategy?.name }}” is no longer offered by the bot. } This pair is skipped on
-                  every cycle — no entry, no exit, no signal. }
+                  route on. } @else { No strategy is saved on this pair. } } @else if (status ===
+                  'unknown-shortname') { “{{ pair.strategy?.name }}” is no longer offered by the
+                  bot. } @else if (verdict.kind === 'refused') { The bot refuses its saved strategy
+                  “{{ pair.strategy?.name }}”: {{ refusalSummary(verdict.issues) }} } This pair is
+                  skipped on every cycle — no entry, no exit, no signal. }
                 </span>
                 <span class="stalled__cta">
-                  {{ deadMarket ? 'Tap to change the pair or remove it' : 'Tap to pick a strategy
-                  the bot offers' }}
+                  {{ deadMarket ? 'Tap to change the pair or remove it' : fixesProtections ? 'Tap to
+                  fix its protections' : 'Tap to pick a strategy the bot offers' }}
                 </span>
               </span>
             </button>
