@@ -121,8 +121,25 @@ export class OpenOrdersPage extends MenuBasePage implements OnInit {
     });
   }
 
+  /** Vrai dès le premier `ionViewWillEnter` : voir ce hook. */
+  private hasEntered = false;
+
+  /**
+   * Relit les ordres au **retour** sur la page, restée vivante dans la pile Ionic : un ordre a pu être
+   * modifié ou annulé depuis son détail.
+   *
+   * Pas au premier passage : le chargement part déjà de la sélection des dex (`onSelectionChanged`),
+   * et relire ici doublait la requête — mesuré le 2026-11-15, deux `frontendOpenOrders` identiques à
+   * 4 ms d'écart, depuis le menu comme depuis le chart. Sauter ce premier passage est sûr dans les deux
+   * ordres possibles : si la sélection arrive **après** (stockage plus lent sur téléphone), le hook
+   * n'aurait construit qu'un chargement vide (`selectedDexNames` à `null`), sans requête.
+   */
   override ionViewWillEnter(): void {
     super.ionViewWillEnter();
+    if (!this.hasEntered) {
+      this.hasEntered = true;
+      return;
+    }
     this.fetchFn.set(this.buildFetchFn());
   }
 
