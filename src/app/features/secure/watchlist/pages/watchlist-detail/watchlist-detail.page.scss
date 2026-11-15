@@ -41,14 +41,17 @@
 }
 
 /* ── Stats header ─────────────────────────────────── */
+// Une seule ligne, toujours : l'heure des bougies tient à droite du prix. Si la place manque (prix à six
+// chiffres et variation à cinq), c'est la variation absolue qui s'abrège, avec des points de suspension
+// visibles — le prix, le pourcentage et l'heure restent entiers.
 .stats-header {
   padding: 16px 20px 8px;
   display: flex;
-  flex-wrap: wrap;
   align-items: baseline;
-  gap: 4px 12px;
+  gap: 10px;
 
   &__price {
+    flex-shrink: 0;
     font-size: 28px;
     font-weight: 700;
     color: var(--ion-text-color);
@@ -56,6 +59,10 @@
   }
 
   &__change {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: 14px;
     font-weight: 600;
 
@@ -73,12 +80,33 @@
     font-size: 12px;
   }
 
-  // Poussée à droite, et sous le prix si la ligne manque de place (`flex-wrap`) : un grand prix et une
-  // variation à quatre chiffres ne laissent pas toujours 80 px à 360 de large.
-  &__as-of {
+  &__read-at {
     margin-left: auto;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
     font-size: 12px;
     color: var(--ion-color-medium);
+    white-space: nowrap;
+
+    // `align-items: center` centre l'icône sur la boîte de ligne, pas sur les chiffres : ceux-ci
+    // n'ont pas de jambage, leur centre est plus haut. Mesuré sur les glyphes (Roboto 12 px, cercle
+    // de `time-outline` de 48 à 464 sur 512) : l'horloge descendait de 0,83 px sous le centre des
+    // chiffres. À refaire si la taille du texte ou de l'icône change.
+    ion-icon {
+      font-size: 13px;
+      transform: translateY(-0.83px);
+    }
+  }
+
+  // Lu par un lecteur d'écran, invisible à l'œil — la forme établie du « visually hidden ».
+  &__hidden-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
     white-space: nowrap;
   }
 

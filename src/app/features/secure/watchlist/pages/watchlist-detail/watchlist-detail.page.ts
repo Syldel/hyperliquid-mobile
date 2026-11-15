@@ -60,6 +60,7 @@ import {
   receiptOutline,
   refreshOutline,
   statsChartOutline,
+  timeOutline,
 } from 'ionicons/icons';
 import {
   CandlestickSeries,
@@ -122,7 +123,7 @@ import {
 import { mayForceRefresh } from '../../utils/forced-refresh.util';
 import {
   analysisCandlesReadAt,
-  formatCandlesAsOf,
+  formatCandlesReadAt,
   freshReadWasIgnored,
 } from '../../utils/candle-age.util';
 import { overlayFailureReason } from '../../utils/overlay-failure.util';
@@ -227,7 +228,8 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   );
 
   /**
-   * L'heure de lecture des bougies affichées (« as of 21:45:12 »), ou `null` tant qu'elle est inconnue.
+   * L'heure de lecture des bougies affichées (« 21:45:12 », derrière une horloge), ou `null` tant qu'elle
+   * est inconnue.
    * Le cache sert des bougies jusqu'à un quart d'intervalle : c'est le compromis choisi, et il se voit.
    * Voir candle-age.util.ts.
    */
@@ -466,6 +468,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   constructor() {
     addIcons({
       calendarOutline,
+      timeOutline,
       refreshOutline,
       receiptOutline,
       addOutline,
@@ -977,11 +980,11 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       return;
     }
 
-    const asOf = formatCandlesAsOf(readAt, receivedAt);
+    const asOf = formatCandlesReadAt(readAt, receivedAt);
     this.candlesAsOf.set(asOf);
     if (freshReadWasIgnored(askedFresh, readAt, receivedAt)) {
       this.candlesAgeNotice.set(
-        `Refresh asked for new candles, but the bot sent older ones (${asOf}).`,
+        `Refresh asked for new candles, but the bot sent older ones (read at ${asOf}).`,
       );
     }
   }

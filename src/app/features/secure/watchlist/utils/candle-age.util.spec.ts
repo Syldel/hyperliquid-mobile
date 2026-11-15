@@ -1,7 +1,7 @@
 import {
   analysisCandlesReadAt,
   FRESH_READ_MAX_AGE_MS,
-  formatCandlesAsOf,
+  formatCandlesReadAt,
   freshReadWasIgnored,
 } from './candle-age.util';
 
@@ -52,17 +52,18 @@ describe('freshReadWasIgnored', () => {
   });
 });
 
-describe('formatCandlesAsOf', () => {
+describe('formatCandlesReadAt', () => {
   // Heure locale : les dates se construisent en local, comme l'affichage.
   const at = (day: number, h: number, m: number, s: number) =>
     new Date(2026, 10, day, h, m, s).getTime();
 
   it('gives the time, to the second, for a read from today', () => {
-    expect(formatCandlesAsOf(at(15, 21, 5, 9), at(15, 21, 30, 0))).toBe('as of 21:05:09');
+    expect(formatCandlesReadAt(at(15, 21, 5, 9), at(15, 21, 30, 0))).toBe('21:05:09');
   });
 
   // Le cache 1D vit 6 h : une lecture d'avant minuit lue après doit dire son jour.
-  it('adds the date when the read is from another day', () => {
-    expect(formatCandlesAsOf(at(14, 23, 10, 0), at(15, 1, 0, 0))).toBe('as of 14 Nov, 23:10:00');
+  // Sans les secondes : elles ne disent plus rien sur une lecture de la veille, et la ligne est courte.
+  it('adds the date, and drops the seconds, when the read is from another day', () => {
+    expect(formatCandlesReadAt(at(14, 23, 10, 0), at(15, 1, 0, 0))).toBe('14 Nov 23:10');
   });
 });

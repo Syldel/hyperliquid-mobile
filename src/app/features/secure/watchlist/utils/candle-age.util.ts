@@ -58,22 +58,26 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const pad = (n: number) => String(n).padStart(2, '0');
 
 /**
- * « as of 21:45:12 », avec la date si ce n'est pas aujourd'hui — en heure locale.
+ * « 21:45:12 », ou « 14 Nov 23:10 » si la lecture n'est pas d'aujourd'hui — en heure locale. Affichée
+ * derrière une icône d'horloge, sur la ligne du prix : d'où un texte court, sans « as of ».
  *
  * Une heure plutôt qu'un âge (« 3 min ago ») : un âge vieillit pendant que l'écran reste ouvert, et
  * l'afficher juste demanderait une horloge qui tourne. Une heure reste vraie sans rien recalculer. Les
  * secondes, parce qu'un rafraîchissement forcé dans la même minute doit se voir.
  *
  * La date s'ajoute dès que le jour diffère : le cache des bougies 1D vit jusqu'à 6 h et peut franchir
- * minuit, et « as of 23:10 » lu à 01:00 se prendrait pour l'heure d'hier soir… ou de ce soir.
+ * minuit, et « 23:10 » lu à 01:00 se prendrait pour l'heure d'hier soir… ou de ce soir. Sans les
+ * secondes alors : elles ne disent plus rien sur une lecture de la veille, et la place manque.
  */
-export function formatCandlesAsOf(readAt: number, now: number): string {
+export function formatCandlesReadAt(readAt: number, now: number): string {
   const read = new Date(readAt);
   const today = new Date(now);
-  const time = `${pad(read.getHours())}:${pad(read.getMinutes())}:${pad(read.getSeconds())}`;
+  const hhmm = `${pad(read.getHours())}:${pad(read.getMinutes())}`;
   const sameDay =
     read.getFullYear() === today.getFullYear() &&
     read.getMonth() === today.getMonth() &&
     read.getDate() === today.getDate();
-  return sameDay ? `as of ${time}` : `as of ${read.getDate()} ${MONTHS[read.getMonth()]}, ${time}`;
+  return sameDay
+    ? `${hhmm}:${pad(read.getSeconds())}`
+    : `${read.getDate()} ${MONTHS[read.getMonth()]} ${hhmm}`;
 }

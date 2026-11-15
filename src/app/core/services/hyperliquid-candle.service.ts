@@ -63,7 +63,7 @@ export class HyperliquidCandleService {
 
   /**
    * `getCandles`, avec l'heure à laquelle ces bougies ont été reçues — qu'elles sortent du cache ou d'une
-   * lecture neuve. Le chart l'affiche (« as of 21:45:12 ») : servir le cache est un compromis accepté,
+   * lecture neuve. Le chart l'affiche, derrière une horloge (« 21:45:12 ») : servir le cache est un compromis accepté,
    * le cacher ne l'est pas.
    */
   getCandlesWithTime(

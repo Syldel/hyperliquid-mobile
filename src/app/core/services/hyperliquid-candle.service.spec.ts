@@ -78,7 +78,7 @@ describe('HyperliquidCandleService — cache', () => {
     expect(next()).toBe(after);
   });
 
-  // L'heure affichée sous le prix (« as of … ») : celle de la lecture, d'où que sortent les bougies.
+  // L'heure affichée à côté du prix, derrière une horloge : celle de la lecture, d'où que sortent les bougies.
   describe('when the candles were received', () => {
     const t0 = 1_800_000_000_000;
 

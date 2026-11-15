@@ -33,9 +33,16 @@
       {{ changeSign }}{{ priceChange().toFixed(2) }}%
       <span class="stats-header__abs">({{ priceChangeAbs() }})</span>
     </div>
-    <!-- L'heure de lecture des bougies : le cache peut les servir jusqu'à un quart d'intervalle. -->
+    <!-- L'heure de lecture des bougies : le cache peut les servir jusqu'à un quart d'intervalle. L'icône
+         est muette ; le libellé caché dit à un lecteur d'écran de quoi c'est l'heure. -->
     @if (candlesAsOf()) {
-    <div class="stats-header__as-of">{{ candlesAsOf() }}</div>
+    <div class="stats-header__read-at">
+      <ion-icon name="time-outline" aria-hidden="true" />
+      <span>
+        <span class="stats-header__hidden-label">Candles read at</span>
+        {{ candlesAsOf() }}
+      </span>
+    </div>
     } }
   </div>
 

@@ -558,8 +558,10 @@ champ échoue bruyamment, l'en-tête en silence. Le bot rend la valeur brute du 
 `@IsBoolean` (`@Transform`) : la conversion implicite de sa `ValidationPipe` faisait passer
 `fresh: 'yes'` (mesuré, 201), et `'false'` aurait valu `true`.
 
-**L'âge des bougies se voit.** Sous le prix, « as of 21:45:12 » : l'heure de lecture des
-bougies affichées, avec la date si ce n'est pas aujourd'hui (le cache 1D vit jusqu'à 6 h).
+**L'âge des bougies se voit.** Sur la ligne du prix, à droite, une horloge et « 21:45:12 » :
+l'heure de lecture des bougies affichées, ou « 14 Nov 23:10 » si ce n'est pas aujourd'hui (le
+cache 1D vit jusqu'à 6 h). Un libellé caché, « Candles read at », la nomme pour un lecteur
+d'écran ; l'icône est muette.
 Une heure plutôt qu'un âge, qui vieillirait à l'écran. Sur le chemin `/analysis`, elle vient
 de `AnalysisResponse.candlesAgeMs` — l'âge mesuré par le bot sur **sa** propre horloge,
 ramené sur celle du téléphone (`reçu à − âge`) sans jamais comparer les deux. Sur le chemin
@@ -576,10 +578,16 @@ des bougies nues, c'est l'heure de réception rangée avec le cache du mobile. V
   message qui le dit, plutôt qu'une heure devinée.
 
 Les deux messages ont été provoqués dans le navigateur en réécrivant la réponse du bot.
-Contrastes mesurés : l'heure à 6,00:1 en sombre et 6,37:1 en clair, le message à 6,11:1 et
-6,20:1. ⚠️ À 360 px, l'heure passe **sous** le prix quand la variation est longue
-(« −14.27 % (−10833.00) » en 1W) : l'en-tête gagne alors une ligne, 18 px. Choisi plutôt que
-de raccourcir le texte jusqu'à l'ambiguïté.
+Contrastes mesurés : l'heure et son icône à 6,00:1 en sombre et 6,37:1 en clair, le message à
+6,11:1 et 6,20:1.
+
+**Toujours une ligne.** Une première version laissait l'heure (« as of 21:45:12 ») passer sous
+le prix quand la place manquait : à 360 px en 1W (« −14.27 % (−10833.00) »), l'en-tête prenait
+18 px de plus. L'horloge et l'heure seule tiennent en 63 px, et l'en-tête garde ses 56 px. Si un
+prix à six chiffres et une variation à cinq ne laissent plus la place, c'est la **variation
+absolue** qui s'abrège, avec des points de suspension visibles : le prix, le pourcentage et
+l'heure restent entiers. Éprouvé à 360 px en imposant « 104250.00 » et « +123.45 % (+57616.50) »
+avec une heure datée : une ligne, l'absolu tronqué, rien ne déborde.
 
 **Dix secondes entre deux forçages** (`mayForceRefresh`). Avec surcouches, forcer fait lire
 les bougies par le gateway, dont l'IP est celle du bot de trading. Dans ce délai, le cache sert
