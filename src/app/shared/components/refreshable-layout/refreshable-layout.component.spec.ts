@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { AuthService } from '@auth/auth.service';
+import { ToastController } from '@ionic/angular/standalone';
 import { RefreshableLayoutComponent } from './refreshable-layout.component';
 
 /**
@@ -97,5 +98,84 @@ describe('RefreshableLayoutComponent — nothing to load yet', () => {
 
     expect(complete).toHaveBeenCalled();
     expect(fixture.componentInstance.data()).toBeNull();
+  });
+});
+
+/**
+ * Deux chargements en vol : seul le dernier lancé a le droit de s'afficher. Les réponses s'appliquaient
+ * dans leur ordre d'arrivée — mesuré sur Open Orders, la lecture lente de l'ancienne sélection de dex
+ * remplaçait à l'écran celle de la nouvelle, sans le moindre signe.
+ */
+describe('RefreshableLayoutComponent — overlapping loads', () => {
+  const deferred = <V>() => {
+    let resolve!: (value: V) => void;
+    let reject!: (error: unknown) => void;
+    const promise = new Promise<V>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  };
+
+  const setup = () => {
+    TestBed.configureTestingModule({
+      providers: [{ provide: AuthService, useValue: { isLoggedIn: () => true } }],
+    });
+    const fixture = TestBed.createComponent(RefreshableLayoutComponent<string>);
+    fixture.componentRef.setInput('title', 'Open Orders');
+    const old = deferred<string>();
+    const latest = deferred<string>();
+    const emitted: string[] = [];
+    fixture.componentInstance.dataLoaded.subscribe((value) => emitted.push(value));
+
+    fixture.componentRef.setInput('fetchFn', () => old.promise);
+    fixture.detectChanges();
+    fixture.componentRef.setInput('fetchFn', () => latest.promise);
+    fixture.detectChanges();
+    return { layout: fixture.componentInstance, old, latest, emitted };
+  };
+
+  const settle = () => new Promise((resolve) => setTimeout(resolve));
+
+  it('shows the latest load, even when an older one answers last', async () => {
+    const { layout, old, latest, emitted } = setup();
+
+    latest.resolve('new selection');
+    await settle();
+    old.resolve('old selection');
+    await settle();
+
+    expect(layout.data()).toBe('new selection');
+    expect(emitted).toEqual(['new selection']);
+  });
+
+  // L'indicateur éteint par le premier fini faisait lire comme définitif ce qui allait être remplacé.
+  it('keeps the spinner until the latest load is done', async () => {
+    const { layout, old, latest } = setup();
+
+    old.resolve('old selection');
+    await settle();
+    expect(layout.showSpinner()).toBe(true);
+
+    latest.resolve('new selection');
+    await settle();
+    expect(layout.showSpinner()).toBe(false);
+  });
+
+  // Sa réponse n'aurait pas été affichée : annoncer son échec ferait croire que l'écran est faux.
+  it('does not announce the failure of a superseded load', async () => {
+    const { layout, old, latest } = setup();
+    const toast = TestBed.inject(ToastController) as unknown as { messages: string[] };
+    toast.messages.length = 0;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    old.reject(new Error('network'));
+    latest.resolve('new selection');
+    await settle();
+
+    expect(toast.messages).toEqual([]);
+    expect(warn).toHaveBeenCalled();
+    expect(layout.data()).toBe('new selection');
+    warn.mockRestore();
   });
 });

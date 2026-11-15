@@ -124,7 +124,21 @@ export class RefreshableLayoutComponent<T> implements OnInit {
     return Array.isArray(d) ? d.length === 0 : d === null;
   }
 
+  /**
+   * Numéro du dernier chargement lancé. Seul celui-là a le droit de s'afficher.
+   *
+   * Deux chargements peuvent être en vol à la fois : un changement de dex pendant une lecture lente, un
+   * retour au premier plan pendant un tirer-pour-rafraîchir. Les réponses s'appliquaient dans leur
+   * **ordre d'arrivée** : mesuré le 2026-11-15 sur Open Orders, une lecture lente de l'ancienne
+   * sélection (800 ms) lancée 50 ms avant une rapide de la nouvelle (100 ms) remplaçait celle-ci à
+   * l'écran, sous le sélecteur qui affichait la nouvelle — et sans le moindre signe. Le premier fini
+   * éteignait aussi l'indicateur, alors que l'autre était encore en cours. Même garde que le `loadToken`
+   * du chart de watchlist-detail.
+   */
+  private loadToken = 0;
+
   private async load(isRefresh: boolean, fn: () => Promise<T> | Observable<T>) {
+    const token = ++this.loadToken;
     if (isRefresh) {
       this.isRefreshing.set(true);
     } else {
@@ -133,18 +147,26 @@ export class RefreshableLayoutComponent<T> implements OnInit {
 
     try {
       const result = await this.toPromise(fn());
+      // Dépassé : une réponse plus récente est attendue, ou déjà affichée.
+      if (token !== this.loadToken) return;
       this.data.set(result);
       this.dataLoaded.emit(result);
     } catch (e) {
+      if (token !== this.loadToken) {
+        // Son résultat n'aurait pas été affiché : pas de toast, mais une trace.
+        console.warn('[RefreshableLayout] superseded load failed', e);
+        return;
+      }
       // Le toast dit « ça a échoué », jamais pourquoi : sans cette ligne la cause
       // (réseau, 401, réponse illisible) n'existait nulle part.
       console.error('[RefreshableLayout] load failed', e);
       await this.showErrorToast();
     } finally {
-      if (isRefresh) {
-        this.isRefreshing.set(false);
-      } else {
+      // Seul le dernier chargement rend la main : éteindre l'indicateur plus tôt ferait lire comme
+      // définitif ce qu'un chargement encore en cours va remplacer.
+      if (token === this.loadToken) {
         this.isLoading.set(false);
+        this.isRefreshing.set(false);
       }
     }
   }
