@@ -1,6 +1,17 @@
-import { computed, inject, Injectable, linkedSignal, resource, signal } from '@angular/core';
+import {
+  computed,
+  effect,
+  inject,
+  Injectable,
+  linkedSignal,
+  resource,
+  ResourceRef,
+  signal,
+  untracked,
+} from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
+import { AuthService } from '@auth/auth.service';
 import {
   HLFrontendOpenOrder,
   HLOrderStatusData,
@@ -8,6 +19,7 @@ import {
   HLUserFillsByTimeRequest,
 } from '@syldel/hl-shared-types';
 import { marketKindLabel, openOrdersDexOf } from '@utils/market-kind.util';
+import { AccountActivityService } from './account-activity.service';
 import { HyperliquidInfoService } from './hyperliquid-info.service';
 
 // ─── Types publics ────────────────────────────────────────────────────────────
@@ -26,14 +38,45 @@ export interface HLCacheConfig {
   dex?: string;
 }
 
+/** Ce qu'une lecture du compte nourrit à l'écran — pour dire lequel manque, pas seulement qu'il manque. */
+export type HLCacheSource = 'openOrders' | 'historicalOrders' | 'fills';
+
+/**
+ * Délai minimal entre deux relectures **non forcées** — un retour au premier plan, une page qui
+ * réapparaît. Une relecture coûte 60 de poids au moins, jusqu'à ~260 si l'historique et les fills
+ * rendent 2000 lignes chacun (`nest-hyperliquid-gateway/docs/rate-limits.md`), sur l'IP du téléphone.
+ */
+export const ACCOUNT_RELOAD_THROTTLE_MS = 60_000;
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
+/**
+ * Les ordres et les fills du compte, tels que le chart de watchlist-detail les dessine.
+ *
+ * Trois règles, chacune tirée d'un défaut constaté le 2026-11-15 :
+ *
+ * - **le compte fait partie de la clé.** Les lectures prennent l'adresse au moment de l'appel, mais rien
+ *   ne les relançait quand elle changeait : en changeant de compte puis en rouvrant un chart dans la
+ *   minute, le chart du compte B portait les ordres et les fills du compte A ;
+ * - **une écriture au compte relit, sans délai** (`AccountActivityService`, nourri par le gateway). Avant,
+ *   seul le `ngOnInit` de la page relisait, au plus une fois par minute — et la page reste vivante dans la
+ *   pile Ionic pendant qu'on modifie un ordre ailleurs ;
+ * - **une lecture en échec se dit** (`failures`). `resource.value()` **lève** sur une erreur : le
+ *   `computed` qui le lisait levait à son tour dans le gabarit, et le chart restait sans lignes — ce qui se
+ *   lit « aucun ordre ».
+ */
 @Injectable({ providedIn: 'root' })
 export class HyperliquidCacheService {
   private readonly hlInfo = inject(HyperliquidInfoService);
+  private readonly auth = inject(AuthService);
+  private readonly activity = inject(AccountActivityService);
 
-  private readonly refreshTick = signal(0);
-  private lastRefresh = 0;
+  /**
+   * Initialisé à la construction, et non à 0 : les ressources lisent dès leur création. À 0, le
+   * `reloadAll()` que la page appelle juste après passait le délai, et **chaque première visite lisait
+   * deux fois** — relevé par la spec le 2026-11-15.
+   */
+  private lastRefresh = Date.now();
 
   // ── Config réactive ───────────────────────────────────────────────────────
   /** Modifiable pour changer le lookback ou le dex à la volée. */
@@ -53,35 +96,44 @@ export class HyperliquidCacheService {
   });
 
   // ── Resources (= fetches réactifs) ────────────────────────────────────────
+  //
+  // Les paramètres ne portent que ce qui **change la réponse** : le compte, le dex, le lookback. Un
+  // rechargement passe par `reload()`, jamais par un compteur glissé dans les paramètres — un paramètre
+  // qui change remet la valeur à vide pendant le chargement (source d'Angular 21, `_resource-chunk.mjs`),
+  // et les lignes d'ordres clignotaient à chaque relecture. `reload()` garde l'ancienne valeur
+  // jusqu'à la nouvelle.
+  //
+  // Sans compte, les paramètres valent `undefined` : la ressource reste au repos, rien n'est demandé.
 
-  /**
-   * Open orders — se re-fetche automatiquement si config.dex change.
-   */
+  /** Open orders — relus si le compte ou le dex change. */
   readonly openOrdersResource = resource({
-    params: computed(() => ({ dex: this.config().dex, _refresh: this.refreshTick() }), {
-      equal: (a, b) => a.dex === b.dex && a._refresh === b._refresh,
-    }),
+    params: computed(
+      () => {
+        const address = this.auth.currentAddress();
+        return address ? { address, dex: this.config().dex } : undefined;
+      },
+      { equal: (a, b) => a?.address === b?.address && a?.dex === b?.dex },
+    ),
     loader: ({ params }) => firstValueFrom(this.hlInfo.getFrontendOpenOrders(params.dex)),
   });
 
-  /**
-   * Historical orders — pas de param dynamique, chargé une fois.
-   */
+  /** Historical orders — relus si le compte change. */
   readonly historicalOrdersResource = resource({
-    params: computed(() => ({ _refresh: this.refreshTick() })),
+    params: computed(() => {
+      const address = this.auth.currentAddress();
+      return address ? { address } : undefined;
+    }),
     loader: () => firstValueFrom(this.hlInfo.getHistoricalOrders()),
   });
 
-  /**
-   * Fills — se re-fetche si le lookback change.
-   */
+  /** Fills — relus si le compte ou le lookback change. */
   readonly fillsResource = resource({
     params: computed(
-      () => ({
-        lookback: this.config().fillsLookbackDays,
-        _refresh: this.refreshTick(),
-      }),
-      { equal: (a, b) => a.lookback === b.lookback && a._refresh === b._refresh },
+      () => {
+        const address = this.auth.currentAddress();
+        return address ? { address, lookback: this.config().fillsLookbackDays } : undefined;
+      },
+      { equal: (a, b) => a?.address === b?.address && a?.lookback === b?.lookback },
     ),
     loader: ({ params }): Promise<HLUserFill[]> => {
       const req: HLUserFillsByTimeRequest = {
@@ -91,26 +143,36 @@ export class HyperliquidCacheService {
     },
   });
 
+  private readonly resources: Record<HLCacheSource, ResourceRef<unknown>> = {
+    openOrders: this.openOrdersResource,
+    historicalOrders: this.historicalOrdersResource,
+    fills: this.fillsResource,
+  };
+
   // ── Computed dérivés ──────────────────────────────────────────────────────
+  //
+  // `hasValue()` avant `value()` : sur une ressource en erreur, `value()` lève. Une source en échec rend
+  // donc une liste vide ICI, et `failures` dit pourquoi elle est vide — jamais l'un sans l'autre.
 
-  readonly openOrders = computed(() => this.openOrdersResource.value() ?? []);
-  readonly historicalOrders = computed(() => this.historicalOrdersResource.value() ?? []);
-  readonly fills = computed(() => this.fillsResource.value() ?? []);
-
-  /** True si au moins une resource est en cours de fetch. */
-  readonly loading = computed(
-    () =>
-      this.openOrdersResource.isLoading() ||
-      this.historicalOrdersResource.isLoading() ||
-      this.fillsResource.isLoading(),
+  readonly openOrders = computed(() =>
+    this.openOrdersResource.hasValue() ? (this.openOrdersResource.value() ?? []) : [],
+  );
+  readonly historicalOrders = computed(() =>
+    this.historicalOrdersResource.hasValue() ? (this.historicalOrdersResource.value() ?? []) : [],
+  );
+  readonly fills = computed(() =>
+    this.fillsResource.hasValue() ? (this.fillsResource.value() ?? []) : [],
   );
 
-  /** Erreurs agrégées. */
-  readonly errors = computed(() => ({
-    openOrders: this.openOrdersResource.error() ?? null,
-    historicalOrders: this.historicalOrdersResource.error() ?? null,
-    fills: this.fillsResource.error() ?? null,
-  }));
+  /**
+   * Les lectures dont la dernière tentative a échoué. Une liste vide n'y figure pas : « aucun ordre » est
+   * une réponse, « ordres illisibles » n'en est pas une.
+   */
+  readonly failures = computed<HLCacheSource[]>(() =>
+    (Object.keys(this.resources) as HLCacheSource[]).filter(
+      (source) => this.resources[source].status() === 'error',
+    ),
+  );
 
   /**
    * Snapshot complet filtré sur le coin sélectionné.
@@ -121,6 +183,24 @@ export class HyperliquidCacheService {
     if (!coin) return null;
     return this.buildSnapshot(coin);
   });
+
+  constructor() {
+    // Une écriture au compte relit tout, tout de suite, sans le délai d'une minute : c'est précisément
+    // le moment où l'écran a le plus de chances d'être faux. Le premier passage (valeur déjà présente
+    // à la construction) ne relit rien — les ressources viennent de partir.
+    //
+    // On craignait qu'`historicalOrders` serve encore l'état d'avant à cet instant : éprouvé en réel
+    // le 2026-11-15 (place, modify, cancel), la ligne suit à chaque fois. Un constat à l'écran, sans
+    // délai mesuré (docs/roadmap.md, point 16) : si une ligne reste un jour à l'ancien prix, c'est ici
+    // qu'il faudrait une seconde relecture après un court délai.
+    let seen = untracked(this.activity.lastWrite);
+    effect(() => {
+      const write = this.activity.lastWrite();
+      if (write === seen) return;
+      seen = write;
+      untracked(() => this.reloadAll(true));
+    });
+  }
 
   // ── API publique ──────────────────────────────────────────────────────────
 
@@ -142,38 +222,22 @@ export class HyperliquidCacheService {
     this.config.update((c) => ({ ...c, ...partial, dex })); // écriture unique, dex + lookback ensemble
   }
 
+  /**
+   * Relit les trois sources. Sans `force`, pas plus d'une fois par `ACCOUNT_RELOAD_THROTTLE_MS` : c'est
+   * le chemin des retours sur la page ou au premier plan, qui peuvent s'enchaîner.
+   *
+   * `force` est réservé à ce qui sait que l'état a changé ou que l'utilisateur le demande : une écriture
+   * au compte, le bouton de rafraîchissement.
+   */
   reloadAll(force = false): void {
     const now = Date.now();
 
-    if (!force && now - this.lastRefresh < 60 * 1000) {
+    if (!force && now - this.lastRefresh < ACCOUNT_RELOAD_THROTTLE_MS) {
       return;
     }
 
     this.lastRefresh = now;
-    this.refreshTick.update((v) => v + 1);
-  }
-
-  /** Computed filtré pour un coin arbitraire (pre-render, prefetch…). */
-  snapshotFor(coin: string) {
-    return computed(() => this.buildSnapshot(coin));
-  }
-
-  openOrdersFor(coin: string) {
-    return computed(() =>
-      this.openOrders().filter((o) => normalizeCoin(o.coin) === normalizeCoin(coin)),
-    );
-  }
-
-  historicalOrdersFor(coin: string) {
-    return computed(() =>
-      this.historicalOrders().filter((o) => normalizeCoin(o.order.coin) === normalizeCoin(coin)),
-    );
-  }
-
-  fillsFor(coin: string) {
-    return computed(() =>
-      this.fills().filter((f) => normalizeCoin(f.coin) === normalizeCoin(coin)),
-    );
+    for (const resource of Object.values(this.resources)) resource.reload();
   }
 
   // ── Privé ─────────────────────────────────────────────────────────────────

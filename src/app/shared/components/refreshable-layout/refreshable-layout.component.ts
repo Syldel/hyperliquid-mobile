@@ -66,6 +66,11 @@ export class RefreshableLayoutComponent<T> implements OnInit {
 
   title = input.required<string>();
   fetchFn = input.required<() => Promise<T> | Observable<T>>();
+  /**
+   * Ce que fait le tirer-pour-rafraîchir, s'il doit faire plus que `fetchFn` — passer les caches, par
+   * exemple (watchlist-detail). Sans lui, le geste rappelle `fetchFn`, comme avant.
+   */
+  refreshFn = input<(() => Promise<T> | Observable<T>) | null>(null);
   emptyIcon = input<string>('file-tray-outline');
   emptyMessage = input<string>('No data found');
   requiresAuth = input<boolean>(false);
@@ -95,7 +100,7 @@ export class RefreshableLayoutComponent<T> implements OnInit {
   }
 
   async onRefresh(event: CustomEvent) {
-    await this.load(true);
+    await this.load(true, this.refreshFn() ?? undefined);
     (event.target as HTMLIonRefresherElement).complete();
   }
 
@@ -104,7 +109,7 @@ export class RefreshableLayoutComponent<T> implements OnInit {
     return Array.isArray(d) ? d.length === 0 : d === null;
   }
 
-  private async load(isRefresh = false) {
+  private async load(isRefresh = false, fn: () => Promise<T> | Observable<T> = this.fetchFn()) {
     if (isRefresh) {
       this.isRefreshing.set(true);
     } else {
@@ -112,7 +117,7 @@ export class RefreshableLayoutComponent<T> implements OnInit {
     }
 
     try {
-      const result = await this.toPromise(this.fetchFn()());
+      const result = await this.toPromise(fn());
       this.data.set(result);
       this.dataLoaded.emit(result);
     } catch (e) {

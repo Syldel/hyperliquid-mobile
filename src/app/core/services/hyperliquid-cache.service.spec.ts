@@ -1,5 +1,9 @@
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { AuthService } from '@auth/auth.service';
+import { HLOrderStatusData } from '@syldel/hl-shared-types';
+import { of, Subject } from 'rxjs';
+import { AccountActivityService } from './account-activity.service';
 import { HyperliquidCacheService } from './hyperliquid-cache.service';
 import { HyperliquidInfoService } from './hyperliquid-info.service';
 
@@ -30,6 +34,7 @@ describe('HyperliquidCacheService — selecting a coin', () => {
             getUserFillsByTime: () => of([]),
           },
         },
+        { provide: AuthService, useValue: { currentAddress: signal('0xA') } },
       ],
     });
     service = TestBed.inject(HyperliquidCacheService);
@@ -93,5 +98,197 @@ describe('HyperliquidCacheService — selecting a coin', () => {
     service.selectCoinWithConfig('xyz:MU', { fillsLookbackDays: 7 });
 
     expect(service.config()).toMatchObject({ dex: 'xyz', fillsLookbackDays: 7 });
+  });
+});
+
+/**
+ * ============================================================================
+ * QUAND LES ORDRES DU CHART SONT RELUS, ET CE QUE L'ÉCRAN EN VOIT
+ *
+ * Trois défauts constatés le 2026-11-15, un bloc chacun : une écriture au compte ne relisait rien, un
+ * changement de compte non plus (le chart de B portait les ordres de A), et une lecture en échec faisait
+ * lever `value()` — un chart sans lignes, qui se lisait « aucun ordre ».
+ *
+ * Le double d'`HyperliquidInfoService` ne rend que des formes que le vrai rend : une liste, ou une
+ * erreur HTTP.
+ * ============================================================================
+ */
+describe('HyperliquidCacheService — reading the account', () => {
+  const order = (oid: number, coin = 'BTC') =>
+    ({
+      order: { oid, coin },
+      status: 'open',
+      statusTimestamp: oid,
+    }) as unknown as HLOrderStatusData;
+
+  let address: ReturnType<typeof signal<string | null>>;
+  let historical: Subject<HLOrderStatusData[]>[];
+  let historicalCalls: (string | null)[];
+  let openOrdersCalls: number;
+  let service: HyperliquidCacheService;
+  let activity: AccountActivityService;
+
+  /** Laisse les effets et les chargeurs de ressources s'exécuter. */
+  const settle = async () => {
+    TestBed.tick();
+    await new Promise((resolve) => setTimeout(resolve));
+    TestBed.tick();
+  };
+
+  /** Répond au dernier appel d'historique en attente. */
+  const answerHistorical = async (orders: HLOrderStatusData[]) => {
+    const pending = historical.at(-1)!;
+    pending.next(orders);
+    pending.complete();
+    await settle();
+  };
+
+  beforeEach(async () => {
+    address = signal<string | null>('0xA');
+    historical = [];
+    historicalCalls = [];
+    openOrdersCalls = 0;
+
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: HyperliquidInfoService,
+          useValue: {
+            getFrontendOpenOrders: () => {
+              openOrdersCalls++;
+              return of([]);
+            },
+            getHistoricalOrders: () => {
+              // L'adresse lue au moment de l'appel, comme le vrai service.
+              historicalCalls.push(address());
+              const pending = new Subject<HLOrderStatusData[]>();
+              historical.push(pending);
+              return pending;
+            },
+            getUserFillsByTime: () => of([]),
+          },
+        },
+        { provide: AuthService, useValue: { currentAddress: address } },
+      ],
+    });
+    service = TestBed.inject(HyperliquidCacheService);
+    activity = TestBed.inject(AccountActivityService);
+    service.selectCoin('BTC');
+    await settle();
+  });
+
+  describe('a write to the account', () => {
+    it('reads the orders again at once, without waiting for the minute', async () => {
+      await answerHistorical([order(1)]);
+      service.reloadAll(); // dans la minute : retenu
+      await settle();
+      expect(historical).toHaveLength(1);
+
+      activity.record('modify');
+      await settle();
+
+      expect(historical).toHaveLength(2);
+      await answerHistorical([order(2)]);
+      expect(service.coinSnapshot()?.historicalOrders).toEqual([order(2)]);
+    });
+
+    it('reads every source again, not only the orders', async () => {
+      const before = openOrdersCalls;
+
+      activity.record('cancel');
+      await settle();
+
+      expect(openOrdersCalls).toBe(before + 1);
+    });
+
+    // Le cache se construit en lisant : sans écriture, rien d'autre ne part.
+    it('reads once at construction, and not again without a write', () => {
+      expect(historical).toHaveLength(1);
+    });
+  });
+
+  describe('a reload', () => {
+    // La valeur restait vide pendant le chargement quand un compteur changeait les paramètres : les
+    // lignes d'ordres disparaissaient du chart à chaque relecture.
+    it('keeps the orders on screen until the new ones arrive', async () => {
+      await answerHistorical([order(1)]);
+
+      service.reloadAll(true);
+      await settle();
+
+      expect(historical).toHaveLength(2);
+      expect(service.coinSnapshot()?.historicalOrders).toEqual([order(1)]);
+    });
+
+    it('is held back within the minute unless forced', async () => {
+      await answerHistorical([order(1)]);
+
+      service.reloadAll();
+      await settle();
+      expect(historical).toHaveLength(1);
+
+      service.reloadAll(true);
+      await settle();
+      expect(historical).toHaveLength(2);
+    });
+  });
+
+  describe('switching account', () => {
+    it('reads the orders of the new account, whatever the minute says', async () => {
+      await answerHistorical([order(1)]);
+
+      address.set('0xB');
+      await settle();
+
+      expect(historicalCalls).toEqual(['0xA', '0xB']);
+    });
+
+    // Pendant la lecture du compte B, rien du compte A ne reste à l'écran.
+    it('never shows the orders of the previous account', async () => {
+      await answerHistorical([order(1)]);
+
+      address.set('0xB');
+      await settle();
+
+      expect(service.coinSnapshot()?.historicalOrders).toEqual([]);
+    });
+
+    it('reads nothing without an account', async () => {
+      address.set(null);
+      await settle();
+
+      expect(historicalCalls).toEqual(['0xA']);
+      expect(service.failures()).toEqual([]);
+    });
+  });
+
+  describe('a failed read', () => {
+    it('says which source failed, instead of throwing', async () => {
+      historical.at(-1)!.error(new Error('HTTP 429'));
+      await settle();
+
+      expect(service.failures()).toEqual(['historicalOrders']);
+      // `value()` lève sur une ressource en erreur : le snapshot, lui, reste lisible.
+      expect(service.coinSnapshot()?.historicalOrders).toEqual([]);
+    });
+
+    // Une liste vide est une réponse : elle ne se signale pas comme une panne.
+    it('does not report an empty answer as a failure', async () => {
+      await answerHistorical([]);
+
+      expect(service.failures()).toEqual([]);
+    });
+
+    it('stops reporting the failure once a reload succeeds', async () => {
+      historical.at(-1)!.error(new Error('HTTP 429'));
+      await settle();
+
+      service.reloadAll(true);
+      await settle();
+      await answerHistorical([order(3)]);
+
+      expect(service.failures()).toEqual([]);
+      expect(service.coinSnapshot()?.historicalOrders).toEqual([order(3)]);
+    });
   });
 });

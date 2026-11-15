@@ -88,7 +88,10 @@ export const SECURE_ROUTES: Routes = [
         loadComponent: () => import('./profile/profile.page').then((m) => m.ProfilePage),
         title: 'Profile',
       },
-      { path: '', redirectTo: 'balances', pathMatch: 'full' },
+      // La page d'arrivée après le choix du compte : la watchlist, l'écran le plus fréquenté (2026-11-15,
+      // auparavant `balances`). Ses charts lisent les ordres du compte que l'on vient de choisir —
+      // `HyperliquidCacheService` les relit sur un changement de compte.
+      { path: '', redirectTo: 'watchlist', pathMatch: 'full' },
     ],
   },
 ];

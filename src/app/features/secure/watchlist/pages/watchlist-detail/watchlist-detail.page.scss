@@ -44,8 +44,9 @@
 .stats-header {
   padding: 16px 20px 8px;
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 12px;
+  gap: 4px 12px;
 
   &__price {
     font-size: 28px;
@@ -70,6 +71,15 @@
     font-weight: 400;
     opacity: 0.7;
     font-size: 12px;
+  }
+
+  // Poussée à droite, et sous le prix si la ligne manque de place (`flex-wrap`) : un grand prix et une
+  // variation à quatre chiffres ne laissent pas toujours 80 px à 360 de large.
+  &__as-of {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--ion-color-medium);
+    white-space: nowrap;
   }
 
   &__price-skel {

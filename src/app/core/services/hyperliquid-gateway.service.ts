@@ -12,12 +12,14 @@ import {
   HLPlaceOrderResponse,
   HLSuccessResponse,
 } from '@syldel/hl-shared-types';
-import { Observable } from 'rxjs';
+import { finalize, Observable } from 'rxjs';
+import { AccountActivityService, AccountWrite } from './account-activity.service';
 
 @Injectable({ providedIn: 'root' })
 export class HyperliquidGatewayService {
   private readonly config = inject(ConfigService);
   private readonly http = inject(HttpClient);
+  private readonly activity = inject(AccountActivityService);
 
   private post<T>(path: string, body: object): Observable<T> {
     return this.http.post<T>(
@@ -25,6 +27,19 @@ export class HyperliquidGatewayService {
       body,
       withWalletToken(),
     );
+  }
+
+  /**
+   * Une écriture au compte, signalée **quelle qu'en soit l'issue** : `finalize` passe sur le succès, sur
+   * l'erreur et sur l'abandon.
+   *
+   * Pas seulement sur le succès, parce qu'un échec ne garantit pas que rien n'a changé : une
+   * modification refusée avec « Error placing new order during modify » a **annulé** l'ordre d'origine
+   * (mesuré : `nest-trading-bot/docs/hyperliquid/live-check.md`), et une réponse perdue en route laisse
+   * l'état inconnu. Relire coûte une lecture ; ne pas relire affiche un ordre qui n'existe plus.
+   */
+  private write<T>(kind: AccountWrite['kind'], path: string, body: object): Observable<T> {
+    return this.post<T>(path, body).pipe(finalize(() => this.activity.record(kind)));
   }
 
   // ── Account info ───────────────────────────────────────────────────────────
@@ -66,10 +81,14 @@ export class HyperliquidGatewayService {
     cancels: Array<{ asset: number; oid: HLOid }>,
     isTestnet = false,
   ): Observable<HLSuccessResponse<HLCancelOrderResponse>> {
-    return this.post<HLSuccessResponse<HLCancelOrderResponse>>('hyperliquid/order/cancel', {
-      cancels,
-      isTestnet,
-    });
+    return this.write<HLSuccessResponse<HLCancelOrderResponse>>(
+      'cancel',
+      'hyperliquid/order/cancel',
+      {
+        cancels,
+        isTestnet,
+      },
+    );
   }
 
   placeOrder(
@@ -77,7 +96,7 @@ export class HyperliquidGatewayService {
     grouping: HLOrderGrouping = 'na',
     isTestnet = false,
   ): Observable<HLSuccessResponse<HLPlaceOrderResponse>> {
-    return this.post<HLSuccessResponse<HLPlaceOrderResponse>>('hyperliquid/order', {
+    return this.write<HLSuccessResponse<HLPlaceOrderResponse>>('place', 'hyperliquid/order', {
       order,
       grouping,
       isTestnet,
@@ -89,7 +108,7 @@ export class HyperliquidGatewayService {
     grouping: HLOrderGrouping = 'na',
     isTestnet = false,
   ): Observable<HLSuccessResponse<HLPlaceOrderResponse>> {
-    return this.post<HLSuccessResponse<HLPlaceOrderResponse>>('hyperliquid/orders', {
+    return this.write<HLSuccessResponse<HLPlaceOrderResponse>>('place', 'hyperliquid/orders', {
       orders,
       grouping,
       isTestnet,
@@ -101,11 +120,15 @@ export class HyperliquidGatewayService {
     order: HLOrderDetails,
     isTestnet = false,
   ): Observable<HLSuccessResponse<HLPlaceOrderResponse>> {
-    return this.post<HLSuccessResponse<HLPlaceOrderResponse>>('hyperliquid/order/modify', {
-      oid,
-      order,
-      isTestnet,
-    });
+    return this.write<HLSuccessResponse<HLPlaceOrderResponse>>(
+      'modify',
+      'hyperliquid/order/modify',
+      {
+        oid,
+        order,
+        isTestnet,
+      },
+    );
   }
 
   // TODO

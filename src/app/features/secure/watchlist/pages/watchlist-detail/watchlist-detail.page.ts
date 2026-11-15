@@ -25,7 +25,7 @@ import {
 import { AppLifecycleService } from '@services/app-lifecycle.service';
 import { BotService } from '@services/bot.service';
 import { ChartAnalysisService } from '@services/chart-analysis.service';
-import { HyperliquidCacheService } from '@services/hyperliquid-cache.service';
+import { HLCacheSource, HyperliquidCacheService } from '@services/hyperliquid-cache.service';
 import { HyperliquidCandleService } from '@services/hyperliquid-candle.service';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { IndicatorPickerComponent } from '@shared/components/indicator-picker/indicator-picker.component';
@@ -119,6 +119,12 @@ import {
   formingCandleOpenTime,
   strategiesSignallingOnFormingCandle,
 } from '../../utils/forming-candle.util';
+import { mayForceRefresh } from '../../utils/forced-refresh.util';
+import {
+  analysisCandlesReadAt,
+  formatCandlesAsOf,
+  freshReadWasIgnored,
+} from '../../utils/candle-age.util';
 import { overlayFailureReason } from '../../utils/overlay-failure.util';
 import { WatchlistService } from '../../services/watchlist.service';
 import {
@@ -137,6 +143,13 @@ import {
 } from '../../utils/backtest-display.util';
 import { mapIndicatorSeriesById } from '../../utils/indicator-series-map.util';
 import type { StrategySignalLayer } from '../../utils/strategy-markers.util';
+
+/** Ce que chaque lecture du compte dessine, pour dire laquelle manque. */
+const ACCOUNT_SOURCE_LABELS: Record<HLCacheSource, string> = {
+  openOrders: 'open orders',
+  historicalOrders: 'order lines',
+  fills: 'fills',
+};
 
 /** Une stratégie backtestée sur la fenêtre courante : ses marqueurs, plus son rapport. */
 interface StrategyRunResult extends StrategySignalLayer {
@@ -202,11 +215,44 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
 
   readonly coinSnapshot = this.hlCache.coinSnapshot;
 
+  /**
+   * Les lectures du compte en échec, nommées. Sans elles le chart reste sans lignes d'ordres ni points
+   * d'exécution, ce qui se lit « aucun ordre » : la panne doit se dire là où le manque se voit.
+   */
+  readonly accountReadFailures = computed(() =>
+    this.hlCache
+      .failures()
+      .map((source) => ACCOUNT_SOURCE_LABELS[source])
+      .join(', '),
+  );
+
+  /**
+   * L'heure de lecture des bougies affichées (« as of 21:45:12 »), ou `null` tant qu'elle est inconnue.
+   * Le cache sert des bougies jusqu'à un quart d'intervalle : c'est le compromis choisi, et il se voit.
+   * Voir candle-age.util.ts.
+   */
+  readonly candlesAsOf = signal<string | null>(null);
+
+  /**
+   * Ce que l'heure des bougies a de suspect : le bot ne l'a pas dite, ou un rafraîchissement forcé a été
+   * servi depuis un cache. Sans ce message, le bouton afficherait des bougies anciennes comme neuves.
+   */
+  readonly candlesAgeNotice = signal<string | null>(null);
+
   readonly presets = DATE_PRESETS;
   readonly intervals = CANDLE_INTERVALS;
   readonly intervalLabels = INTERVAL_LABELS;
 
   fetchFn = signal<() => Promise<void>>(async () => {});
+
+  /**
+   * Le tirer-pour-rafraîchir fait la même chose que le bouton : un rafraîchissement forcé. Les deux gestes
+   * disent la même chose, et un tirer qui servirait le cache ne rafraîchirait rien.
+   */
+  readonly forcedFetchFn = () => this.buildFetchFn({ force: true })();
+
+  /** Date du dernier rafraîchissement qui a passé les caches — voir `mayForceRefresh`. */
+  private lastForcedAt: number | null = null;
 
   private readonly onMouseUp = () => this.scheduleOverlayDraw();
   private readonly onTouchEnd = () => this.scheduleOverlayDraw();
@@ -441,11 +487,14 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       untracked(() => this.buildChart(el));
     });
 
-    // Recharge les candles au retour en foreground
+    // Au retour au premier plan : les bougies (depuis les caches), et les ordres du compte — un ordre
+    // posé entre-temps par le bot ou par l'interface d'Hyperliquid n'est passé par aucune écriture de
+    // cette app. Relecture non forcée : au plus une par minute.
     effect(() => {
       this.lifecycle.foregroundCount();
       untracked(() => {
         if (!this.appReady) return;
+        this.hlCache.reloadAll();
         this.fetchFn.set(this.buildFetchFn());
       });
     });
@@ -499,6 +548,17 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     this.hlMarket.resolveCoin(coin).subscribe((name) => this.coinTitle.set(name));
   }
 
+  /**
+   * La page reparaît après une autre de la pile — typiquement Open Orders, où l'on vient de lire des
+   * ordres que le chart doit aussi montrer. Les écritures faites depuis l'app ont déjà fait relire
+   * (`AccountActivityService`) ; celle-ci rattrape le reste, au plus une fois par minute. Les bougies ne
+   * sont pas relues : rien de ce qu'on fait ailleurs ne les change.
+   */
+  ionViewWillEnter(): void {
+    if (!this.appReady) return;
+    this.hlCache.reloadAll();
+  }
+
   ngOnDestroy(): void {
     const el = this.chartEl()?.nativeElement;
     if (el) {
@@ -524,13 +584,38 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
 
   // ── Fetch candles ──────────────────────────────────────────────────────────
 
-  private buildFetchFn() {
+  /**
+   * Le chargement du chart. `force` passe les caches — bougies du mobile, bougies du bot, ordres et
+   * fills du compte — pour le bouton et le tirer-pour-rafraîchir ; tout le reste (changement
+   * d'intervalle, retour au premier plan) sert depuis les caches, au prix de données un peu anciennes.
+   *
+   * Le forçage ne vaut que **pour le premier appel** de la fonction rendue : `RefreshableLayoutComponent`
+   * rappelle la même fonction au retour au premier plan, et ce rappel n'a pas à passer les caches.
+   */
+  private buildFetchFn({ force = false }: { force?: boolean } = {}) {
+    let forceOnce = force;
+
     return async () => {
       const item = this.item();
       if (!item) return;
 
+      const now = Date.now();
+      const fresh =
+        forceOnce &&
+        mayForceRefresh(
+          now,
+          this.lastForcedAt,
+          this.hasError() || this.hlCache.failures().length > 0,
+        );
+      forceOnce = false;
+      if (fresh) {
+        this.lastForcedAt = now;
+        this.hlCache.reloadAll(true);
+      }
+
       this.loading.set(true);
       this.hasError.set(false);
+      this.candlesAgeNotice.set(null);
 
       const token = ++this.loadToken;
       const preset = this.selectedPreset();
@@ -553,9 +638,9 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
 
       try {
         if (hasOverlayData) {
-          await this.fetchViaAnalysis(item, startTime, endTime, token);
+          await this.fetchViaAnalysis(item, startTime, endTime, token, fresh);
         } else {
-          await this.fetchViaCandles(item, startTime, endTime, token);
+          await this.fetchViaCandles(item, startTime, endTime, token, fresh);
         }
       } catch {
         if (token === this.loadToken) this.hasError.set(true);
@@ -572,6 +657,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     displayStartTime: number,
     endTime: number,
     token: number,
+    fresh: boolean,
   ): Promise<void> {
     const active = this.activeIndicators();
     // Une stratégie sans côté à évaluer fait rejeter la requête d'analyse
@@ -600,7 +686,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
      */
     const chartInterval = chartIntervalFor(interval);
     if (chartInterval === null) {
-      await this.fetchViaCandles(item, displayStartTime, endTime, token);
+      await this.fetchViaCandles(item, displayStartTime, endTime, token, fresh);
       await this.notifyOverlaysUnavailable(
         `the bot cannot analyse ${INTERVAL_LABELS[interval]} candles.`,
       );
@@ -629,7 +715,8 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     };
 
     try {
-      const res = await firstValueFrom(this.chartAnalysis.analyze(request));
+      const res = await firstValueFrom(this.chartAnalysis.analyze(request, { fresh }));
+      const receivedAt = Date.now();
       if (!res.candles.length) {
         this.hasError.set(true);
         return;
@@ -654,6 +741,11 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
 
       this.renderCandles(candles);
       this.computeStats(candles.filter((c) => c.t >= displayStartTime));
+      this.showCandlesReadAt(
+        analysisCandlesReadAt(receivedAt, res.candlesAgeMs),
+        fresh,
+        receivedAt,
+      );
       this.cacheIndicatorSeries(res, active);
       this.applyIndicatorVisibility();
       this.formingOpenTime.set(
@@ -674,7 +766,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       // panne du service d'analyse se lisait comme « cet indicateur ne donne
       // rien », ce qui est le pire diagnostic possible sur un outil de trading.
       if (token !== this.loadToken) return;
-      await this.fetchViaCandles(item, displayStartTime, endTime, token);
+      await this.fetchViaCandles(item, displayStartTime, endTime, token, fresh);
       await this.notifyOverlaysUnavailable(overlayFailureReason(error));
     }
   }
@@ -823,14 +915,18 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     startTime: number,
     endTime: number,
     token: number,
+    fresh: boolean,
   ): Promise<void> {
-    const candles = await firstValueFrom(
-      this.hlCandle.getCandles({
-        coin: item.coin,
-        interval: this.selectedInterval(),
-        startTime,
-        endTime,
-      }),
+    const { candles, readAt } = await firstValueFrom(
+      this.hlCandle.getCandlesWithTime(
+        {
+          coin: item.coin,
+          interval: this.selectedInterval(),
+          startTime,
+          endTime,
+        },
+        { fresh },
+      ),
     );
 
     if (!candles.length) {
@@ -847,6 +943,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     this.requestedRange = { from: startTime, to: endTime };
     this.renderCandles(candles);
     this.computeStats(candles);
+    this.showCandlesReadAt(readAt, fresh, Date.now());
     // Les résultats de backtest décrivent la fenêtre du dernier appel réussi,
     // pas ces bougies-ci. Les garder laissait le bilan chiffré et la bande de
     // positions affichés sous des bougies nues — mesuré : les chiffres du 1H
@@ -864,8 +961,42 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     this.scheduleOverlayDraw();
   }
 
+  /**
+   * Affiche l'heure des bougies qu'on vient de peindre, et dit ce qu'elle a de suspect.
+   *
+   * `readAt` à `null` : le bot n'a pas rendu `candlesAgeMs` — un bot d'avant les types partagés 0.35.0.
+   * On ne devine pas une heure à sa place, et on ne laisse pas non plus l'heure du chargement précédent :
+   * elle décrirait d'autres bougies.
+   */
+  private showCandlesReadAt(readAt: number | null, askedFresh: boolean, receivedAt: number): void {
+    if (readAt === null) {
+      this.candlesAsOf.set(null);
+      this.candlesAgeNotice.set(
+        'The bot did not say how old these candles are (older bot version?): they may be stale.',
+      );
+      return;
+    }
+
+    const asOf = formatCandlesAsOf(readAt, receivedAt);
+    this.candlesAsOf.set(asOf);
+    if (freshReadWasIgnored(askedFresh, readAt, receivedAt)) {
+      this.candlesAgeNotice.set(
+        `Refresh asked for new candles, but the bot sent older ones (${asOf}).`,
+      );
+    }
+  }
+
   loadData(): void {
     this.fetchFn.set(this.buildFetchFn());
+  }
+
+  /**
+   * Le bouton de rafraîchissement : tout, sans cache — bougies et ordres. Avant le 2026-11-15 il appelait
+   * `loadData()`, donc servait les caches (jusqu'à un quart d'intervalle : 6 h en 1D) et ne relisait
+   * jamais les ordres.
+   */
+  refresh(): void {
+    this.fetchFn.set(this.buildFetchFn({ force: true }));
   }
 
   // ── Chart setup ────────────────────────────────────────────────────────────

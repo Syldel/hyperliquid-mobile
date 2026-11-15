@@ -7,12 +7,19 @@ import {
   CandleSnapshotRequest,
 } from '@syldel/hl-shared-types';
 import { Observable, of } from 'rxjs';
-import { tap } from 'rxjs/operators';
+import { map } from 'rxjs/operators';
 import { ConfigService } from './config.service';
 
 interface CacheEntry {
   data: CandleSnapshot[];
+  /** Heure de **réception** de la réponse, sur l'horloge du téléphone. */
   fetchedAt: number;
+}
+
+/** Des bougies, et l'heure à laquelle elles ont été reçues d'Hyperliquid. */
+export interface TimedCandles {
+  candles: CandleSnapshot[];
+  readAt: number;
 }
 
 /** TTL cache par interval = (durée de la bougie) / 4, plancher à 15s. Derived from
@@ -40,7 +47,29 @@ export class HyperliquidCandleService {
 
   // ── Public API ─────────────────────────────────────────────────────────────
 
-  getCandles(req: CandleSnapshotRequest): Observable<CandleSnapshot[]> {
+  /**
+   * Les bougies d'une fenêtre, servies depuis le cache tant qu'elles ont moins de `CACHE_TTL`.
+   *
+   * `fresh` saute la **lecture** du cache, pas son écriture : la réponse neuve remplace l'entrée, et le
+   * prochain appel ordinaire la sert. Sans cette écriture, un changement d'intervalle aller-retour juste
+   * après un rafraîchissement forcé ramenait le chart aux bougies d'avant.
+   */
+  getCandles(
+    req: CandleSnapshotRequest,
+    options: { fresh?: boolean } = {},
+  ): Observable<CandleSnapshot[]> {
+    return this.getCandlesWithTime(req, options).pipe(map(({ candles }) => candles));
+  }
+
+  /**
+   * `getCandles`, avec l'heure à laquelle ces bougies ont été reçues — qu'elles sortent du cache ou d'une
+   * lecture neuve. Le chart l'affiche (« as of 21:45:12 ») : servir le cache est un compromis accepté,
+   * le cacher ne l'est pas.
+   */
+  getCandlesWithTime(
+    req: CandleSnapshotRequest,
+    options: { fresh?: boolean } = {},
+  ): Observable<TimedCandles> {
     const endTime = req.endTime ?? Date.now();
     const startTime = req.startTime ?? 0;
     const ttl = CACHE_TTL[req.interval] ?? 15_000;
@@ -50,14 +79,22 @@ export class HyperliquidCandleService {
     const entry = this.cache.get(key);
     const now = Date.now();
 
-    if (entry && now - entry.fetchedAt < ttl) {
-      return of(entry.data);
+    if (!options.fresh && entry && now - entry.fetchedAt < ttl) {
+      return of({ candles: entry.data, readAt: entry.fetchedAt });
     }
 
     return this.post<CandleSnapshot[]>({
       type: 'candleSnapshot',
       req,
-    }).pipe(tap((data) => this.cache.set(key, { data, fetchedAt: now })));
+    }).pipe(
+      map((data) => {
+        // L'heure de réception, et non celle de l'envoi (`now`) comme jusqu'au 2026-11-15 : c'est elle
+        // qui s'affiche. L'écart, la durée de l'appel, ne change rien au TTL.
+        const fetchedAt = Date.now();
+        this.cache.set(key, { data, fetchedAt });
+        return { candles: data, readAt: fetchedAt };
+      }),
+    );
   }
 
   getRecentCandles(

@@ -64,6 +64,22 @@ describe('ChartAnalysisService', () => {
     call.flush({});
   });
 
+  // Le rafraîchissement forcé du chart : sans ce champ, le bot sert ses bougies en cache (un quart
+  // d'intervalle) et le bouton ne rafraîchit rien dès qu'une stratégie est attachée.
+  it('asks the bot for fresh candles in the body, only when told to', () => {
+    service.analyze(request, { fresh: true }).subscribe();
+    service.analyze(request).subscribe();
+
+    const [fresh, ordinary] = httpMock.match('http://bot.test/analysis');
+    expect(fresh.request.body).toEqual({ ...request, fresh: true });
+    // Une lecture ordinaire reste la requête d'avant, sans le champ.
+    expect(ordinary.request.body).toBe(request);
+    // Plus d'en-tête : un bot qui l'ignorerait servirait son cache sans rien dire.
+    expect(fresh.request.headers.has('Cache-Control')).toBe(false);
+    fresh.flush({});
+    ordinary.flush({});
+  });
+
   it('hands back the response as received', () => {
     const response = { symbol: 'xyz:BRENTOIL', candles: [] } as unknown as AnalysisResponse;
     let received: AnalysisResponse | undefined;

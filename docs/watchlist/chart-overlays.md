@@ -516,6 +516,94 @@ nouvelle annonce, puis une annonce de nouveau après un chargement réussi.
 
 ---
 
+# Fraîcheur : ce qui sert le cache, ce qui le passe
+
+Ce chart est l'écran le plus visité de l'app : la plupart de ses chargements se servent des
+caches, au prix de données un peu anciennes. Deux moments seulement exigent l'état réel, et
+ce sont ceux-là qui passent les caches. Établi le 2026-11-15.
+
+| Moment                                         | Bougies               | Ordres et fills du compte                        |
+| ---------------------------------------------- | --------------------- | ------------------------------------------------ |
+| ouverture, changement d'intervalle ou de plage | caches                | lus à la construction du cache, puis ≤ 1/min     |
+| retour sur la page (pile Ionic), premier plan  | non relues / caches   | relus si la dernière lecture a plus d'une minute |
+| **écriture au compte** depuis l'app            | non relues            | **relus tout de suite**                          |
+| **bouton rafraîchir, tirer-pour-rafraîchir**   | **relues sans cache** | **relus tout de suite**                          |
+
+**Les caches.** Deux caches de bougies, à la même règle — un quart d'intervalle, 15 s au
+moins (15 min en 1H, 6 h en 1D) : celui du mobile (`HyperliquidCandleService`, chart sans
+surcouche) et celui du bot (`HyperliquidApiService.getCandleSnapshot`, derrière
+`POST /analysis`). Les ordres et fills vivent dans `HyperliquidCacheService`, relus au plus
+une fois par minute sur les chemins ordinaires.
+
+**Une écriture relit sans attendre.** `HyperliquidGatewayService` signale chaque `place`,
+`modify` et `cancel` à `AccountActivityService`, **quelle qu'en soit l'issue** : un modify
+refusé peut avoir annulé l'ordre d'origine (mesuré, `nest-trading-bot/docs/hyperliquid/live-check.md`),
+une réponse perdue laisse l'état inconnu. Le cache des ordres, s'il existe, relit les trois
+sources. Le signal passe par un service à part parce que le cache lit dès sa construction :
+l'injecter dans le gateway aurait coûté trois lectures à chaque formulaire d'ordre.
+
+**Le rafraîchissement forcé l'est vraiment.** Avant le 2026-11-15, le bouton rappelait le
+chargement ordinaire : caches servis, ordres jamais relus. Il passe désormais les deux caches
+de bougies et relit le compte. Côté bot, la demande est un champ du corps,
+`AnalysisRequest.fresh` (types partagés 0.35.0). Le bot **revalide** (relit, puis range sous
+la même clé) au lieu de contourner : un aller-retour d'intervalle juste après ne ramène pas
+les bougies d'avant. Mesuré dans le navigateur le jour même : un appui sur rafraîchir =
+1 `candleSnapshot` (ou 1 `/analysis` avec `fresh`) + 3 lectures du compte ; le journal du bot
+montre la relecture des bougies sur une clé encore en cache.
+
+Pourquoi un champ et pas l'en-tête `Cache-Control: no-cache`, essayé le même jour puis
+abandonné avant d'être publié : un bot qui ne connaît pas l'en-tête l'**ignore** et sert son
+cache sans rien dire, alors qu'un champ inconnu est **refusé** (`forbidNonWhitelisted`). Le
+champ échoue bruyamment, l'en-tête en silence. Le bot rend la valeur brute du corps à
+`@IsBoolean` (`@Transform`) : la conversion implicite de sa `ValidationPipe` faisait passer
+`fresh: 'yes'` (mesuré, 201), et `'false'` aurait valu `true`.
+
+**L'âge des bougies se voit.** Sous le prix, « as of 21:45:12 » : l'heure de lecture des
+bougies affichées, avec la date si ce n'est pas aujourd'hui (le cache 1D vit jusqu'à 6 h).
+Une heure plutôt qu'un âge, qui vieillirait à l'écran. Sur le chemin `/analysis`, elle vient
+de `AnalysisResponse.candlesAgeMs` — l'âge mesuré par le bot sur **sa** propre horloge,
+ramené sur celle du téléphone (`reçu à − âge`) sans jamais comparer les deux. Sur le chemin
+des bougies nues, c'est l'heure de réception rangée avec le cache du mobile. Voir
+`candle-age.util.ts`.
+
+**Et ce qu'elle a de suspect se dit**, en rouge sous les puces :
+
+- un rafraîchissement forcé servi avec des bougies de plus de 10 s
+  (`FRESH_READ_MAX_AGE_MS`) — « Refresh asked for new candles, but the bot sent older ones ».
+  Mesuré : une relecture suivie d'effet rend `candlesAgeMs: 0` avec une EMA 9 ; le cache du bot,
+  lui, rendait 100 721 ms à une ouverture ordinaire. Le seuil sépare largement les deux ;
+- un bot qui ne rend pas `candlesAgeMs` (antérieur à 0.35.0) — pas d'heure affichée, et un
+  message qui le dit, plutôt qu'une heure devinée.
+
+Les deux messages ont été provoqués dans le navigateur en réécrivant la réponse du bot.
+Contrastes mesurés : l'heure à 6,00:1 en sombre et 6,37:1 en clair, le message à 6,11:1 et
+6,20:1. ⚠️ À 360 px, l'heure passe **sous** le prix quand la variation est longue
+(« −14.27 % (−10833.00) » en 1W) : l'en-tête gagne alors une ligne, 18 px. Choisi plutôt que
+de raccourcir le texte jusqu'à l'ambiguïté.
+
+**Dix secondes entre deux forçages** (`mayForceRefresh`). Avec surcouches, forcer fait lire
+les bougies par le gateway, dont l'IP est celle du bot de trading. Dans ce délai, le cache sert
+des données de moins de 10 s — celles qu'on vient de recevoir. Un forçage qui suit un échec
+passe toujours.
+
+**Une lecture du compte en échec se dit** sous les puces (« Could not load order lines… »).
+`resource.value()` lève sur une erreur : le chart restait sans lignes, ce qui se lisait
+« aucun ordre ». Contraste du message mesuré à 6,11:1 en sombre et 6,20:1 en clair, 360 px
+sans débordement.
+
+**Le compte fait partie de la clé** des lectures : en changeant de compte puis en rouvrant un
+chart dans la minute, le chart du compte B portait les ordres et fills du compte A.
+
+**La relecture n'arrive pas trop tôt** : `historicalOrders` reflète déjà l'action quand
+`/exchange` a répondu. Éprouvé en réel le 2026-11-15 — un ordre limite posé, modifié puis
+annulé depuis Open Orders, la ligne du chart à jour à chaque retour, sans rafraîchir. ⚠️ Un
+constat à l'écran sur une séquence, sans délai mesuré : voir
+[roadmap.md](../roadmap.md#à-éprouver-en-réel--ce-quaucun-double-ne-peut-établir), point 16.
+
+⚠️ Les lignes d'ordres viennent de `historicalOrders`, le badge de `frontendOpenOrders`. Si
+l'historique est plafonné (2000 ordres selon la doc, **pas relu en brut**), un vieil ordre
+encore ouvert pourrait être compté dans le badge sans être dessiné.
+
 # Le canvas séparé
 
 Les ordres et les exécutions de l'utilisateur ne sont pas des séries : ils sont dessinés

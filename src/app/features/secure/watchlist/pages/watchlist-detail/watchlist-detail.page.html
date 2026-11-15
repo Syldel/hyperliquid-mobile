@@ -1,6 +1,7 @@
 <app-refreshable-layout
   [title]="coinTitle()"
   [fetchFn]="fetchFn()"
+  [refreshFn]="forcedFetchFn"
   [pageHeaderParams]="{ startButton: 'back', defaultHref: backHref() }"
 >
   <ng-template #endButtons>
@@ -12,7 +13,8 @@
       </ion-badge>
       }
     </ion-button>
-    <ion-button (click)="loadData()">
+    <!-- Rafraîchissement forcé : bougies et ordres relus sans cache. Voir `refresh()`. -->
+    <ion-button (click)="refresh()" [disabled]="loading()" aria-label="Refresh chart and orders">
       <ion-icon slot="icon-only" name="refresh-outline" />
     </ion-button>
   </ng-template>
@@ -31,7 +33,10 @@
       {{ changeSign }}{{ priceChange().toFixed(2) }}%
       <span class="stats-header__abs">({{ priceChangeAbs() }})</span>
     </div>
-    }
+    <!-- L'heure de lecture des bougies : le cache peut les servir jusqu'à un quart d'intervalle. -->
+    @if (candlesAsOf()) {
+    <div class="stats-header__as-of">{{ candlesAsOf() }}</div>
+    } }
   </div>
 
   <div class="preset-strip">
@@ -108,6 +113,21 @@
     Provisional signal on the last candle, which has not closed yet: {{ provisionalSignalNames() }}.
     It may change or disappear.
   </p>
+  }
+
+  <!-- Une lecture du compte en échec laisse le chart sans lignes d'ordres ou sans exécutions : sans ce
+       message, ce manque se lirait « aucun ordre ». Voir `HyperliquidCacheService.failures`. -->
+  @if (accountReadFailures()) {
+  <p class="strip-note" role="alert">
+    Could not load {{ accountReadFailures() }}: what the chart shows of your orders may be
+    incomplete. Tap refresh to retry.
+  </p>
+  }
+
+  <!-- Une heure de bougies inconnue, ou un rafraîchissement forcé servi depuis un cache : sans ce message,
+       des bougies anciennes se liraient comme neuves. Voir `showCandlesReadAt`. -->
+  @if (candlesAgeNotice()) {
+  <p class="strip-note" role="alert">{{ candlesAgeNotice() }}</p>
   }
 
   <!-- Opérandes tracés sous le chart : débogage visuel d'une règle. -->

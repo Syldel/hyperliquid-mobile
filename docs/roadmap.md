@@ -1109,6 +1109,17 @@ Profit Limit"`, `triggerCondition: "Price above 81959"`.
     Au passage, la relecture de la confirmation a refusé deux fois d'envoyer : le plafond avait
     bougé de 0,27 % et 0,17 % pendant la lecture, au-delà des 0,1 % tolérés.
 
+16. **✅ Le chart relit un ordre posé, modifié ou annulé dès la réponse de `/exchange`.** Depuis
+    le 2026-11-15, chaque `place`, `modify` et `cancel` fait relire au chart de watchlist-detail
+    ses ordres et fills **à l'instant où la réponse arrive** (voir
+    [chart-overlays.md](watchlist/chart-overlays.md#fraîcheur--ce-qui-sert-le-cache-ce-qui-le-passe)).
+    On craignait qu'`historicalOrders` serve encore l'état d'avant à ce moment. **Éprouvé en réel
+    par le développeur le 2026-11-15** : ordre limite posé depuis Open Orders, modifié, annulé, avec
+    un retour au chart après chaque étape — la ligne a suivi à chaque fois, sans rafraîchissement.
+    ⚠️ Un constat à l'écran, pas une mesure : aucun délai relevé, une séquence, ni oid ni marché
+    notés. Si une ligne reste un jour à l'ancien prix, c'est ce point qu'il faut rouvrir — le bouton
+    rafraîchir reste le recours, et le remède serait une seconde relecture après un court délai.
+
 ## Précédent
 
 Le dernier risque refermé — une expression malformée faisant rejeter toute la requête
