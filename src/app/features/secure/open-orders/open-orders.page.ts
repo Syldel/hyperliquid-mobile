@@ -36,7 +36,7 @@ import { HLFrontendOpenOrder } from '@syldel/hl-shared-types';
 import { marketKindLabel, openOrdersDexOf, orderSideLabel } from '@utils/market-kind.util';
 import { addIcons } from 'ionicons';
 import { addOutline, createOutline } from 'ionicons/icons';
-import { forkJoin, map, Observable, of } from 'rxjs';
+import { forkJoin, map, Observable } from 'rxjs';
 import { OrderFormComponent } from './open-form/order-form.component';
 import { describeStuckTriggered, isStuckTriggeredOrder } from './stuck-triggered-order.util';
 
@@ -132,7 +132,7 @@ export class OpenOrdersPage extends MenuBasePage implements OnInit {
    * et relire ici doublait la requête — mesuré le 2026-11-15, deux `frontendOpenOrders` identiques à
    * 4 ms d'écart, depuis le menu comme depuis le chart. Sauter ce premier passage est sûr dans les deux
    * ordres possibles : si la sélection arrive **après** (stockage plus lent sur téléphone), le hook
-   * n'aurait construit qu'un chargement vide (`selectedDexNames` à `null`), sans requête.
+   * n'aurait rien eu à charger (`selectedDexNames` à `null`).
    */
   override ionViewWillEnter(): void {
     super.ionViewWillEnter();
@@ -173,9 +173,13 @@ export class OpenOrdersPage extends MenuBasePage implements OnInit {
     return coin.toUpperCase();
   }
 
-  private buildFetchFn() {
+  /**
+   * `null` tant que la sélection des dex n'est pas connue : le layout attend, indicateur affiché. Un
+   * `of([])` d'attente se lisait « No open order found » — voir `RefreshableLayoutComponent.fetchFn`.
+   */
+  private buildFetchFn(): (() => Observable<HLFrontendOpenOrder[]>) | null {
     const dexs = this.selectedDexNames();
-    if (dexs === null) return (): Observable<HLFrontendOpenOrder[]> => of([]);
+    if (dexs === null) return null;
 
     return (): Observable<HLFrontendOpenOrder[]> => {
       const calls =

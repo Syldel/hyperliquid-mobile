@@ -31,7 +31,9 @@ describe('OpenOrdersPage — reading the open orders', () => {
 
   /** Ce que fait le layout : appeler la fonction de chargement en cours. */
   const runLoad = async () => {
-    const result = page.fetchFn()();
+    const fn = page.fetchFn();
+    if (fn === null) throw new Error('nothing to load');
+    const result = fn();
     await firstValueFrom(result as Observable<unknown>);
   };
 
@@ -57,6 +59,11 @@ describe('OpenOrdersPage — reading the open orders', () => {
     });
     page = TestBed.runInInjectionContext(() => new OpenOrdersPage());
     lastFetchFn = page.fetchFn();
+  });
+
+  // Une liste vide d'attente se lisait « No open order found » : avant la sélection, rien à charger.
+  it('has nothing to load before the dex selection is known', () => {
+    expect(page.fetchFn()).toBeNull();
   });
 
   // L'ordre mesuré dans le navigateur : la sélection restaurée, puis le hook d'entrée.

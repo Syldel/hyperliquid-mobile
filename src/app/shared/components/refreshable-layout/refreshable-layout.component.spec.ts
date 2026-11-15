@@ -49,3 +49,53 @@ describe('RefreshableLayoutComponent — pull to refresh', () => {
     expect(component.data()).toBe('cached');
   });
 });
+
+/**
+ * Une page qui ne sait pas encore quoi charger passe `null`. Open Orders et Perp Summary rendaient à la
+ * place un `of([])` d'attente : le layout l'affichait comme une réponse, et « No open order found »
+ * restait à l'écran le temps que le stockage rende la sélection des dex (150 ms mesurées en le
+ * ralentissant d'autant, sur un compte qui avait deux ordres ouverts).
+ */
+describe('RefreshableLayoutComponent — nothing to load yet', () => {
+  const create = () => {
+    TestBed.configureTestingModule({
+      providers: [{ provide: AuthService, useValue: { isLoggedIn: () => true } }],
+    });
+    const fixture = TestBed.createComponent(RefreshableLayoutComponent<string[]>);
+    fixture.componentRef.setInput('title', 'Open Orders');
+    fixture.componentRef.setInput('fetchFn', null);
+    fixture.detectChanges();
+    return fixture;
+  };
+
+  it('shows the spinner, never the empty message, while it waits', () => {
+    const fixture = create();
+    const html = fixture.nativeElement as HTMLElement;
+
+    expect(fixture.componentInstance.showSpinner()).toBe(true);
+    expect(html.querySelector('.loading-spinner')).not.toBeNull();
+    expect(html.textContent).not.toContain('No data found');
+  });
+
+  it('loads as soon as the page knows what to load', async () => {
+    const fixture = create();
+    const fetchFn = vi.fn(async () => ['order']);
+
+    fixture.componentRef.setInput('fetchFn', fetchFn);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(fixture.componentInstance.data()).toEqual(['order']);
+  });
+
+  it('lets a pull to refresh end without loading anything', async () => {
+    const fixture = create();
+    const complete = vi.fn();
+
+    await fixture.componentInstance.onRefresh({ target: { complete } } as unknown as CustomEvent);
+
+    expect(complete).toHaveBeenCalled();
+    expect(fixture.componentInstance.data()).toBeNull();
+  });
+});

@@ -17,7 +17,7 @@ import {
   HLPerpMarginSummary,
   HLPerpPositionDetail,
 } from '@syldel/hl-shared-types';
-import { forkJoin, Observable, of } from 'rxjs';
+import { forkJoin, Observable } from 'rxjs';
 import { MarginSummaryComponent } from './components/margin-summary/margin-summary.component';
 import { PositionItemComponent } from './components/position-item/position-item.component';
 
@@ -59,9 +59,13 @@ export class PerpSummaryPage extends MenuBasePage {
     });
   }
 
-  private buildFetchFn() {
+  /**
+   * `null` tant que la sélection des dex n'est pas connue : le layout attend, indicateur affiché, au lieu
+   * d'afficher une liste vide — voir `RefreshableLayoutComponent.fetchFn`.
+   */
+  private buildFetchFn(): (() => Observable<HLClearinghouseState[]>) | null {
     const dexs = this.selectedDexNames();
-    if (dexs === null) return (): Observable<HLClearinghouseState[]> => of([]);
+    if (dexs === null) return null;
 
     return (): Observable<HLClearinghouseState[]> => {
       const calls =

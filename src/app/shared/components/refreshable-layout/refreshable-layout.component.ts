@@ -65,7 +65,16 @@ export class RefreshableLayoutComponent<T> implements OnInit {
   private readonly lifecycle = inject(AppLifecycleService);
 
   title = input.required<string>();
-  fetchFn = input.required<() => Promise<T> | Observable<T>>();
+  /**
+   * Ce que la page charge. `null` : elle ne sait pas encore **quoi** charger — Open Orders et Perp
+   * Summary attendent la sélection des dex, lue dans le stockage. Le layout montre alors son indicateur
+   * de chargement et ne charge rien.
+   *
+   * Ces pages rendaient jusqu'au 2026-11-15 un `of([])` d'attente, que le layout prenait pour une
+   * réponse : « No open order found » s'affichait tant que le stockage n'avait pas répondu — 150 ms
+   * mesurées en ralentissant le stockage d'autant, alors que le compte avait deux ordres ouverts.
+   */
+  fetchFn = input.required<(() => Promise<T> | Observable<T>) | null>();
   /**
    * Ce que fait le tirer-pour-rafraîchir, s'il doit faire plus que `fetchFn` — passer les caches, par
    * exemple (watchlist-detail). Sans lui, le geste rappelle `fetchFn`, comme avant.
@@ -82,16 +91,20 @@ export class RefreshableLayoutComponent<T> implements OnInit {
   isLoading = signal(false);
   isRefreshing = signal(false);
 
+  /** En chargement, ou en attente de savoir quoi charger : dans les deux cas, rien à affirmer encore. */
+  readonly showSpinner = computed(() => this.isLoading() || this.fetchFn() === null);
+
   readonly isLoggedIn = computed(() => this.authService.isLoggedIn());
 
   readonly endButtonsTpl = contentChild<TemplateRef<unknown>>('endButtons');
 
   constructor() {
     effect(() => {
-      this.fetchFn();
+      const fn = this.fetchFn();
       this.lifecycle.foregroundCount();
+      if (fn === null) return;
       if (this.requiresAuth() && !this.authService.isLoggedIn()) return;
-      untracked(() => this.load(false));
+      untracked(() => this.load(false, fn));
     });
   }
 
@@ -100,7 +113,9 @@ export class RefreshableLayoutComponent<T> implements OnInit {
   }
 
   async onRefresh(event: CustomEvent) {
-    await this.load(true, this.refreshFn() ?? undefined);
+    const fn = this.refreshFn() ?? this.fetchFn();
+    // Rien à relire tant que la page ne sait pas quoi charger : le chargement partira de lui-même.
+    if (fn !== null) await this.load(true, fn);
     (event.target as HTMLIonRefresherElement).complete();
   }
 
@@ -109,7 +124,7 @@ export class RefreshableLayoutComponent<T> implements OnInit {
     return Array.isArray(d) ? d.length === 0 : d === null;
   }
 
-  private async load(isRefresh = false, fn: () => Promise<T> | Observable<T> = this.fetchFn()) {
+  private async load(isRefresh: boolean, fn: () => Promise<T> | Observable<T>) {
     if (isRefresh) {
       this.isRefreshing.set(true);
     } else {
@@ -161,8 +176,9 @@ export class RefreshableLayoutComponent<T> implements OnInit {
     await modal.present();
 
     modal.onDidDismiss().then((result) => {
-      if (result.data) {
-        this.load(false);
+      const fn = this.fetchFn();
+      if (result.data && fn !== null) {
+        this.load(false, fn);
       }
     });
   }
