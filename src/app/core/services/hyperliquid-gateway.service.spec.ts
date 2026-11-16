@@ -29,7 +29,7 @@ describe('HyperliquidGatewayService — writes to the account', () => {
     ['placeOrders', 'hyperliquid/orders', 'place', (s) => s.placeOrders([order]).subscribe(ignore)],
     [
       'modifyOrder',
-      'hyperliquid/order/modify',
+      'hyperliquid/order/batch-modify',
       'modify',
       (s) => s.modifyOrder(1, order).subscribe(ignore),
     ],
@@ -96,6 +96,15 @@ describe('HyperliquidGatewayService — writes to the account', () => {
     httpMock.expectOne('http://gw.test/hyperliquid/order/cancel').flush({ status: 'ok' });
 
     expect(activity.lastWrite()).not.toBe(first);
+  });
+
+  // Le `modify` seul ne rend pas le nouvel oid ; le lot à une entrée, si (W4, live-check.md).
+  it('modifies through a one-entry batch, whose reply gives the new oid', () => {
+    service.modifyOrder(42, order).subscribe();
+
+    const call = httpMock.expectOne('http://gw.test/hyperliquid/order/batch-modify');
+    expect(call.request.body).toEqual({ modifies: [{ oid: 42, order }], isTestnet: false });
+    call.flush({ status: 'ok' });
   });
 
   // Une lecture ne change rien au compte : elle ne doit pas faire relire le chart.

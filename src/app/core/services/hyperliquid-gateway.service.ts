@@ -115,6 +115,16 @@ export class HyperliquidGatewayService {
     });
   }
 
+  /**
+   * Modifie un ordre — par un `batchModify` à **une** entrée, et non par `modify`.
+   *
+   * Une modification remplace l'ordre : l'ancien oid passe `canceled`, un nouveau naît. `modify` répond
+   * `{"type":"default"}`, sans ce nouvel oid ; `batchModify` le rend dans `statuses[0].resting.oid`
+   * (mesuré par cette route le 2026-11-09, `nest-trading-bot/docs/hyperliquid/live-check.md`, W4). Sans
+   * lui, la page de détail relisait l'ancien oid et affichait « canceled » après un succès. Même
+   * conversion d'ordre côté gateway (`mapOrderType`, `convertToApiOrder`), même coût : une action.
+   * La réponse se lit avec `readModifyOutcome`.
+   */
   modifyOrder(
     oid: HLOid,
     order: HLOrderDetails,
@@ -122,10 +132,9 @@ export class HyperliquidGatewayService {
   ): Observable<HLSuccessResponse<HLPlaceOrderResponse>> {
     return this.write<HLSuccessResponse<HLPlaceOrderResponse>>(
       'modify',
-      'hyperliquid/order/modify',
+      'hyperliquid/order/batch-modify',
       {
-        oid,
-        order,
+        modifies: [{ oid, order }],
         isTestnet,
       },
     );

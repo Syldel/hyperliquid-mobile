@@ -1,4 +1,4 @@
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe, Location } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
@@ -17,9 +17,12 @@ import {
   IonItem,
   IonLabel,
   IonNote,
+  IonRouterOutlet,
   ModalController,
+  NavController,
   ToastController,
 } from '@ionic/angular/standalone';
+import { AccountActivityService } from '@services/account-activity.service';
 import { AvailableCapitalService } from '@services/available-capital.service';
 import { HyperliquidGatewayService } from '@services/hyperliquid-gateway.service';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
@@ -36,6 +39,7 @@ import { orderSideLabel } from '@utils/market-kind.util';
 import { addIcons } from 'ionicons';
 import { closeOutline, createOutline, trashOutline } from 'ionicons/icons';
 import { of, switchMap } from 'rxjs';
+import { afterModify, ModifyOutcome } from '../modify-outcome.util';
 import { OrderFormComponent } from '../open-form/order-form.component';
 import { describeStuckTriggered, isStuckTriggeredOrder } from '../stuck-triggered-order.util';
 import { AgentExpiryNoticeComponent } from '@shared/components/agent-expiry-notice/agent-expiry-notice.component';
@@ -75,6 +79,10 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
   private readonly toastCtrl = inject(ToastController);
   private readonly modalCtrl = inject(ModalController);
   private readonly availableCapitalService = inject(AvailableCapitalService);
+  private readonly activity = inject(AccountActivityService);
+  private readonly location = inject(Location);
+  private readonly navCtrl = inject(NavController);
+  private readonly outlet = inject(IonRouterOutlet, { optional: true });
 
   oid = signal<number | null>(null);
   coin = signal<string>('');
@@ -165,6 +173,7 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
     const current = this.order();
     if (!current) return;
 
+    const writeBefore = this.activity.lastWrite();
     const modal = await this.modalCtrl.create({
       component: OrderFormComponent,
       componentProps: {
@@ -172,11 +181,53 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
       },
     });
     await modal.present();
-    const { role } = await modal.onWillDismiss();
-    if (role === 'confirm') {
-      // Rafraîchit les données de la page
+    const { data, role } = await modal.onWillDismiss<ModifyOutcome>();
+
+    if (role === 'confirm' && data && data.kind !== 'refused') {
+      this.followModify(data);
+      return;
+    }
+    // Fermé sans succès, mais après une écriture : un `modify` refusé annule souvent l'original (mesuré
+    // le 2026-10-27 et le 2026-11-09). Sans cette relecture, la page restait sur « open ».
+    if (this.activity.lastWrite() !== writeBefore) {
       this.fetchFn.set(this.buildFetchFn());
     }
+  }
+
+  /**
+   * Une modification **remplace** l'ordre : l'ancien oid est `canceled`. La page relisait cet ancien oid
+   * et affichait « canceled » après un succès. Elle passe désormais au nouvel ordre — l'URL remplacée,
+   * pour qu'un retour arrière ne ramène pas l'ancien — ou, si la réponse ne dit pas lequel, à la liste.
+   */
+  private followModify(outcome: Exclude<ModifyOutcome, { kind: 'refused' }>): void {
+    const { show, message } = afterModify(outcome);
+    this.showToast(message, 'success');
+    if (show === null) {
+      this.backToList();
+      return;
+    }
+    this.oid.set(show);
+    this.orderStatus.set(null);
+    this.statusTimestamp.set(null);
+    this.location.replaceState(
+      '/secure/open-orders/detail',
+      new URLSearchParams({ oid: String(show), coin: this.coin() }).toString(),
+    );
+    this.fetchFn.set(this.buildFetchFn());
+  }
+
+  /**
+   * Retour à la liste **telle qu'on l'a laissée** : son filtre et sa sélection de dex. La navigation
+   * d'avant imposait `?coin=` — mesuré le 2026-11-15, une liste ouverte sans filtre depuis le menu
+   * revenait filtrée sur le marché de l'ordre annulé. La page de détail ne s'ouvre que depuis la liste ;
+   * sans elle dans la pile (un lien direct), on y va comme le bouton retour (`defaultHref`).
+   */
+  private backToList(): void {
+    if (this.outlet?.canGoBack()) {
+      void this.navCtrl.back();
+      return;
+    }
+    void this.navCtrl.navigateBack('/secure/open-orders', { queryParams: { coin: this.coin() } });
   }
 
   private getOrderLabel(order: HLOrderStatusDetails | null): string {
@@ -232,9 +283,8 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
           if (status === 'success') {
             this.showToast(`Order ${this.oid()} cancelled`, 'success');
             this.availableCapitalService.invalidate();
-            this.router.navigate(['/secure/open-orders'], {
-              queryParams: { coin: this.coin() },
-            });
+            // La liste se relit à son retour (`OpenOrdersPage.ionViewWillEnter`).
+            this.backToList();
           } else {
             this.showToast(`Cancel failed: ${status.error}`, 'danger');
           }

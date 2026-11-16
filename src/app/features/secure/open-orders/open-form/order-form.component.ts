@@ -45,12 +45,7 @@ import {
   HLTif,
   hlPerpDexOf,
 } from '@syldel/hl-shared-types';
-import {
-  asSentence,
-  exchangeRefusal,
-  extractErrorMessage,
-  modifyRefusal,
-} from '@utils/hl-error.utils';
+import { asSentence, exchangeRefusal, extractErrorMessage } from '@utils/hl-error.utils';
 import { roundPrice, roundSize } from '@utils/hl-rounding.utils';
 import { MIN_ORDER_VALUE_USD, protectiveMinimumRefusal } from '@utils/order-minimum.utils';
 import {
@@ -80,6 +75,7 @@ import {
   type ActiveAssetPayload,
   type MarketDataState,
 } from './active-asset.util';
+import { readModifyOutcome } from '../modify-outcome.util';
 import {
   blocksOnMarketMeta,
   marketMetaDetailOf,
@@ -1236,26 +1232,23 @@ export class OrderFormComponent implements OnInit {
         this.submitting.set(false);
 
         if (this.isModify()) {
-          // Un `ok` sans `data.statuses` reste un succès (la réponse d'un
-          // `modify` n'en porte pas forcément). Mais un `ok` peut aussi porter
-          // un refus par ordre, `statuses[0].error` : c'est la forme mesurée le
-          // 2026-11-09 pour le même refus dans un lot (`modifyRefusal`).
-          const refusal = modifyRefusal(res);
-          if (refusal === null && res?.status === 'ok') {
-            this.presentToast('Order updated', 'success');
-            this.availableCapitalService.invalidate();
-            this.modalCtrl.dismiss(null, 'confirm');
-          } else {
+          // Le refus se lit à ses deux niveaux (`modifyRefusal`), et un succès dit où est passé l'ordre :
+          // une modification le **remplace**, sous un nouvel oid (`readModifyOutcome`).
+          const outcome = readModifyOutcome(res);
+          this.availableCapitalService.invalidate();
+          if (outcome.kind === 'refused') {
             // Mesuré le 2026-10-27 et le 2026-11-09 : un `modify` refusé a
             // **annulé** l'ordre d'origine (« Error placing new order during
             // modify »), pour un croisement comme pour un montant sous le
             // minimum. Pas toujours (un agent inconnu est refusé avant tout) :
             // on le dit comme une possibilité, à vérifier.
             this.error.set(
-              `${asSentence(refusal ?? 'Failed to update order: unexpected reply.')} Check the open orders: the original may have been cancelled.`,
+              `${asSentence(outcome.message)} Check the open orders: the original may have been cancelled.`,
             );
-            this.availableCapitalService.invalidate();
+            return;
           }
+          // La page qui a ouvert le formulaire montre l'ordre qui en résulte, et le dit.
+          this.modalCtrl.dismiss(outcome, 'confirm');
           return;
         }
 

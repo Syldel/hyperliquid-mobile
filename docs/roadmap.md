@@ -840,6 +840,35 @@ est tenu par le bot.
 dégradé faute d'historique) ne se lit que dans le journal du bot (`[PAIR][ladder]`). Si l'app doit un jour l'afficher, ce
 serait un champ de plus dans ce que le bot expose — pas un calcul de l'app, qui ne calcule rien.
 
+## Après une écriture, l'écran montre l'ordre qui en résulte (2026-11-15)
+
+La page de détail d'un ordre traitait l'annulation et la modification de deux façons, et la seconde
+affichait un état faux.
+
+- **Modifier affichait « canceled » après un succès.** Une modification _remplace_ l'ordre (ancien
+  oid `canceled`, nouveau né à la même milliseconde, point 3 ci-dessous), et la page relisait
+  l'ancien oid. Un `modify` seul ne rend pas le nouveau (`{"type":"default"}`) ; un `batchModify` le
+  rend par entrée (`statuses[0].resting.oid`, mesuré par la route du gateway le 2026-11-09, W4 de
+  `nest-trading-bot/docs/hyperliquid/live-check.md`). `HyperliquidGatewayService.modifyOrder` passe
+  donc par `/hyperliquid/order/batch-modify` avec une entrée, `readModifyOutcome` lit la réponse, et
+  la page passe au nouvel oid en **remplaçant** l'URL : un retour arrière ramène à la liste, pas à
+  l'ancien ordre. Sans oid dans la réponse, la page revient à la liste et le dit — on ne cherche pas
+  l'ordre en comparant prix et taille, deux ordres identiques rendraient le choix arbitraire.
+- **Une modification refusée laissait « open » à l'écran.** Un refus annule souvent l'original
+  (mesuré le 2026-10-27 et le 2026-11-09), le formulaire le disait, mais la page ne relisait l'ordre
+  qu'après un succès. Elle le relit désormais à la fermeture du formulaire **dès qu'une écriture a eu
+  lieu** (`AccountActivityService`), et seulement dans ce cas.
+- **Annuler imposait un filtre à la liste.** La navigation passait `?coin=` : mesuré le 2026-11-15,
+  une liste ouverte sans filtre depuis le menu revenait filtrée sur le marché de l'ordre annulé.
+  L'annulation revient désormais à la liste **telle qu'on l'a laissée** (retour dans la pile Ionic),
+  et la liste s'y relit.
+
+Éprouvé dans le navigateur **sans aucune écriture**, en appelant la page avec des issues simulées sur
+les ordres réels du compte : retour à la liste sans filtre, passage au nouvel oid (URL remplacée,
+statut `open` relu), retour à la liste sans oid, et une relecture de l'ordre à la fermeture du
+formulaire après une écriture signalée, aucune sans. ⚠️ La modification réelle reste à éprouver :
+point 17 ci-dessous.
+
 ## À éprouver en réel : ce qu'aucun double ne peut établir
 
 Ces points ne se tranchent ni par la lecture du code ni dans le navigateur : il faut un
@@ -1119,6 +1148,14 @@ Profit Limit"`, `triggerCondition: "Price above 81959"`.
     ⚠️ Un constat à l'écran, pas une mesure : aucun délai relevé, une séquence, ni oid ni marché
     notés. Si une ligne reste un jour à l'ancien prix, c'est ce point qu'il faut rouvrir — le bouton
     rafraîchir reste le recours, et le remède serait une seconde relecture après un court délai.
+
+17. **⚠️ Une modification depuis le mobile mène-t-elle au nouvel ordre ?** Depuis le 2026-11-15, la
+    modification passe par un `batchModify` à une entrée, dont la réponse donne le nouvel oid (forme
+    mesurée par le bot, jamais depuis le mobile). À éprouver : modifier un petit ordre limite loin du
+    marché depuis sa page de détail ; la page doit montrer le nouvel ordre, `open`, à son nouveau prix,
+    avec « Hyperliquid replaced it with order … », et un retour arrière mener à la liste. ⚠️ Jamais
+    mesuré : une modification qui **s'exécute aussitôt** (`filled`) ; elle est traitée comme un ordre
+    `order` exécuté, forme supposée identique.
 
 ## Précédent
 

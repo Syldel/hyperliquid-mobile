@@ -711,9 +711,10 @@ describe('OrderFormComponent — price wiring', () => {
     });
 
     /**
-     * Un `ok` qui porte un refus par ordre : la forme mesurée le 2026-11-09 pour le même refus dans un
-     * `batchModify`. Jamais vue pour un `modify` seul, mais l'annoncer « Order updated » serait le pire
-     * des deux affichages : dans chaque cas mesuré, l'ordre visé n'existait plus.
+     * Un `ok` qui porte un refus par ordre : la forme mesurée le 2026-11-09 pour un refus dans un
+     * `batchModify` — celle qu'on attend depuis que la modification passe par un lot à une entrée.
+     * L'annoncer « Order updated » serait le pire des deux affichages : dans chaque cas mesuré, l'ordre
+     * visé n'existait plus.
      */
     it('does not call an accepted envelope carrying a refusal an update', () => {
       create(
@@ -755,6 +756,36 @@ describe('OrderFormComponent — price wiring', () => {
       );
       expect(form.error()).toContain('the original may have been cancelled');
       expect(dismiss).not.toHaveBeenCalled();
+    });
+
+    // Une modification remplace l'ordre : la page de détail doit savoir sous quel oid (W4, 2026-11-09).
+    it('hands the new oid to the page that opened the form', () => {
+      create(
+        (component) =>
+          (component.existingOrder = {
+            oid: 1,
+            coin: 'BTC',
+            side: 'B',
+            limitPx: '80000',
+            sz: '0.001',
+            reduceOnly: false,
+            isTrigger: false,
+            orderType: 'Limit',
+          } as unknown as HLFrontendOpenOrder),
+      );
+      const dismiss = vi.fn();
+      (form as unknown as { modalCtrl: { dismiss: unknown } }).modalCtrl.dismiss = dismiss;
+      gateway()['modifyOrder'] = vi.fn(() =>
+        of({
+          status: 'ok',
+          response: { type: 'order', data: { statuses: [{ resting: { oid: 599951351972 } }] } },
+        }),
+      );
+
+      form.submit();
+
+      expect(form.error()).toBeNull();
+      expect(dismiss).toHaveBeenCalledWith({ kind: 'resting', oid: 599951351972 }, 'confirm');
     });
 
     // Vu à l'écran le 2026-11-12 (mesure 7) : le texte de l'exchange n'a pas de point, et la phrase suivante s'y collait.
