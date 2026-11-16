@@ -866,8 +866,8 @@ affichait un état faux.
 Éprouvé dans le navigateur **sans aucune écriture**, en appelant la page avec des issues simulées sur
 les ordres réels du compte : retour à la liste sans filtre, passage au nouvel oid (URL remplacée,
 statut `open` relu), retour à la liste sans oid, et une relecture de l'ordre à la fermeture du
-formulaire après une écriture signalée, aucune sans. ⚠️ La modification réelle reste à éprouver :
-point 17 ci-dessous.
+formulaire après une écriture signalée, aucune sans. La modification réelle a été éprouvée
+ensuite : point 17 ci-dessous.
 
 ## À éprouver en réel : ce qu'aucun double ne peut établir
 
@@ -1149,13 +1149,16 @@ Profit Limit"`, `triggerCondition: "Price above 81959"`.
     notés. Si une ligne reste un jour à l'ancien prix, c'est ce point qu'il faut rouvrir — le bouton
     rafraîchir reste le recours, et le remède serait une seconde relecture après un court délai.
 
-17. **⚠️ Une modification depuis le mobile mène-t-elle au nouvel ordre ?** Depuis le 2026-11-15, la
-    modification passe par un `batchModify` à une entrée, dont la réponse donne le nouvel oid (forme
-    mesurée par le bot, jamais depuis le mobile). À éprouver : modifier un petit ordre limite loin du
-    marché depuis sa page de détail ; la page doit montrer le nouvel ordre, `open`, à son nouveau prix,
-    avec « Hyperliquid replaced it with order … », et un retour arrière mener à la liste. ⚠️ Jamais
-    mesuré : une modification qui **s'exécute aussitôt** (`filled`) ; elle est traitée comme un ordre
-    `order` exécuté, forme supposée identique.
+17. **✅ Une modification depuis le mobile mène au nouvel ordre (2026-11-16).** La modification passe
+    par un `batchModify` à une entrée, dont la réponse donne le nouvel oid. Éprouvé en réel sur un
+    take-profit BTC loin du marché (déclencheur, pas un ordre limite), modifié **deux fois de suite**
+    depuis sa page de détail, gateway local : chaque fois le toast « Hyperliquid replaced it with order
+    … », la page sur le nouvel oid (`open`, nouveau déclencheur), et dans la pile Ionic aucune page de
+    l'ancien ordre derrière elle — l'URL est bien remplacée. L'historique montre la chaîne
+    607443428761 → 607450567413 → 607451222390, chaque ancien oid `canceled` à la milliseconde même
+    où le suivant naît `open`. Un retour arrière ramène à la liste telle qu'ouverte depuis le chart
+    (`?coin=BTC`), sans oid périmé. ⚠️ Jamais mesuré : une modification qui **s'exécute aussitôt**
+    (`filled`) ; elle est traitée comme un ordre `order` exécuté, forme supposée identique.
 
 18. **Un ordre posé depuis le mobile est listé dès la relecture qui suit l'écriture** (mesuré une
     fois, le 2026-11-16). La relecture du compte part à l'instant où `/exchange` répond, une seule
