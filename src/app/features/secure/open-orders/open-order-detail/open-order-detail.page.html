@@ -9,7 +9,10 @@
   (dataLoaded)="onDataLoaded($event)"
 >
   <ng-template #endButtons>
-    <ion-button (click)="openEditModal()" [disabled]="!order() || !authService.isLoggedIn()">
+    <ion-button
+      (click)="openEditModal()"
+      [disabled]="!order() || !!editRefusal() || !authService.isLoggedIn()"
+    >
       <ion-icon slot="icon-only" name="create-outline" />
     </ion-button>
 
@@ -24,7 +27,11 @@
 
   <app-agent-expiry-notice />
 
-  @if (order(); as o) {
+  @if (order(); as o) { @if (editRefusal(); as refusal) {
+  <ion-item lines="full" class="edit-refusal">
+    <ion-label class="ion-text-wrap">{{ refusal }}</ion-label>
+  </ion-item>
+  }
   <ion-item lines="full">
     <ion-label>Side</ion-label>
     <div slot="end">

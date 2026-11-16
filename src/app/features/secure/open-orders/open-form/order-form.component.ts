@@ -110,6 +110,7 @@ import {
 } from '../market-order/market-execution.util';
 import type { MarketFillOutcome } from '../market-order/market-fill.util';
 import { MarketOrderService } from '../market-order/market-order.service';
+import { editRefusal } from '../editable-order.util';
 import {
   crossingCloseLimitWarning,
   marginShortfallWarning,
@@ -1184,6 +1185,15 @@ export class OrderFormComponent implements OnInit {
 
   submit(): void {
     this.error.set(null);
+
+    // Un ordre d'un type que cet écran ne sait pas modifier (le trailing stop natif) : l'envoi
+    // serait un `modify` vers un ordre ordinaire. La page de détail désactive déjà le bouton, mais
+    // `submit()` est public, et le refus ne doit pas dépendre d'un seul appelant.
+    const refusal = this.existingOrder ? editRefusal(this.existingOrder) : null;
+    if (refusal) {
+      this.error.set(refusal);
+      return;
+    }
 
     // Le bouton est désactivé dans ce cas, mais `submit()` est public : le refus ne doit
     // pas dépendre du seul bouton.

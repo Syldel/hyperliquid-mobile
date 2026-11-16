@@ -301,6 +301,42 @@ describe('OrderFormComponent — price wiring', () => {
     });
   });
 
+  describe('an existing native trailing stop', () => {
+    // Recopié de `frontendOpenOrders` le 2026-11-16 (ETH ; `nest-trading-bot/docs/hyperliquid/live-check.md`),
+    // `coin` changé pour la méta de ces tests. « Stop » et « Market » dans le nom : le formulaire le
+    // lisait comme un Stop Market, et `submit()` envoyait un `modify` vers un stop ordinaire.
+    const trailing = {
+      coin: 'BTC',
+      side: 'A',
+      limitPx: '1481.0',
+      sz: '0.0065',
+      oid: 607485054558,
+      timestamp: 1794866197053,
+      triggerCondition: 'Activation immediate, retracement 10%, best 1828.3',
+      isTrigger: true,
+      triggerPx: '1645.47',
+      isPositionTpsl: false,
+      reduceOnly: true,
+      orderType: 'Trailing Stop Market',
+      origSz: '0.0065',
+      tif: null,
+      cloid: null,
+    } as HLFrontendOpenOrder;
+
+    beforeEach(() => create((component) => (component.existingOrder = trailing)));
+
+    it('refuses submit() without calling the gateway, and says why', () => {
+      const modifyOrder = vi.fn();
+      (form as unknown as { hlGateway: { modifyOrder: unknown } }).hlGateway.modifyOrder =
+        modifyOrder;
+
+      form.submit();
+
+      expect(modifyOrder).not.toHaveBeenCalled();
+      expect(form.error()).toContain('A trailing stop cannot be edited here');
+    });
+  });
+
   /**
    * LA GRILLE DU MARCHÉ : LA SIENNE, OU L'ENVOI EST BLOQUÉ.
    *

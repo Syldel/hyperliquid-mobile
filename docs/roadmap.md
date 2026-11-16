@@ -335,6 +335,30 @@ Ce que ça demandera :
 
 Dans l'app, une petite feuille ouverte depuis la ligne du levier.
 
+## En cours : le trailing stop natif, en plus du stop du bot
+
+Hyperliquid a ajouté le trailing stop natif le 2026-09-21. Le but est de pouvoir le **poser et le remplacer depuis
+l'app**, **en plus** du stop intelligent du bot, jamais à sa place (décidé le 2026-11-16).
+
+**Fait le 2026-11-16.**
+
+- **La mesure** de ce que l'API en rend : `nest-trading-bot/docs/hyperliquid/live-check.md`, « Le trailing stop natif ».
+- **Le garde-fou** : les trois dépôts le prenaient pour un stop ordinaire. Ici, « Edit Order » le refuse et dit pourquoi
+  (`open-orders/editable-order.util.ts`). Le bot et le gateway le laissent intact.
+
+**Reste à faire, dans cet ordre.**
+
+1. **Le gateway** : l'action `trailingStop` (dont la doc n'a ni réponse d'erreur ni `cloid`), une route validée, et la
+   signature éprouvée en réel. Son type rejoint `hl-shared-types` avec la liste des `orderType` connus.
+2. **L'affichage** : l'état lu dans `triggerCondition` (en attente à X, ou suit depuis W et déclenche à T), une ligne
+   propre sur le chart. Le déclencheur est hors de la grille des prix, et vaut `"0.0"` en attente.
+3. **La pose** depuis une position : reduce-only, à la taille de la position par défaut, l'unité de chaque champ écrite
+   (`%` ou prix). Une saisie prise pour un pourcentage a été refusée par l'exchange pendant la mesure.
+4. **Le remplacement**, qui n'est pas une modification : poser le nouveau, puis annuler l'ancien. L'écran dit que le
+   suivi repart du prix marqué du moment.
+
+⚠️ **Pas mesuré** : l'activation et le déclenchement d'un trailing, un achat, un dex HIP-3.
+
 ---
 
 # Limites acceptées

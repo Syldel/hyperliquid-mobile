@@ -39,6 +39,7 @@ import { orderSideLabel } from '@utils/market-kind.util';
 import { addIcons } from 'ionicons';
 import { closeOutline, createOutline, trashOutline } from 'ionicons/icons';
 import { of, switchMap } from 'rxjs';
+import { editRefusal } from '../editable-order.util';
 import { afterModify, ModifyOutcome } from '../modify-outcome.util';
 import { OrderFormComponent } from '../open-form/order-form.component';
 import { describeStuckTriggered, isStuckTriggeredOrder } from '../stuck-triggered-order.util';
@@ -127,6 +128,16 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
     return sz * px;
   });
 
+  /**
+   * Pourquoi cet ordre ne se modifie pas ici (un trailing stop natif, un type inconnu), ou `null`.
+   * Le bouton est désactivé **et** la raison s'affiche : un bouton grisé sans explication est une
+   * défaillance muette (voir `editable-order.util.ts`).
+   */
+  readonly editRefusal = computed(() => {
+    const order = this.order();
+    return order ? editRefusal(order) : null;
+  });
+
   protected readonly orderSideLabel = computed(() => {
     const order = this.order();
     return order ? this.getOrderLabel(order) : '';
@@ -171,7 +182,7 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
 
   async openEditModal(): Promise<void> {
     const current = this.order();
-    if (!current) return;
+    if (!current || this.editRefusal()) return;
 
     const writeBefore = this.activity.lastWrite();
     const modal = await this.modalCtrl.create({
