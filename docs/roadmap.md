@@ -1157,6 +1157,18 @@ Profit Limit"`, `triggerCondition: "Price above 81959"`.
     mesuré : une modification qui **s'exécute aussitôt** (`filled`) ; elle est traitée comme un ordre
     `order` exécuté, forme supposée identique.
 
+18. **Un ordre posé depuis le mobile est listé dès la relecture qui suit l'écriture** (mesuré une
+    fois, le 2026-11-16). La relecture du compte part à l'instant où `/exchange` répond, une seule
+    fois ; si le listing suivait avec retard — le bot en a déjà vu un, cause non établie
+    (`nest-trading-bot/docs/hyperliquid/live-check.md`, « Le listing … n'est pas un verdict ») —, le
+    chart resterait sur l'état d'avant. Mesuré : take-profit BTC posé depuis Open Orders, gateway
+    local, et le nouvel ordre présent dès cette relecture — `frontendOpenOrders` à +611 ms de la
+    réponse, `historicalOrders` à +1636 ms ; trois relectures forcées à +2, +5 et +15 s n'ont rien
+    changé. Aucune relecture supplémentaire n'est donc ajoutée. ⚠️ Une seule mesure, sans passer par
+    le gateway du VPS. Piège rencontré en la faisant : dans `historicalOrders`, un ordre rempli ou
+    annulé dans la milliseconde de sa pose porte `open` et son état final au **même**
+    `statusTimestamp` — laisser gagner `open` comptait 62 ordres ouverts sur un compte qui en avait un.
+
 ## Précédent
 
 Le dernier risque refermé — une expression malformée faisant rejeter toute la requête
