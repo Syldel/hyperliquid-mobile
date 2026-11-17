@@ -361,6 +361,11 @@ l'app**, **en plus** du stop intelligent du bot, jamais à sa place (décidé le
 4. **Le remplacement**, qui n'est pas une modification : poser le nouveau, puis annuler l'ancien. L'écran dit que le
    suivi repart du prix marqué du moment.
 
+⚠️ **Mesuré le 2026-11-17, à reporter dans la pose (3)** : l'exchange **accepte** une activation du mauvais côté (une vente
+activée sous le marqué) et la suit tout de suite, sans rien dire. Le client officiel refuse cette saisie ; le gateway aussi
+depuis le même jour (400), l'app devra le dire dès la saisie. Et un 400 du gateway arrive sans son code (`"message":"Validation failed"`, le texte dans
+`errors`) : l'écran doit lire `errors`. Détail : `nest-hyperliquid-gateway/docs/trailing-stop.md`.
+
 ⚠️ **Pas mesuré** : l'activation et le déclenchement d'un trailing, un achat, un dex HIP-3.
 
 ---
