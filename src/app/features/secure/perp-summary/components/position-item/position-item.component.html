@@ -3,7 +3,7 @@
     <h2>
       {{ position().coin }}
       <ion-badge [color]="isLong() ? 'success' : 'danger'">
-        {{ isLong() ? 'LONG' : 'SHORT' }}
+        {{ sideLabel() }}
       </ion-badge>
     </h2>
 

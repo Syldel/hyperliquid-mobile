@@ -12,6 +12,7 @@ import { SmartDecimalPipe } from '@pipes/smart-decimal.pipe';
 import { MiniChartComponent } from '@shared/components/mini-chart/mini-chart.component';
 import { HLPerpPositionDetail } from '@syldel/hl-shared-types';
 import { ClosePositionComponent } from '../../../open-orders/market-order/close-position.component';
+import { sideBadgeLabel } from '@utils/order-labels.util';
 import {
   OrderFormComponent,
   type ClosePreset,
@@ -44,6 +45,7 @@ export class PositionItemComponent {
   readonly changed = output<void>();
 
   isLong = () => parseFloat(this.position().szi) > 0;
+  sideLabel = () => sideBadgeLabel(this.position().coin, this.isLong());
 
   pnlColor = computed(() => {
     const pnl = parseFloat(this.position().unrealizedPnl);

@@ -201,9 +201,9 @@
             (ionChange)="tif.set($event.detail.value)"
             interface="popover"
           >
-            <ion-select-option value="Gtc">GTC – Good till cancelled</ion-select-option>
-            <ion-select-option value="Alo">ALO – Post only</ion-select-option>
-            <ion-select-option value="Ioc">IOC – Immediate or cancel</ion-select-option>
+            @for (tif of tifChoices; track tif) {
+              <ion-select-option [value]="tif">{{ tifDescription(tif) }}</ion-select-option>
+            }
           </ion-select>
         </ion-item>
       }

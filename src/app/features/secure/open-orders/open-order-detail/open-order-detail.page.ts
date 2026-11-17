@@ -38,6 +38,7 @@ import {
 } from '@syldel/hl-shared-types';
 import { exchangeRefusal, extractErrorMessage } from '@utils/hl-error.utils';
 import { openOrdersDexOf, orderSideLabel } from '@utils/market-kind.util';
+import { sideBadgeLabel, tifDescription } from '@utils/order-labels.util';
 import { addIcons } from 'ionicons';
 import { closeOutline, createOutline, trashOutline } from 'ionicons/icons';
 import { catchError, map, Observable, of, switchMap } from 'rxjs';
@@ -202,6 +203,14 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
     const order = this.order();
     return order ? this.getOrderLabel(order) : '';
   });
+
+  /** Le côté en capitales, et ce qu'un reduce-only ferme (voir `order-labels.util.ts`). */
+  readonly sideBadge = computed(() => {
+    const order = this.order();
+    return order ? sideBadgeLabel(this.coin(), order.side === 'B', order.reduceOnly) : '';
+  });
+
+  readonly tifDescription = tifDescription;
 
   readonly orderSideColor = computed(() => {
     const order = this.order();

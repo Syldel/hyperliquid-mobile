@@ -44,7 +44,7 @@
             </ion-badge>
             <ion-badge color="medium">{{ trailing ? 'Trailing' : openOrder.orderType }}</ion-badge>
             @if (openOrder.tif) {
-            <ion-badge color="medium">{{ openOrder.tif }}</ion-badge>
+            <ion-badge color="medium">{{ tifLabel(openOrder.tif) }}</ion-badge>
             } @if (isStuckTriggered(openOrder)) {
             <ion-badge color="danger">Triggered</ion-badge>
             }
@@ -69,7 +69,7 @@
 
         <div slot="end" class="order-badges">
           @if (openOrder.reduceOnly) {
-          <ion-badge color="warning">Reduce</ion-badge>
+          <ion-badge color="warning">Reduce only</ion-badge>
           } @if (openOrder.isTrigger && !trailing) {
           <ion-badge color="tertiary">Trigger {{ openOrder.triggerPx }}</ion-badge>
           } @if (openOrder.isPositionTpsl) {

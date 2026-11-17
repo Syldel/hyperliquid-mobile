@@ -14,7 +14,8 @@ import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
-import { HLOrderStatusData } from '@syldel/hl-shared-types';
+import { HLOrderStatusData, HLOrderStatusDetails } from '@syldel/hl-shared-types';
+import { sideBadgeLabel, tifLabel } from '@utils/order-labels.util';
 import { Observable } from 'rxjs';
 
 @Component({
@@ -40,6 +41,11 @@ export class HistoryPage extends MenuBasePage {
   private readonly lifecycle = inject(AppLifecycleService);
 
   historicalOrders = signal<HLOrderStatusData[]>([]);
+
+  /** Le côté, avec la règle du reste de l'app : l'historique écrivait « Buy » même sur un perp. */
+  readonly sideLabel = (order: HLOrderStatusDetails) =>
+    sideBadgeLabel(order.coin, order.side === 'B', order.reduceOnly);
+  readonly tifLabel = tifLabel;
   coinFilter = signal<string>('');
   coinsResolved = signal(false);
 

@@ -35,7 +35,7 @@
   <ion-item lines="full">
     <ion-label>Side</ion-label>
     <div slot="end">
-      <ion-badge [color]="orderSideColor()" class="side-badge">{{ orderSideLabel() }}</ion-badge>
+      <ion-badge [color]="orderSideColor()" class="side-badge">{{ sideBadge() }}</ion-badge>
     </div>
   </ion-item>
 
@@ -56,7 +56,7 @@
   @if (o.tif) {
   <ion-item lines="full">
     <ion-label>TIF</ion-label>
-    <ion-note slot="end">{{ o.tif }}</ion-note>
+    <ion-note slot="end">{{ tifDescription(o.tif) }}</ion-note>
   </ion-item>
   } @if (trailingEnded(); as ended) {
   <!-- Plus ouvert : ce qu'en garde l'exchange n'est pas un état courant (voir trailingEnded). -->
@@ -169,7 +169,7 @@
     <ion-label></ion-label>
     <div slot="end" class="detail-badges">
       @if (o.reduceOnly) {
-      <ion-badge color="warning">Reduce Only</ion-badge>
+      <ion-badge color="warning">Reduce only</ion-badge>
       } @if (o.isPositionTpsl) {
       <ion-badge color="primary">TP/SL</ion-badge>
       }

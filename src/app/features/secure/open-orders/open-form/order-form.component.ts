@@ -111,6 +111,7 @@ import {
 import type { MarketFillOutcome } from '../market-order/market-fill.util';
 import { MarketOrderService } from '../market-order/market-order.service';
 import { editRefusal } from '../editable-order.util';
+import { tifDescription } from '@utils/order-labels.util';
 import {
   crossingCloseLimitWarning,
   marginShortfallWarning,
@@ -498,6 +499,9 @@ export class OrderFormComponent implements OnInit {
   sz = signal('');
   reduceOnly = signal(false);
   tif = signal<HLTif>('Alo');
+  /** Les trois TIF, dans l'ordre du sélecteur, et leur sens (`order-labels.util.ts`). */
+  readonly tifChoices: readonly HLTif[] = ['Gtc', 'Alo', 'Ioc'];
+  readonly tifDescription = tifDescription;
   orderKind = signal<OrderKind>('limit');
   triggerPx = signal('');
   isMarket = signal(true);

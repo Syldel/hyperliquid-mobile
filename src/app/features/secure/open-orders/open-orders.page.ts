@@ -33,7 +33,8 @@ import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { DexSelectorComponent } from '@shared/components/dex-selector/dex-selector.component';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import { HLFrontendOpenOrder } from '@syldel/hl-shared-types';
-import { marketKindLabel, openOrdersDexOf, orderSideLabel } from '@utils/market-kind.util';
+import { marketKindLabel, openOrdersDexOf } from '@utils/market-kind.util';
+import { sideBadgeLabel, tifLabel } from '@utils/order-labels.util';
 import { addIcons } from 'ionicons';
 import { addOutline, createOutline } from 'ionicons/icons';
 import { forkJoin, map, Observable } from 'rxjs';
@@ -77,6 +78,7 @@ export class OpenOrdersPage extends MenuBasePage implements OnInit {
    * `stuck-triggered-order.util.ts`).
    */
   readonly isStuckTriggered = isStuckTriggeredOrder;
+  readonly tifLabel = tifLabel;
 
   /** Ce qu'on en dit : entier, ou exécuté en partie (voir `describeStuckTriggered`). */
   readonly stuckTriggeredText = (order: HLFrontendOpenOrder) => describeStuckTriggered(order);
@@ -110,8 +112,8 @@ export class OpenOrdersPage extends MenuBasePage implements OnInit {
     return (coin ? this.openOrders().filter((o) => o.coin === coin) : this.openOrders()).map(
       (o) => ({
         ...o,
-        // Long / Short est le vocabulaire d'un perp ; tout autre marché se dit Buy / Sell.
-        sideLabel: orderSideLabel(o.coin, o.side === 'B'),
+        // LONG / SHORT sur un perp, BUY / SELL ailleurs, CLOSE … pour un reduce-only (`order-labels.util.ts`).
+        sideLabel: sideBadgeLabel(o.coin, o.side === 'B', o.reduceOnly),
       }),
     );
   });

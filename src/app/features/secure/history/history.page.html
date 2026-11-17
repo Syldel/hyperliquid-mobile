@@ -31,10 +31,12 @@
         <div class="order-header">
           <strong>{{ displayCoin(entry.order.coin) }}</strong>
           <ion-badge [color]="entry.order.side === 'B' ? 'success' : 'danger'">
-            {{ entry.order.side === 'B' ? 'Buy' : 'Sell' }}
+            {{ sideLabel(entry.order) }}
           </ion-badge>
           <ion-badge color="medium">{{ entry.order.orderType }}</ion-badge>
-          <ion-badge color="medium">{{ entry.order.tif }}</ion-badge>
+          @if (entry.order.tif) {
+          <ion-badge color="medium">{{ tifLabel(entry.order.tif) }}</ion-badge>
+          }
         </div>
         <p>Limit: {{ entry.order.limitPx }} · Sz: {{ entry.order.sz }}/{{ entry.order.origSz }}</p>
         <p>
@@ -48,7 +50,7 @@
       <div slot="end" class="order-badges">
         <ion-badge [color]="statusColor(entry.status)">{{ entry.status }}</ion-badge>
         @if (entry.order.reduceOnly) {
-        <ion-badge color="warning">Reduce</ion-badge>
+        <ion-badge color="warning">Reduce only</ion-badge>
         } @if (entry.order.isTrigger) {
         <ion-badge color="tertiary">Trigger {{ entry.order.triggerPx }}</ion-badge>
         } @if (entry.order.isPositionTpsl) {

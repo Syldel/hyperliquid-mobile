@@ -28,6 +28,7 @@ import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import { HLUserFill } from '@syldel/hl-shared-types';
+import { fillDirectionLabel } from '@utils/order-labels.util';
 import { interval, Observable } from 'rxjs';
 
 @Component({
@@ -105,6 +106,12 @@ export class UserFillsPage extends MenuBasePage {
   totalPnl = computed(() =>
     this.filteredFills().reduce((sum, f) => sum + parseFloat(f.closedPnl), 0),
   );
+
+  /**
+   * Le sens du remplissage en capitales (`CLOSE SHORT`), lu dans `dir`. La pastille disait `BUY` et
+   * la ligne du dessous répétait `dir` : une seule information, dite une fois.
+   */
+  readonly directionLabel = fillDirectionLabel;
 
   readonly maxDate = signal(this.getCurrentMaxDate());
   readonly startDateStr = signal(this.toLocalISO(this.daysAgo(7)));

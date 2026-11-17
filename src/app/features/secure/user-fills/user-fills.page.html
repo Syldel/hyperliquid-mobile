@@ -111,10 +111,9 @@
               }
             </span>
             <ion-badge [color]="fill.side === 'B' ? 'success' : 'danger'">
-              {{ fill.side === 'B' ? 'BUY' : 'SELL' }}
+              {{ directionLabel(fill) }}
             </ion-badge>
           </div>
-          <p class="fill-dir">{{ fill.dir }}</p>
           <div class="fill-row">
             <span>{{ fill.px }} · {{ fill.sz }}</span>
             @if (!isOpen(fill)) {
