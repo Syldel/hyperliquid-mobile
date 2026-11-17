@@ -1,0 +1,45 @@
+:host {
+  display: inline-flex;
+}
+
+.pie {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--ion-color-medium);
+
+  // La couleur du rond suit le ton ; le libellé et le pourcentage restent en texte atténué, qui
+  // tient 4,5:1 dans les deux thèmes (docs/theming.md).
+  --pie-color: var(--ion-color-medium);
+}
+
+.pie[data-tone='alert'] {
+  --pie-color: var(--ion-color-danger);
+}
+
+.pie[data-tone='partial'] {
+  --pie-color: var(--app-coverage-partial);
+}
+
+.pie[data-tone='covered'] {
+  --pie-color: var(--ion-color-success);
+}
+
+.pie__ring {
+  fill: none;
+  stroke: var(--pie-color);
+  stroke-width: 1.5;
+}
+
+.pie__fill {
+  fill: var(--pie-color);
+}
+
+.pie__slice {
+  fill: none;
+  stroke: var(--pie-color);
+  stroke-width: 5.5;
+}

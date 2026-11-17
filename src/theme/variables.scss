@@ -207,6 +207,11 @@ $dark-text: #feffff;
   --bubble-background: #a8bfb5;
   --bubble-color: #a8bfb5;
 
+  // L'orange d'une couverture partielle (le rond SL d'une position, `coverage-pie`). Un symbole
+  // graphique doit tenir 3:1 sur son fond : le jaune de `warning` en est loin sur le blanc, d'où un
+  // orange à part, plus foncé en clair. Mesures : docs/theming.md.
+  --app-coverage-partial: #c45500;
+
   @include stepped-colors($light-background, $light-text);
 }
 
@@ -360,6 +365,7 @@ $dark-text: #feffff;
 
   --bubble-background: #{$dark-background};
   --bubble-color: #2f4d40;
+  --app-coverage-partial: #ff9f43;
 }
 
 /// Applique un bloc **aux deux chemins** qui mènent au thème sombre.

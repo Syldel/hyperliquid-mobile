@@ -356,6 +356,20 @@ tombe sur le fond de page, **4,68:1** s'il tombe sur une carte en `step-50`. Les
 deux passent, mais le second de justesse — c'est la mesure qui trancherait, et
 elle n'a pas été faite.
 
+### Un orange à part, pour un symbole et non pour du texte
+
+Le rond SL d'une position (`coverage-pie`, 2026-11-17) passe du rouge au vert par
+l'**orange** d'une couverture partielle. Ni `warning` (un jaune, loin de 3:1 sur
+le blanc) ni `warning-shade` (`#856500`, un ambre brun, qui ne se lit plus comme
+l'étape entre rouge et vert) ne convenaient. D'où `--app-coverage-partial` :
+`#c45500` en clair, `#ff9f43` en sombre.
+
+Un symbole graphique doit tenir **3:1** (WCAG 1.4.11), pas 4,5:1. Mesuré dans le
+navigateur sur les cartes : **4,51:1** en clair sur `#feffff`, **8,26:1** en
+sombre sur `#1d1d1d`. Il sert aussi à l'icône ⓘ quand une note change la lecture.
+Les autres tons du rond reprennent `danger`, `success` et `medium`, tous au-dessus
+de 6:1 dans les deux thèmes.
+
 ## Ce qui reste
 
 - **`danger` plein reste à 4,39:1 en sombre** sur une puce — la seule des douze

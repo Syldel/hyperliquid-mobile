@@ -27,3 +27,40 @@ h2 {
   height: 44px;
   flex-shrink: 0;
 }
+
+// Le bloc SL · TP · robot · ⓘ : un élément du `h2` en flex-wrap, qui ne se coupe jamais lui-même.
+.coverage {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.bot-mark {
+  flex-shrink: 0;
+  fill: none;
+  stroke: var(--ion-color-medium);
+  stroke-width: 1.4;
+}
+
+// Un vrai bouton, pour le clavier et le lecteur d'écran ; son clic ne replie pas la carte.
+.info-button {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 16px;
+  color: var(--ion-color-medium);
+  cursor: pointer;
+}
+
+.info-button--alters {
+  color: var(--app-coverage-partial);
+}
+
+.info-notes {
+  margin: 0;
+  padding: 8px 12px 8px 24px;
+  font-size: 13px;
+}

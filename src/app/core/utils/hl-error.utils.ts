@@ -18,6 +18,8 @@ export function extractErrorMessage(err: HttpErrorResponse | Error): string {
   }
   const body = err.error;
   if (typeof body === 'string' && body) return body;
+  const reasons = validationReasons(body);
+  if (reasons) return reasons;
   if (typeof body?.message === 'string' && body.message) return body.message;
   if (typeof body?.error === 'string' && body.error) return body.error;
   if (err.status === 401) return 'Unauthorized – please log in again.';
@@ -25,6 +27,24 @@ export function extractErrorMessage(err: HttpErrorResponse | Error): string {
   if (err.status === 404) return 'Resource not found.';
   if (err.status >= 500) return `Server error (${err.status}).`;
   return `Error ${err.status}`;
+}
+
+/**
+ * La raison d'un 400 du gateway. Son filtre global (`ValidationExceptionFilter`) réécrit **tout** 400
+ * en `{ message: 'Validation failed', errors }` : `errors` est la liste des champs refusés par le
+ * ValidationPipe, ou le texte d'un refus du service (« a sell activates above the mark… », mesuré le
+ * 2026-11-17). Lire `message` d'abord affichait « Validation failed » pour chacun, sans la raison.
+ * ⚠️ Le code du refus (`TRAILING_STOP_ACTIVATION_WRONG_SIDE`…) est perdu par ce filtre, côté gateway.
+ */
+function validationReasons(body: unknown): string | null {
+  if (typeof body !== 'object' || body === null || !('errors' in body)) return null;
+  const errors = (body as { errors: unknown }).errors;
+  if (typeof errors === 'string') return errors || null;
+  if (Array.isArray(errors)) {
+    const texts = errors.filter((e): e is string => typeof e === 'string' && e !== '');
+    return texts.length > 0 ? texts.join('; ') : null;
+  }
+  return null;
 }
 
 /**

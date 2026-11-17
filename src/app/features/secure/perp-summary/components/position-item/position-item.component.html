@@ -5,6 +5,56 @@
       <ion-badge [color]="isLong() ? 'success' : 'danger'">
         {{ sideLabel() }}
       </ion-badge>
+      <!-- Ce qui fermerait la position : stop-loss et take-profit, en deux ronds (coverage-pie), avec
+           le robot et ⓘ. Un seul bloc insécable : sous un nom long, il passe à la ligne entier, au lieu
+           de laisser SL sur la première ligne et TP sur la seconde (vu le 2026-11-17, xyz:BRENTOIL). -->
+      <span class="coverage">
+        <app-coverage-pie kind="SL" [coverage]="sl()" />
+        <app-coverage-pie kind="TP" [coverage]="tp()" />
+        @if (botManaged()) {
+          <!-- Ionicons n'a pas de robot : dessiné ici, au trait, comme ses icônes « outline ». -->
+          <svg
+            class="bot-mark"
+            width="15"
+            height="15"
+            viewBox="0 0 16 16"
+            role="img"
+            aria-label="Managed by the bot: it moves this pair's stop-loss and take-profit"
+          >
+            <title>Managed by the bot</title>
+            <line x1="8" y1="1.5" x2="8" y2="4" />
+            <circle cx="8" cy="1.5" r="0.9" />
+            <rect x="2.5" y="4" width="11" height="9" rx="2.5" />
+            <circle cx="6" cy="8.5" r="1.1" />
+            <circle cx="10" cy="8.5" r="1.1" />
+          </svg>
+        }
+        @if (notes().length > 0) {
+          <button
+            type="button"
+            class="info-button"
+            [class.info-button--alters]="notesAlter()"
+            aria-label="Why"
+            (click)="openInfo($event)"
+          >
+            <ion-icon name="information-circle-outline" aria-hidden="true" />
+          </button>
+          <ion-popover
+            [isOpen]="infoOpen()"
+            [event]="infoEvent()"
+            (didDismiss)="infoOpen.set(false)"
+            (click)="$event.stopPropagation()"
+          >
+            <ng-template>
+              <ul class="info-notes">
+                @for (note of notes(); track note.text) {
+                  <li>{{ note.text }}</li>
+                }
+              </ul>
+            </ng-template>
+          </ion-popover>
+        }
+      </span>
     </h2>
 
     <p>
@@ -17,6 +67,9 @@
     </p>
 
     @if (expanded()) {
+      @if (levels(); as levels) {
+        <p>{{ levels }}</p>
+      }
       <p>
         Entry: {{ position().entryPx | smartDecimal }} · Size: {{ position().szi | smartDecimal }} ·
         Value:

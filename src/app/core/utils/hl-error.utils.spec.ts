@@ -20,6 +20,35 @@ describe('extractErrorMessage', () => {
       expect(extractErrorMessage(http(0))).toContain('Network error');
     });
 
+    // Le corps exact d'un 400 du gateway, relevé le 2026-11-17 : la raison est dans `errors`.
+    it('reads the reason of a gateway 400, not its "Validation failed" heading', () => {
+      const refused = {
+        statusCode: 400,
+        message: 'Validation failed',
+        errors: 'retracement.pct must be greater than zero',
+      };
+      expect(extractErrorMessage(http(400, refused))).toBe(
+        'retracement.pct must be greater than zero',
+      );
+    });
+
+    it('joins the fields the validation pipe refused', () => {
+      const refused = {
+        statusCode: 400,
+        message: 'Validation failed',
+        errors: ['sz must be a string', 'reduceOnly must be a boolean value'],
+      };
+      expect(extractErrorMessage(http(400, refused))).toBe(
+        'sz must be a string; reduceOnly must be a boolean value',
+      );
+    });
+
+    it('falls back on the message when errors says nothing', () => {
+      expect(extractErrorMessage(http(400, { message: 'Validation failed', errors: [] }))).toBe(
+        'Validation failed',
+      );
+    });
+
     it('prefers what the server said: a text body, then message, then error', () => {
       expect(extractErrorMessage(http(400, 'bad asset'))).toBe('bad asset');
       expect(extractErrorMessage(http(400, { message: 'asset is required' }))).toBe(

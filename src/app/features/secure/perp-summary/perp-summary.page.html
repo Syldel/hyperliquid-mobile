@@ -2,7 +2,7 @@
   title="Perp Summary"
   [fetchFn]="fetchFn()"
   emptyMessage="No Perp Summary found"
-  (dataLoaded)="clearinghouseStates.set($event)"
+  (dataLoaded)="data.set($event)"
 >
   <app-dex-selector filters (selectionChanged)="onSelectionChanged($event)" />
 
@@ -17,9 +17,11 @@
 
   @if (activeSegment() === 'positions') {
   <ion-list>
-    @for (position of positions(); track position.coin) {
+    @for (row of positions(); track row.position.coin) {
     <app-position-item
-      [position]="position"
+      [position]="row.position"
+      [protection]="row.protection"
+      [botManaged]="row.botManaged"
       (clicked)="openWatchlist($event)"
       (changed)="reload()"
     />

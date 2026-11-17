@@ -379,6 +379,42 @@ l'app**, **en plus** du stop intelligent du bot, jamais à sa place (décidé le
      précision d'une action signée (`3.5 %`), et le détail montre le texte brut sous « Exchange text ».
 3. **La pose** depuis une position : reduce-only, à la taille de la position par défaut, l'unité de chaque champ écrite
    (`%` ou prix). Une saisie prise pour un pourcentage a été refusée par l'exchange pendant la mesure.
+   **Écrit le 2026-11-17, sans formulaire encore** : la validation de la saisie (`open-orders/trailing-stop-entry.util.ts`),
+   qui reprend les refus du gateway et refuse l'activation du mauvais côté ; et la lecture d'un 400 du gateway par
+   `errors` (`extractErrorMessage`), qui affichait « Validation failed » sur **toutes** les routes.
+   **Avant le formulaire, décidé le même jour : la carte d'une position dit ce qui la fermerait** — ce qui manquait le
+   plus. Deux ronds de 14 px à côté de LONG / SHORT (`perp-summary/components/coverage-pie`), lus dans
+   `frontendOpenOrders` de son dex (`perp-summary/position-protection.util.ts`, la règle de couverture du bot recopiée,
+   deux écarts écrits en tête du fichier) :
+   - **SL** : vide rouge, part orange avec son pourcentage, plein vert ;
+   - **TP** : vide gris (l'absence est un choix, pas une alerte), part ou plein vert ;
+   - gris en pointillé quand les ordres n'ont pas pu être lus ;
+   - un **robot** sur les paires que le bot gère (profil utilisateur, sa règle `enabled` stricte) : ses ordres n'ont pas
+     de `cloid`, mais sur ses paires il tient tous les SL/TP. ⚠️ C'est la configuration, pas la preuve qu'il tourne ;
+   - **ⓘ** seulement s'il y a quelque chose à dire, en quelques mots dans une bulle (« SL triggered, still resting »,
+     « Trailing waits > 2355 ») ; orange quand la note change la lecture ;
+   - dans le bloc déplié, une ligne `SL 1788.6 +1 · TP 2100` : les niveaux les plus proches du prix.
+
+   Le bot ne publie pas son propre verdict : aucune route ne l'expose. Une première version écrivait `PROTECTED` /
+   `UNPROTECTED` en toutes lettres, et les explications en phrases : deux lignes de plus par carte, remplacées le même
+   soir à la demande de l'utilisateur. **Vu dans le navigateur le 2026-11-17**, en clair et en sombre, à 360 px,
+   contrastes calculés (symboles ≥ 4,51:1 en clair, ≥ 6,00:1 en sombre ; seuil 3:1) ; le pire cas (`xyz:BRENTOIL`,
+   deux parts, robot, ⓘ) passe sur deux lignes sans déborder — le bloc SL · TP · robot · ⓘ **entier** (`.coverage`,
+   insécable), mesuré à x = 16 sur la seconde ligne, au lieu de laisser SL en haut et TP en bas comme d'abord. ⚠️ Le compte n'avait **plus aucune position** ce
+   soir-là : la lecture réelle (0 position, 0 ordre, aucune paire au bot) a été vérifiée, mais les ronds ont été vus sur
+   des positions **injectées** dans la page, aux formes d'ordres mesurées. **Puis vu sur une vraie position**, le même
+   soir à 22:28 : un short `xyz:NVDA` de 0,138, couvert par un trailing posé depuis l'interface officielle (achat
+   reduce-only, `Activation immediate, retracement 4%, best 160.13`, `triggerPx` 166.535 = 160,13 × 1,04). La carte
+   montre SL plein vert, TP vide gris, et `TS 166.535` dépliée, en clair et en sombre, à 360 px. Reste à voir une vraie
+   position couverte par le stop du bot. ⚠️ La page ne lit que les dex **cochés** dans son sélecteur : la position
+   n'apparaissait pas tant que `xyz` n'y était pas — ce n'est pas une absence de position, c'est un filtre, et la
+   page ne le dit pas. ⚠️ Le sens du seuil d'un **take-profit** (`Price above` pour fermer un long) est
+   déduit par symétrie de celui du stop, mesuré : un désaccord ne compte pas et s'écrit dans la bulle.
+
+   **Sur une paire du bot, le bouton « Trail »** : la cohabitation est mesurée (2026-11-16,
+   `nest-trading-bot/docs/known-gaps.md`), mais un trailing plus serré que le stop du bot devance la sortie que le
+   backtest a éprouvée. Le formulaire devra le dire.
+
 4. **Le remplacement**, qui n'est pas une modification : poser le nouveau, puis annuler l'ancien. L'écran dit que le
    suivi repart du prix marqué du moment.
 
@@ -388,6 +424,10 @@ depuis le même jour (400), l'app devra le dire dès la saisie. Et un 400 du gat
 `errors`) : l'écran doit lire `errors`. Détail : `nest-hyperliquid-gateway/docs/trailing-stop.md`.
 
 ⚠️ **Pas mesuré** : l'activation et le déclenchement d'un trailing, un achat, un dex HIP-3.
+**Vu le 2026-11-17 au soir** : un trailing natif **existe sur un dex HIP-3**. Un achat reduce-only sur `xyz:NVDA`, posé
+depuis l'interface officielle, se lit dans `frontendOpenOrders` du dex `xyz` sous la même forme qu'au dex principal
+(`limitPx` 183.18 ≈ stop × 1,1). Le gateway et `planTrailingEntry` refusent encore les dex HIP-3 : la **pose** n'y est
+pas mesurée.
 
 ---
 
