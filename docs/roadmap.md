@@ -350,6 +350,10 @@ l'app**, **en plus** du stop intelligent du bot, jamais à sa place (décidé le
 
 1. **Le gateway** : l'action `trailingStop` (dont la doc n'a ni réponse d'erreur ni `cloid`), une route validée, et la
    signature éprouvée en réel. Son type rejoint `hl-shared-types` avec la liste des `orderType` connus.
+   **Écrit le 2026-11-17, pas encore éprouvé en réel** : `POST /orders/trailing-stop` refuse une valeur hors grille au
+   lieu de la tronquer et ne relance jamais (voir `nest-hyperliquid-gateway/docs/trailing-stop.md`) ; `hl-shared-types`
+   porte l'action, `HL_ORDER_TYPE` et `parseTrailingStopCondition`, que l'affichage (2) lira. La mesure de la signature
+   attend la publication du paquet et la sonde `trailing-stop-api.ts` du bot, lancée par l'utilisateur.
 2. **L'affichage** : l'état lu dans `triggerCondition` (en attente à X, ou suit depuis W et déclenche à T), une ligne
    propre sur le chart. Le déclencheur est hors de la grille des prix, et vaut `"0.0"` en attente.
 3. **La pose** depuis une position : reduce-only, à la taille de la position par défaut, l'unité de chaque champ écrite
