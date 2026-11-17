@@ -364,9 +364,11 @@ l'app**, **en plus** du stop intelligent du bot, jamais à sa place (décidé le
    une activation hors de l'échelle se dessinait hors du canvas (elle se colle désormais au bord, avec une flèche :
    `pinToPane`), et une étiquette posée au bord droit perdait sa fin.
    ⚠️ Deux points ouverts, mesurés le même jour (`nest-trading-bot/docs/hyperliquid/live-check.md`, S5) :
-   - **la liste et le détail ne montrent pas le même stop** : la liste lit `frontendOpenOrders`, le détail `orderStatus`,
-     et l'exchange y rend deux états différents au même instant (stop 1 847,93 contre 1 854,0). Lequel déclenche n'est
-     pas établi ; l'écran ne le dit pas encore ;
+   - **le détail montre un stop périmé** : la liste lit `frontendOpenOrders`, le détail `orderStatus`, et **tranché le
+     même jour par un déclenchement réel** (`live-check.md`, S6) : `orderStatus` rend l'état de la pose, figé, et son
+     stop n'est pas appliqué (rempli 0,255 % sous lui). Le détail doit lire l'état courant dans `frontendOpenOrders`.
+     ⚠️ Pas encore corrigé. Un trailing déclenché écrit `"Triggered"`, que le lecteur strict ne connaît pas : le détail
+     d'un ordre rempli le montre comme illisible ;
    - l'exchange écrit `3.5000000000000004%` : **réglé le même jour**, le repli s'affiche arrondi à quatre décimales, la
      précision d'une action signée (`3.5 %`), et le détail montre le texte brut sous « Exchange text ».
 3. **La pose** depuis une position : reduce-only, à la taille de la position par défaut, l'unité de chaque champ écrite
