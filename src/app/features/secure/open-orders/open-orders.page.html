@@ -32,7 +32,8 @@
   </div>
 
   <ion-list>
-    @for (openOrder of filteredOrders(); track openOrder.oid) {
+    @for (openOrder of filteredOrders(); track openOrder.oid) { @let trailing =
+    trailingView(openOrder);
     <ion-item-sliding>
       <ion-item (click)="openWatchlist($event, openOrder.coin)">
         <ion-label>
@@ -41,13 +42,25 @@
             <ion-badge [color]="openOrder.side === 'B' ? 'success' : 'danger'">
               {{ openOrder.sideLabel }}
             </ion-badge>
-            <ion-badge color="medium">{{ openOrder.orderType }}</ion-badge>
+            <ion-badge color="medium">{{ trailing ? 'Trailing' : openOrder.orderType }}</ion-badge>
+            @if (openOrder.tif) {
             <ion-badge color="medium">{{ openOrder.tif }}</ion-badge>
-            @if (isStuckTriggered(openOrder)) {
+            } @if (isStuckTriggered(openOrder)) {
             <ion-badge color="danger">Triggered</ion-badge>
             }
           </div>
+          @if (trailing) {
+          <p
+            class="trailing-state"
+            [class.trailing-state--unreadable]="trailing.state === 'unreadable'"
+            [attr.role]="trailing.state === 'unreadable' ? 'alert' : null"
+          >
+            {{ trailingSummary(trailing) }}
+          </p>
+          <p>Sz: {{ openOrder.sz }}/{{ openOrder.origSz }}</p>
+          } @else {
           <p>Limit: {{ openOrder.limitPx }} · Sz: {{ openOrder.sz }}/{{ openOrder.origSz }}</p>
+          }
           <p>{{ openOrder.timestamp | date:'dd/MM/yy HH:mm' }}</p>
           @if (isStuckTriggered(openOrder)) {
           <p class="stuck-triggered" role="alert">{{ stuckTriggeredText(openOrder) }}</p>
@@ -57,7 +70,7 @@
         <div slot="end" class="order-badges">
           @if (openOrder.reduceOnly) {
           <ion-badge color="warning">Reduce</ion-badge>
-          } @if (openOrder.isTrigger) {
+          } @if (openOrder.isTrigger && !trailing) {
           <ion-badge color="tertiary">Trigger {{ openOrder.triggerPx }}</ion-badge>
           } @if (openOrder.isPositionTpsl) {
           <ion-badge color="primary">TP/SL</ion-badge>

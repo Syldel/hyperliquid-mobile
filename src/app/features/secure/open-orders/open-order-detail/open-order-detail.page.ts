@@ -43,6 +43,7 @@ import { editRefusal } from '../editable-order.util';
 import { afterModify, ModifyOutcome } from '../modify-outcome.util';
 import { OrderFormComponent } from '../open-form/order-form.component';
 import { describeStuckTriggered, isStuckTriggeredOrder } from '../stuck-triggered-order.util';
+import { activationLabel, trailingStopView } from '../trailing-stop-view.util';
 import { AgentExpiryNoticeComponent } from '@shared/components/agent-expiry-notice/agent-expiry-notice.component';
 
 @Component({
@@ -110,9 +111,15 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
     }
   });
 
+  /**
+   * La taille en dollars, au `limitPx`. Pas pour un trailing stop natif : son `limitPx` est la borne
+   * de glissement de l'exchange (≈ déclencheur × 1,1 à l'achat, × 0,9 à la vente, mesuré le
+   * 2026-11-17), pas un prix choisi, et ni le déclencheur futur ni l'activation n'en sont un. Le
+   * détail affichait « ≈ 10.90 $ » pour un achat en attente à 1250, soit 0,0065 × 1677,5.
+   */
   sizeUsd = computed(() => {
     const o = this.order();
-    if (!o) return null;
+    if (!o || this.trailing()) return null;
     const sz = parseFloat(o.sz);
     const px = parseFloat(o.limitPx);
     if (!sz || !px) return null;
@@ -121,7 +128,7 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
 
   origSizeUsd = computed(() => {
     const o = this.order();
-    if (!o) return null;
+    if (!o || this.trailing()) return null;
     const sz = parseFloat(o.origSz);
     const px = parseFloat(o.limitPx);
     if (!sz || !px) return null;
@@ -136,6 +143,17 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
   readonly editRefusal = computed(() => {
     const order = this.order();
     return order ? editRefusal(order) : null;
+  });
+
+  /**
+   * L'état d'un trailing stop natif, ou `null` (voir `trailing-stop-view.util.ts`). Il remplace les
+   * lignes « Limit price » et « Trigger » : la première n'est pas un prix choisi, la seconde vaut
+   * `"0.0"` tant qu'il attend.
+   */
+  readonly activationLabel = activationLabel;
+  readonly trailing = computed(() => {
+    const order = this.order();
+    return order ? trailingStopView(order) : null;
   });
 
   protected readonly orderSideLabel = computed(() => {

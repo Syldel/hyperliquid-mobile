@@ -36,6 +36,7 @@ import {
   CANDLE_INTERVALS,
   CandleInterval,
   CandleSnapshot,
+  HLFrontendOpenOrder,
   HLOrderStatusData,
   HLUserFill,
 } from '@syldel/hl-shared-types';
@@ -144,6 +145,13 @@ import {
 } from '../../utils/backtest-display.util';
 import { mapIndicatorSeriesById } from '../../utils/indicator-series-map.util';
 import type { StrategySignalLayer } from '../../utils/strategy-markers.util';
+import {
+  isTrailingStop,
+  pinToPane,
+  trailingChartMark,
+  trailingStopView,
+  type TrailingChartMark,
+} from '../../../open-orders/trailing-stop-view.util';
 
 /** Ce que chaque lecture du compte dessine, pour dire laquelle manque. */
 const ACCOUNT_SOURCE_LABELS: Record<HLCacheSource, string> = {
@@ -464,6 +472,8 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   private readonly COLOR_BUY = '#2dd36f';
   private readonly COLOR_SELL = '#eb445a';
   private readonly COLOR_TPSL = '#f4a261';
+  /** Un trailing stop en attente d'activation : ni stop ni entrée encore. Texte noir dessus : 7,0:1. */
+  private readonly COLOR_WAITING = '#92949c';
 
   constructor() {
     addIcons({
@@ -1238,6 +1248,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     if (!snap) return;
 
     this.drawOrderLines(ctx, snap.historicalOrders);
+    this.drawTrailingStops(ctx, snap.openOrders);
     this.drawFills(ctx, snap.fills);
   }
 
@@ -1303,6 +1314,9 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     }
 
     for (const chain of groups.values()) {
+      // Un trailing stop natif ne se dessine pas depuis l'historique : son niveau a bougé depuis la
+      // pose, et l'historique n'en garde qu'un état. Voir `drawTrailingStops`.
+      if (isTrailingStop(chain[0].order)) continue;
       chain.sort((a, b) => {
         if (a.statusTimestamp !== b.statusTimestamp) {
           return a.statusTimestamp - b.statusTimestamp;
@@ -1408,6 +1422,84 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
         ctx.fillText(priceLabel, xEnd + padX, y + fSize / 2 - 2);
       }
     }
+  }
+
+  /**
+   * Les trailing stops natifs ouverts, à leur niveau **actuel** seulement (voir
+   * `trailingChartMark`) : un court segment au bord droit et son étiquette, sans trait vers le
+   * passé. Un état illisible n'a pas de prix sûr : il est dit en haut du chart au lieu d'être tu.
+   */
+  private drawTrailingStops(ctx: CanvasRenderingContext2D, orders: HLFrontendOpenOrder[]): void {
+    const visibleRange = this.chart!.timeScale().getVisibleRange();
+    if (!visibleRange) return;
+    const xEnd = this.chart!.timeScale().timeToCoordinate(visibleRange.to);
+    if (xEnd === null) return;
+
+    let unreadable = 0;
+    for (const order of orders) {
+      const view = trailingStopView(order);
+      if (!view) continue;
+      const mark = trailingChartMark(view, order);
+      if (!mark) {
+        unreadable++;
+        continue;
+      }
+      this.drawTrailingMark(ctx, mark, xEnd);
+    }
+
+    if (unreadable > 0) {
+      ctx.font = '11px monospace';
+      ctx.fillStyle = this.COLOR_SELL;
+      ctx.fillText(`${unreadable} trailing stop(s) unreadable: see open orders`, 8, 16);
+    }
+  }
+
+  private drawTrailingMark(
+    ctx: CanvasRenderingContext2D,
+    mark: TrailingChartMark,
+    xEnd: number,
+  ): void {
+    const rawY = this.candleSeries!.priceToCoordinate(parseFloat(mark.price));
+    if (rawY === null) return;
+
+    const fSize = 10;
+    const padX = 6;
+    const padY = 4;
+    // Hors de l'échelle, collé au bord franchi avec une flèche, sans segment : voir `pinToPane`.
+    const { y, pinned } = pinToPane(rawY, this.chart!.paneSize(0).height, fSize / 2 + padY);
+    const label = pinned === null ? mark.label : `${mark.label} ${pinned === 'above' ? '↑' : '↓'}`;
+
+    const color =
+      mark.tone === 'waiting'
+        ? this.COLOR_WAITING
+        : mark.tone === 'buy'
+          ? this.COLOR_BUY
+          : this.COLOR_SELL;
+    const segment = 48;
+
+    if (pinned === null) {
+      ctx.beginPath();
+      ctx.setLineDash(mark.tone === 'waiting' ? [2, 3] : [5, 4]);
+      ctx.moveTo(xEnd - segment, y);
+      ctx.lineTo(xEnd, y);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    ctx.font = `${fSize}px monospace`;
+    const tw = ctx.measureText(label).width;
+    const boxWidth = tw + padX * 2;
+    // Rentrée dans le canvas : posée à `xEnd`, l'étiquette débordait à droite et perdait sa flèche
+    // (mesuré le 2026-11-17, « TS ≤ 1250 » sans son « ↓ »).
+    const xBox = Math.min(xEnd, ctx.canvas.width - boxWidth);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect(xBox, y - fSize / 2 - padY, boxWidth, fSize + padY * 2, 3);
+    ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.fillText(label, xBox + padX, y + fSize / 2 - 2);
   }
 
   // ── UI handlers ────────────────────────────────────────────────────────────

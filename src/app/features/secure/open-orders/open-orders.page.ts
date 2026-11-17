@@ -39,6 +39,7 @@ import { addOutline, createOutline } from 'ionicons/icons';
 import { forkJoin, map, Observable } from 'rxjs';
 import { OrderFormComponent } from './open-form/order-form.component';
 import { describeStuckTriggered, isStuckTriggeredOrder } from './stuck-triggered-order.util';
+import { trailingStopSummary, trailingStopView } from './trailing-stop-view.util';
 
 @Component({
   selector: 'app-open-orders',
@@ -79,6 +80,13 @@ export class OpenOrdersPage extends MenuBasePage implements OnInit {
 
   /** Ce qu'on en dit : entier, ou exécuté en partie (voir `describeStuckTriggered`). */
   readonly stuckTriggeredText = (order: HLFrontendOpenOrder) => describeStuckTriggered(order);
+
+  /**
+   * L'état d'un trailing stop natif (voir `trailing-stop-view.util.ts`) : son `limitPx` n'est pas un
+   * prix choisi, et son `triggerPx` vaut `"0.0"` tant qu'il attend. La ligne dit l'état à la place.
+   */
+  readonly trailingView = trailingStopView;
+  readonly trailingSummary = trailingStopSummary;
 
   openOrders = signal<HLFrontendOpenOrder[]>([]);
   selectedDexNames = signal<string[] | null>(null);

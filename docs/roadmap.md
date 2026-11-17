@@ -356,6 +356,19 @@ l'app**, **en plus** du stop intelligent du bot, jamais à sa place (décidé le
    attend la publication du paquet et la sonde `trailing-stop-api.ts` du bot, lancée par l'utilisateur.
 2. **L'affichage** : l'état lu dans `triggerCondition` (en attente à X, ou suit depuis W et déclenche à T), une ligne
    propre sur le chart. Le déclencheur est hors de la grille des prix, et vaut `"0.0"` en attente.
+   **Écrit le 2026-11-17** : `open-orders/trailing-stop-view.util.ts`, lu par la liste, le détail et le chart (voir
+   [watchlist/chart-overlays.md](watchlist/chart-overlays.md#le-trailing-stop-natif--son-niveau-actuel-jamais-son-passé)).
+   `limitPx` ne s'affiche plus pour ce type, ni « Trigger 0.0 », ni la taille en dollars qui en découlait.
+   **Vu dans le navigateur le 2026-11-17**, sur un achat reduce-only en suivi et un achat en attente sous 1 250, en clair,
+   en sombre et à 360 px, le chart par capture. La vérification a trouvé et corrigé deux défaillances muettes du chart :
+   une activation hors de l'échelle se dessinait hors du canvas (elle se colle désormais au bord, avec une flèche :
+   `pinToPane`), et une étiquette posée au bord droit perdait sa fin.
+   ⚠️ Deux points ouverts, mesurés le même jour (`nest-trading-bot/docs/hyperliquid/live-check.md`, S5) :
+   - **la liste et le détail ne montrent pas le même stop** : la liste lit `frontendOpenOrders`, le détail `orderStatus`,
+     et l'exchange y rend deux états différents au même instant (stop 1 847,93 contre 1 854,0). Lequel déclenche n'est
+     pas établi ; l'écran ne le dit pas encore ;
+   - l'exchange écrit `3.5000000000000004%` : **réglé le même jour**, le repli s'affiche arrondi à quatre décimales, la
+     précision d'une action signée (`3.5 %`), et le détail montre le texte brut sous « Exchange text ».
 3. **La pose** depuis une position : reduce-only, à la taille de la position par défaut, l'unité de chaque champ écrite
    (`%` ou prix). Une saisie prise pour un pourcentage a été refusée par l'exchange pendant la mesure.
 4. **Le remplacement**, qui n'est pas une modification : poser le nouveau, puis annuler l'ancien. L'écran dit que le

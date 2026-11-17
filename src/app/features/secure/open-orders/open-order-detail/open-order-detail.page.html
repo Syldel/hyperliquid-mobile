@@ -58,12 +58,60 @@
     <ion-label>TIF</ion-label>
     <ion-note slot="end">{{ o.tif }}</ion-note>
   </ion-item>
-  }
-
+  } @if (trailing(); as t) { @switch (t.state) { @case ('tracking') {
+  <ion-item lines="full">
+    <ion-label>State</ion-label>
+    <ion-note slot="end">Tracking</ion-note>
+  </ion-item>
+  <ion-item lines="full">
+    <ion-label>Stop price</ion-label>
+    <ion-note slot="end">{{ t.stopPx }}</ion-note>
+  </ion-item>
+  <ion-item lines="full">
+    <ion-label>Best price</ion-label>
+    <ion-note slot="end">{{ t.best }}</ion-note>
+  </ion-item>
+  <ion-item lines="full">
+    <ion-label>Retracement</ion-label>
+    <ion-note slot="end">{{ t.retracement }}</ion-note>
+  </ion-item>
+  <ion-item lines="full">
+    <ion-label>Activation</ion-label>
+    <ion-note slot="end">
+      @if (t.activation; as a) { {{ activationLabel(a) }} } @else { Immediate }
+    </ion-note>
+  </ion-item>
+  } @case ('waiting') {
+  <ion-item lines="full">
+    <ion-label>State</ion-label>
+    <ion-note slot="end">Waiting for activation</ion-note>
+  </ion-item>
+  <ion-item lines="full">
+    <ion-label>Activation</ion-label>
+    <ion-note slot="end">{{ activationLabel(t.activation) }}</ion-note>
+  </ion-item>
+  <ion-item lines="full">
+    <ion-label>Retracement</ion-label>
+    <ion-note slot="end">{{ t.retracement }}</ion-note>
+  </ion-item>
+  } @case ('unreadable') {
+  <ion-item lines="full" class="trailing-unreadable">
+    <ion-label class="ion-text-wrap" role="alert">{{ t.reason }}: "{{ t.raw }}"</ion-label>
+  </ion-item>
+  } } @if (t.state !== 'unreadable') {
+  <!-- Le texte tel que l'exchange l'écrit : les lignes au-dessus en sont lues, et arrondies. -->
+  <ion-item lines="full">
+    <ion-label class="ion-text-wrap">
+      Exchange text
+      <p>{{ o.triggerCondition }}</p>
+    </ion-label>
+  </ion-item>
+  } } @else {
   <ion-item lines="full">
     <ion-label>Limit price</ion-label>
     <ion-note slot="end">{{ o.limitPx }}</ion-note>
   </ion-item>
+  }
 
   <ion-item lines="full">
     <ion-label>Size</ion-label>
@@ -81,7 +129,7 @@
   <ion-item lines="full" class="stuck-triggered">
     <ion-label class="ion-text-wrap" role="alert">{{ stuckTriggeredText(o) }}</ion-label>
   </ion-item>
-  } @if (o.isTrigger) {
+  } @if (o.isTrigger && !trailing()) {
   <ion-item lines="full">
     <ion-label>Trigger</ion-label>
     <ion-note slot="end">{{ o.triggerCondition }} @ {{ o.triggerPx }}</ion-note>

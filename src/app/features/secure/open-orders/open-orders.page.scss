@@ -52,3 +52,14 @@
   font-weight: 600;
   white-space: normal;
 }
+
+/* L'état d'un trailing stop : plusieurs lignes si besoin, la colonne est étroite à 360 px. Illisible,
+   il prend le rouge du thème comme un stop resté au carnet. */
+.trailing-state {
+  white-space: normal;
+
+  &--unreadable {
+    color: var(--ion-color-danger) !important;
+    font-weight: 600;
+  }
+}

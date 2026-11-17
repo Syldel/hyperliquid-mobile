@@ -622,3 +622,26 @@ La conséquence pratique est qu'il faut **le redessiner soi-même** à chaque ch
 plage visible (`subscribeVisibleLogicalRangeChange`), contrairement à une série que la
 librairie repositionne seule. `scheduleOverlayDraw()` passe par `requestAnimationFrame`
 pour ne pas redessiner plusieurs fois dans la même frame.
+
+## Le trailing stop natif : son niveau actuel, jamais son passé
+
+Un trailing stop natif d'Hyperliquid (`orderType` `"Trailing Stop Market"`) déplace son stop à chaque
+nouveau meilleur prix, sur le même oid. Le chart le dessinait comme un stop ordinaire, depuis
+`historicalOrders` : **au niveau actuel, prolongé jusqu'à l'heure de pose**, ce qui racontait un stop
+resté là depuis le début. Et en attente d'activation, son `triggerPx` vaut `"0.0"` : `if (!price)` le
+sautait, sans rien dire.
+
+Depuis le 2026-11-17 (`drawTrailingStops`) :
+
+- l'historique ne dessine **aucun** trailing stop, ouvert ou terminé : il n'en garde qu'un état ;
+- un trailing **ouvert** est lu dans `frontendOpenOrders`, par `trailingStopView`
+  (`open-orders/trailing-stop-view.util.ts`, la même lecture que la liste et le détail), et dessiné
+  en **court segment au bord droit** avec son étiquette : `TS 1630.35` en suivi, `TS ≥ 2355` en
+  attente, au prix d'activation et en gris ;
+- reduce-only, il prend la couleur d'un stop ; sinon celle de son côté, comme un ordre qui peut
+  ouvrir une position ;
+- un état illisible n'a pas de prix sûr : le chart l'écrit en haut à gauche
+  (« N trailing stop(s) unreadable: see open orders ») au lieu de le taire.
+
+⚠️ Comme tout ordre du chart, un trailing dont le prix sort de la fenêtre n'est pas signalé. En attente,
+l'activation est souvent loin du marché : elle sera hors champ plus souvent qu'un stop.
