@@ -25,26 +25,43 @@ import {
 import { AccountActivityService } from '@services/account-activity.service';
 import { AvailableCapitalService } from '@services/available-capital.service';
 import { HyperliquidGatewayService } from '@services/hyperliquid-gateway.service';
+import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import {
+  HLFrontendOpenOrder,
   HLOrderStatus,
   HLOrderStatusDetails,
   HLOrderStatusResponse,
   Timestamp,
 } from '@syldel/hl-shared-types';
 import { exchangeRefusal, extractErrorMessage } from '@utils/hl-error.utils';
-import { orderSideLabel } from '@utils/market-kind.util';
+import { openOrdersDexOf, orderSideLabel } from '@utils/market-kind.util';
 import { addIcons } from 'ionicons';
 import { closeOutline, createOutline, trashOutline } from 'ionicons/icons';
-import { of, switchMap } from 'rxjs';
+import { catchError, map, Observable, of, switchMap } from 'rxjs';
 import { editRefusal } from '../editable-order.util';
 import { afterModify, ModifyOutcome } from '../modify-outcome.util';
 import { OrderFormComponent } from '../open-form/order-form.component';
 import { describeStuckTriggered, isStuckTriggeredOrder } from '../stuck-triggered-order.util';
-import { activationLabel, trailingStopView } from '../trailing-stop-view.util';
+import {
+  activationLabel,
+  isTrailingStop,
+  liveTrailingState,
+  trailingStopView,
+  type TrailingStopView,
+} from '../trailing-stop-view.util';
 import { AgentExpiryNoticeComponent } from '@shared/components/agent-expiry-notice/agent-expiry-notice.component';
+
+/**
+ * Ce que la page lit : `orderStatus`, et pour un trailing stop ouvert `frontendOpenOrders` en plus —
+ * `undefined` quand cette seconde lecture n'a pas lieu, `null` quand elle a échoué.
+ */
+interface OrderDetailData {
+  response: HLOrderStatusResponse | null;
+  listed: HLFrontendOpenOrder[] | null | undefined;
+}
 
 @Component({
   selector: 'app-open-order-detail',
@@ -67,7 +84,8 @@ import { AgentExpiryNoticeComponent } from '@shared/components/agent-expiry-noti
 })
 export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
   /** Un stop déclenché dont l'ordre est resté au carnet (voir `stuck-triggered-order.util.ts`). */
-  readonly isStuckTriggered = isStuckTriggeredOrder;
+  readonly isStuckTriggered = (order: HLOrderStatusDetails) =>
+    isStuckTriggeredOrder(order, this.orderStatus());
 
   /** Ce qu'on en dit, avec son limite : entier, ou exécuté en partie. */
   readonly stuckTriggeredText = (order: HLOrderStatusDetails) =>
@@ -75,6 +93,7 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
 
   private readonly route = inject(ActivatedRoute);
   private readonly hlGateway = inject(HyperliquidGatewayService);
+  private readonly hlInfo = inject(HyperliquidInfoService);
   private readonly market = inject(HyperliquidMarketService);
   private readonly alertCtrl = inject(AlertController);
   private readonly hlMarket = inject(HyperliquidMarketService);
@@ -93,6 +112,8 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
   orderStatus = signal<HLOrderStatus | null>(null);
   statusTimestamp = signal<Timestamp | null>(null);
   coinTitle = signal<string>('—');
+  /** Pourquoi l'état courant d'un trailing ouvert n'a pas pu être lu (voir `liveTrailingState`). */
+  trailingMissing = signal<string | null>(null);
 
   fetchFn = signal(this.buildFetchFn());
 
@@ -151,9 +172,30 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
    * `"0.0"` tant qu'il attend.
    */
   readonly activationLabel = activationLabel;
-  readonly trailing = computed(() => {
+  readonly trailing = computed((): TrailingStopView | null => {
     const order = this.order();
-    return order ? trailingStopView(order) : null;
+    if (!order) return null;
+    const missing = this.trailingMissing();
+    // Sans état courant, celui d'`orderStatus` est celui de la pose : montré comme tel, jamais comme un stop.
+    if (missing && isTrailingStop(order)) {
+      return {
+        state: 'unreadable',
+        raw: order.triggerCondition ?? '',
+        reason: `${missing}. State at placement`,
+      };
+    }
+    return trailingStopView(order);
+  });
+
+  /**
+   * Le statut d'un trailing stop qui n'est plus ouvert, ou `null`. Il n'a plus d'état courant : ce
+   * qu'`orderStatus` en garde est l'état de la pose, ou `"Triggered"` une fois déclenché (mesuré le
+   * 2026-11-17). Les lignes « Tracking » ou « Waiting » le feraient passer pour actif.
+   */
+  readonly trailingEnded = computed(() => {
+    const order = this.order();
+    const status = this.orderStatus();
+    return order && status && status !== 'open' && isTrailingStop(order) ? status : null;
   });
 
   protected readonly orderSideLabel = computed(() => {
@@ -189,13 +231,33 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
   private buildFetchFn() {
     const oid = this.oid();
     if (!oid) return () => of(null);
-    return () => this.hlGateway.getOrderStatus(oid);
+    return (): Observable<OrderDetailData> =>
+      this.hlGateway.getOrderStatus(oid).pipe(
+        switchMap((response) => {
+          const data = response?.order;
+          if (!data || data.status !== 'open' || !isTrailingStop(data.order)) {
+            return of({ response, listed: undefined });
+          }
+          // `orderStatus` fige un trailing stop à sa pose : son état courant se lit dans la liste
+          // (poids 20, seulement pour ce type). Un échec se dit, il ne retombe pas sur l'état figé.
+          const dex = openOrdersDexOf(this.coin());
+          if (dex === null) return of({ response, listed: null });
+          return this.hlInfo.getFrontendOpenOrders(dex).pipe(
+            map((listed): OrderDetailData => ({ response, listed })),
+            catchError(() => of({ response, listed: null })),
+          );
+        }),
+      );
   }
 
-  onDataLoaded(data: HLOrderStatusResponse | null): void {
-    if (data?.order?.order) this.order.set(data.order.order);
-    if (data?.order?.status) this.orderStatus.set(data.order.status);
-    if (data?.order?.statusTimestamp) this.statusTimestamp.set(data.order.statusTimestamp);
+  onDataLoaded(data: OrderDetailData | null): void {
+    const status = data?.response?.order;
+    if (!status) return;
+    const live = liveTrailingState(status.order, status.status, data.listed ?? null);
+    this.order.set(live.kind === 'live' ? live.order : status.order);
+    this.trailingMissing.set(live.kind === 'missing' ? live.reason : null);
+    this.orderStatus.set(status.status);
+    if (status.statusTimestamp) this.statusTimestamp.set(status.statusTimestamp);
   }
 
   async openEditModal(): Promise<void> {

@@ -117,6 +117,53 @@ export function trailingStopView(order: TrailingOrderFields): TrailingStopView |
   };
 }
 
+/**
+ * Où lire l'état **courant** d'un trailing stop ouvert, quand on part d'`orderStatus`.
+ *
+ * `orderStatus` rend l'état de la **pose**, figé : son meilleur prix est resté celui de la pose pendant
+ * 19 minutes et quatre nouveaux plus bas, et l'ordre a été rempli 0,255 % sous le stop qu'il affichait
+ * — ce stop n'était pas appliqué (mesuré le 2026-11-17 sur BTC, `nest-trading-bot/docs/hyperliquid/
+ * live-check.md`, S6). `frontendOpenOrders` suit le watermark. Le détail affichait le stop figé.
+ *
+ * - `not-needed` : pas un trailing stop, ou plus ouvert — il n'a plus d'état courant à lire ;
+ * - `live` : l'ordre d'`orderStatus`, avec l'état et les prix de `frontendOpenOrders` ;
+ * - `missing` : ouvert selon `orderStatus` mais absent de la liste (déclenché ou annulé entre les deux
+ *   lectures, ou liste illisible). On le dit, on ne retombe pas sur l'état de la pose.
+ */
+export type LiveTrailingState<T> =
+  | { kind: 'not-needed' }
+  | { kind: 'live'; order: T }
+  | { kind: 'missing'; reason: string };
+
+type LiveFields = Pick<HLFrontendOpenOrder, 'oid' | 'triggerCondition' | 'triggerPx' | 'limitPx'>;
+
+export function liveTrailingState<T extends LiveFields & Pick<HLFrontendOpenOrder, 'orderType'>>(
+  order: T,
+  status: string | null,
+  listed: readonly LiveFields[] | null,
+): LiveTrailingState<T> {
+  if (!isTrailingStop(order) || status !== 'open') return { kind: 'not-needed' };
+  if (listed === null) {
+    return { kind: 'missing', reason: 'The open orders list could not be read' };
+  }
+  const current = listed.find((o) => o.oid === order.oid);
+  if (!current) {
+    return {
+      kind: 'missing',
+      reason: 'Not in the open orders list: it may have just triggered or been cancelled',
+    };
+  }
+  return {
+    kind: 'live',
+    order: {
+      ...order,
+      triggerCondition: current.triggerCondition,
+      triggerPx: current.triggerPx,
+      limitPx: current.limitPx,
+    },
+  };
+}
+
 /** `Above 2355` : le prix qui démarre le suivi, et de quel côté il doit être franchi. */
 export function activationLabel(activation: { direction: 'above' | 'below'; px: string }): string {
   return `${activation.direction === 'above' ? 'Above' : 'Below'} ${activation.px}`;

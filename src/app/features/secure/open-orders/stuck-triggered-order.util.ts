@@ -26,7 +26,15 @@ import type { HLFrontendOpenOrder } from '@syldel/hl-shared-types';
  */
 export function isStuckTriggeredOrder(
   order: Partial<Pick<HLFrontendOpenOrder, 'isTrigger' | 'triggerCondition' | 'reduceOnly'>>,
+  /**
+   * Le statut d'`orderStatus`, quand on le connaît. Un ordre qui n'est plus `open` ne repose plus :
+   * le détail d'un trailing stop entièrement rempli (`sz` `"0.0"`, `triggerCondition` `"Triggered"`)
+   * affichait « 0.0 is still resting … not protected » (mesuré le 2026-11-17). Absent : la liste, qui
+   * ne contient que des ordres ouverts.
+   */
+  status?: string | null,
 ): boolean {
+  if (status != null && status !== 'open') return false;
   return (
     order.reduceOnly === true && order.isTrigger === false && order.triggerCondition === 'Triggered'
   );

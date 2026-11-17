@@ -55,6 +55,17 @@ describe('isStuckTriggeredOrder', () => {
 
     expect(isStuckTriggeredOrder(withoutIsTrigger)).toBe(false);
   });
+
+  // Mesuré le 2026-11-17 : le détail d'un trailing BTC entièrement rempli disait « 0.0 is still resting ».
+  it('does not call an order that has ended still resting', () => {
+    expect(isStuckTriggeredOrder(MEASURED_ON_ETH, 'filled')).toBe(false);
+    expect(isStuckTriggeredOrder(MEASURED_ON_ETH, 'canceled')).toBe(false);
+  });
+
+  it('still flags it while orderStatus says open, or when no status is known (the list)', () => {
+    expect(isStuckTriggeredOrder(MEASURED_ON_ETH, 'open')).toBe(true);
+    expect(isStuckTriggeredOrder(MEASURED_ON_ETH, null)).toBe(true);
+  });
 });
 
 /**

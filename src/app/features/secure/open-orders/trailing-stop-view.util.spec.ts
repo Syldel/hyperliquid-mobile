@@ -1,6 +1,7 @@
 import type { HLFrontendOpenOrder } from '@syldel/hl-shared-types';
 import {
   activationLabel,
+  liveTrailingState,
   pinToPane,
   trailingChartMark,
   trailingStopSummary,
@@ -178,6 +179,49 @@ describe('trailingChartMark', () => {
   it('marks nothing for a state it could not read', () => {
     const view = trailingStopView(order({ triggerCondition: 'Price below 1800' }))!;
     expect(trailingChartMark(view, reduceSell)).toBeNull();
+  });
+});
+
+describe('liveTrailingState', () => {
+  // Les deux lectures du même ordre BTC à 14:26:38Z le 2026-11-17 (`live-check.md`, S6) : `orderStatus`
+  // rendait encore l'état de la pose, et l'ordre a été rempli sous son stop.
+  const FROZEN = {
+    oid: 608143361101,
+    orderType: 'Trailing Stop Market',
+    triggerCondition: 'Activation immediate, retracement 0.3%, best 64971',
+    triggerPx: '65165.9',
+    limitPx: '71682.0',
+  };
+  const LISTED = {
+    oid: 608143361101,
+    triggerCondition: 'Activation immediate, retracement 0.3%, best 64893',
+    triggerPx: '65087.7',
+    limitPx: '71596.0',
+  };
+
+  it('takes the current state from the open orders list, not the frozen one (measured)', () => {
+    expect(liveTrailingState(FROZEN, 'open', [LISTED])).toEqual({
+      kind: 'live',
+      order: { ...FROZEN, ...LISTED },
+    });
+  });
+
+  it('says so when the open order is not in the list, instead of falling back on the frozen state', () => {
+    expect(liveTrailingState(FROZEN, 'open', [])).toMatchObject({ kind: 'missing' });
+  });
+
+  it('says so when the list could not be read', () => {
+    expect(liveTrailingState(FROZEN, 'open', null)).toEqual({
+      kind: 'missing',
+      reason: 'The open orders list could not be read',
+    });
+  });
+
+  it('reads nothing more for an order that has ended, or that is not a trailing stop', () => {
+    expect(liveTrailingState(FROZEN, 'filled', [LISTED])).toEqual({ kind: 'not-needed' });
+    expect(liveTrailingState({ ...FROZEN, orderType: 'Stop Market' }, 'open', [LISTED])).toEqual({
+      kind: 'not-needed',
+    });
   });
 });
 

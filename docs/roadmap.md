@@ -366,9 +366,15 @@ l'app**, **en plus** du stop intelligent du bot, jamais à sa place (décidé le
    ⚠️ Deux points ouverts, mesurés le même jour (`nest-trading-bot/docs/hyperliquid/live-check.md`, S5) :
    - **le détail montre un stop périmé** : la liste lit `frontendOpenOrders`, le détail `orderStatus`, et **tranché le
      même jour par un déclenchement réel** (`live-check.md`, S6) : `orderStatus` rend l'état de la pose, figé, et son
-     stop n'est pas appliqué (rempli 0,255 % sous lui). Le détail doit lire l'état courant dans `frontendOpenOrders`.
-     ⚠️ Pas encore corrigé. Un trailing déclenché écrit `"Triggered"`, que le lecteur strict ne connaît pas : le détail
-     d'un ordre rempli le montre comme illisible ;
+     stop n'est pas appliqué (rempli 0,255 % sous lui). **Corrigé le même jour** : pour un trailing ouvert, le détail
+     lit aussi `frontendOpenOrders` (poids 20) et en prend l'état et les prix (`liveTrailingState`) ; absent de la
+     liste, il le dit au lieu de montrer l'état de la pose. Un trailing qui n'est plus ouvert s'affiche « Ended », avec le
+     dernier texte de l'exchange (`"Triggered"` une fois déclenché, que le lecteur strict ne connaît pas). **Vu dans le
+     navigateur** le même jour, en clair, en sombre et à 360 px : le trailing ETH ouvert affiche 1 847,93 quand
+     `orderStatus` répond 1 854,0, et le trailing BTC rempli « Ended (filled) ». La vérification a trouvé une fausse
+     alerte plus ancienne : le détail d'un ordre déclenché **et rempli** disait « 0.0 is still resting … not
+     protected » ; `isStuckTriggeredOrder` lit désormais le statut. ⚠️ Le cas « absent de la liste » n'a été vu qu'en
+     test : il demande un déclenchement entre les deux lectures ;
    - l'exchange écrit `3.5000000000000004%` : **réglé le même jour**, le repli s'affiche arrondi à quatre décimales, la
      précision d'une action signée (`3.5 %`), et le détail montre le texte brut sous « Exchange text ».
 3. **La pose** depuis une position : reduce-only, à la taille de la position par défaut, l'unité de chaque champ écrite

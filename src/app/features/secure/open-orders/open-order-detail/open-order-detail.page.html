@@ -58,7 +58,19 @@
     <ion-label>TIF</ion-label>
     <ion-note slot="end">{{ o.tif }}</ion-note>
   </ion-item>
-  } @if (trailing(); as t) { @switch (t.state) { @case ('tracking') {
+  } @if (trailingEnded(); as ended) {
+  <!-- Plus ouvert : ce qu'en garde l'exchange n'est pas un état courant (voir trailingEnded). -->
+  <ion-item lines="full">
+    <ion-label>State</ion-label>
+    <ion-note slot="end">Ended ({{ ended }})</ion-note>
+  </ion-item>
+  <ion-item lines="full">
+    <ion-label class="ion-text-wrap">
+      Last text written by the exchange
+      <p>{{ o.triggerCondition }}</p>
+    </ion-label>
+  </ion-item>
+  } @else if (trailing(); as t) { @switch (t.state) { @case ('tracking') {
   <ion-item lines="full">
     <ion-label>State</ion-label>
     <ion-note slot="end">Tracking</ion-note>
