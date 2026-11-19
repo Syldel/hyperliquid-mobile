@@ -4,6 +4,7 @@ import {
   liveTrailingState,
   pinToPane,
   trailingChartMark,
+  trailingStart,
   trailingStopSummary,
   trailingStopView,
 } from './trailing-stop-view.util';
@@ -245,5 +246,60 @@ describe('pinToPane', () => {
   it('keeps a label whole near an edge without calling the level off-scale', () => {
     expect(pinToPane(396, 400, 9)).toEqual({ y: 391, pinned: null });
     expect(pinToPane(3, 400, 9)).toEqual({ y: 9, pinned: null });
+  });
+});
+
+describe('trailingStart', () => {
+  // L'achat de S6 (BTC, 2026-11-17) : l'enregistrement `open` garde l'état de la pose, celui `triggered`
+  // le stop appliqué au déclenchement (`live-check.md`).
+  const OID = 608143361101;
+  const S6_POSE = {
+    order: {
+      oid: OID,
+      orderType: 'Trailing Stop Market',
+      triggerCondition: 'Activation immediate, retracement 0.3%, best 64971',
+      triggerPx: '65165.9',
+    },
+    status: 'open',
+    statusTimestamp: 1_795_000_027_000,
+  };
+  const S6_TRIGGERED = {
+    order: { ...S6_POSE.order, triggerCondition: 'Triggered', triggerPx: '64983.4' },
+    status: 'triggered',
+    statusTimestamp: 1_795_001_619_946,
+  };
+
+  it('starts at the stop the order was placed with, not the one it triggered at', () => {
+    expect(trailingStart(OID, [S6_TRIGGERED, S6_POSE])).toEqual({
+      time: 1_795_000_027_000,
+      price: '65165.9',
+      waiting: false,
+    });
+  });
+
+  // Posé en attente, le stop de la pose vaut 0.0 : le départ est le prix d'activation.
+  it('starts a trailing stop placed waiting at its activation price', () => {
+    const pose = { order: { ...S2_WAITING, oid: 7 }, status: 'open', statusTimestamp: 5 };
+    expect(trailingStart(7, [pose])).toEqual({ time: 5, price: '2355', waiting: true });
+  });
+
+  // Un trailing annulé garde son dernier état, lisible (T2 du 2026-11-16, `live-check.md`) : sans la pose
+  // dans l'historique, cet état de la fin ne doit pas passer pour le départ.
+  it('never takes a later record for the start', () => {
+    const canceled = {
+      order: {
+        ...S6_POSE.order,
+        triggerCondition: 'Activation immediate, retracement 10%, best 1834.6',
+        triggerPx: '1651.14',
+      },
+      status: 'canceled',
+      statusTimestamp: 1_795_000_000_000,
+    };
+    expect(trailingStart(OID, [canceled])).toBeNull();
+  });
+
+  it('has no start when the placement is not in the history', () => {
+    expect(trailingStart(OID, [S6_TRIGGERED])).toBeNull();
+    expect(trailingStart(1, [S6_POSE])).toBeNull();
   });
 });

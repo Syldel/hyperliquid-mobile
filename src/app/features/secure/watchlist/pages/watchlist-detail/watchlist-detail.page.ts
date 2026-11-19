@@ -149,8 +149,10 @@ import {
   isTrailingStop,
   pinToPane,
   trailingChartMark,
+  trailingStart,
   trailingStopView,
   type TrailingChartMark,
+  type TrailingStart,
 } from '../../../open-orders/trailing-stop-view.util';
 
 /** Ce que chaque lecture du compte dessine, pour dire laquelle manque. */
@@ -1248,7 +1250,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     if (!snap) return;
 
     this.drawOrderLines(ctx, snap.historicalOrders);
-    this.drawTrailingStops(ctx, snap.openOrders);
+    this.drawTrailingStops(ctx, snap.openOrders, snap.historicalOrders);
     this.drawFills(ctx, snap.fills);
   }
 
@@ -1425,11 +1427,17 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   }
 
   /**
-   * Les trailing stops natifs ouverts, à leur niveau **actuel** seulement (voir
-   * `trailingChartMark`) : un court segment au bord droit et son étiquette, sans trait vers le
-   * passé. Un état illisible n'a pas de prix sûr : il est dit en haut du chart au lieu d'être tu.
+   * Les trailing stops natifs ouverts : leur niveau **actuel** (voir `trailingChartMark`), un court
+   * segment au bord droit et son étiquette, et leur **départ** (`trailingStart`, lu dans l'historique
+   * déjà chargé), un rond creux à l'heure de la pose. Rien entre les deux : l'API ne garde pas
+   * l'escalier, et un trait du départ au niveau actuel raconterait un chemin que personne n'a lu. Un état
+   * illisible n'a pas de prix sûr : il est dit en haut du chart au lieu d'être tu.
    */
-  private drawTrailingStops(ctx: CanvasRenderingContext2D, orders: HLFrontendOpenOrder[]): void {
+  private drawTrailingStops(
+    ctx: CanvasRenderingContext2D,
+    orders: HLFrontendOpenOrder[],
+    history: HLOrderStatusData[],
+  ): void {
     const visibleRange = this.chart!.timeScale().getVisibleRange();
     if (!visibleRange) return;
     const xEnd = this.chart!.timeScale().timeToCoordinate(visibleRange.to);
@@ -1444,6 +1452,8 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
         unreadable++;
         continue;
       }
+      const start = trailingStart(order.oid, history);
+      if (start) this.drawTrailingStart(ctx, start, start.waiting ? 'waiting' : mark.tone, xEnd);
       this.drawTrailingMark(ctx, mark, xEnd);
     }
 
@@ -1452,6 +1462,44 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       ctx.fillStyle = this.COLOR_SELL;
       ctx.fillText(`${unreadable} trailing stop(s) unreadable: see open orders`, 8, 16);
     }
+  }
+
+  /**
+   * Le départ d'un trailing stop : un rond **creux**, pour ne pas se lire comme un remplissage (rond
+   * plein), et `TS start`, sans prix : jugé trop long par l'utilisateur (2026-11-19). Hors des bougies
+   * chargées, il n'a pas d'abscisse : rien n'est dessiné.
+   */
+  private drawTrailingStart(
+    ctx: CanvasRenderingContext2D,
+    start: TrailingStart,
+    tone: TrailingChartMark['tone'],
+    xEnd: number,
+  ): void {
+    const intervalSec = this.getIntervalSeconds();
+    const time = (Math.floor(start.time / 1000 / intervalSec) * intervalSec) as unknown as Time;
+    const x = this.chart!.timeScale().timeToCoordinate(time);
+    const y = this.candleSeries!.priceToCoordinate(parseFloat(start.price));
+    if (x === null || y === null) return;
+
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.strokeStyle =
+      tone === 'waiting' ? this.COLOR_WAITING : tone === 'buy' ? this.COLOR_BUY : this.COLOR_SELL;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Le texte à la couleur du texte du thème, pas à celle du rond : le rouge des stops fait 3,8:1 sur le
+    // fond clair, sous le seuil de 4,5:1 d'un texte de 10 px (mesuré le 2026-11-19, docs/theming.md).
+    ctx.font = '10px monospace';
+    ctx.fillStyle =
+      getComputedStyle(document.documentElement).getPropertyValue('--ion-text-color').trim() ||
+      '#ccc';
+    // Au-dessus du rond : un départ proche du niveau actuel tombe sur son trait pointillé, qui barrait le
+    // texte. Et à gauche s'il entrerait sous l'étiquette du niveau actuel (48 px de segment au bord droit,
+    // `drawTrailingMark`) : une pose récente cachait son texte dessous (deux captures du 2026-11-19).
+    const text = 'TS start';
+    const tw = ctx.measureText(text).width;
+    ctx.fillText(text, x + 4 + tw > xEnd - 52 ? x - 4 - tw : x + 4, y - 7);
   }
 
   private drawTrailingMark(

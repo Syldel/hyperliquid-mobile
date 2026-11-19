@@ -645,3 +645,27 @@ Depuis le 2026-11-17 (`drawTrailingStops`) :
 
 ⚠️ Comme tout ordre du chart, un trailing dont le prix sort de la fenêtre n'est pas signalé. En attente,
 l'activation est souvent loin du marché : elle sera hors champ plus souvent qu'un stop.
+
+### Son départ (2026-11-19)
+
+Un **rond creux** à l'heure de la pose, au stop de la pose — ou au prix d'activation, en gris, pour un
+trailing posé en attente —, avec `TS start` au-dessus (sans le prix, jugé trop long), à la couleur du texte du thème (le rouge
+des stops ne tient que 3,8:1 sur le fond clair). Creux, pour ne pas se lire comme un remplissage.
+
+- **aucune lecture en plus** : l'enregistrement `open` de `historicalOrders`, que le chart charge déjà,
+  fige l'état de la pose (S6, `nest-trading-bot/docs/hyperliquid/live-check.md`) — `trailingStart`. Vu
+  sur les deux trailings réels de `xyz:BRENTOIL` : 85,6454 (5 %) et 82,9187 (8 %) ;
+- **rien entre le départ et le niveau actuel** : l'API ne garde pas l'escalier, un trait raconterait un
+  chemin que personne n'a lu ;
+- le texte passe **au-dessus** du rond (un départ proche du niveau actuel tombait sur son pointillé) et
+  **à gauche** quand il entrerait sous l'étiquette du niveau actuel (une pose récente) ;
+- une pose dans les 48 derniers pixels a son rond **sous** le segment du niveau actuel : seul le texte se
+  voit. Zoomer le fait réapparaître.
+
+Une première version (même jour) y ajoutait une alerte « moved since … ? » tirée des bougies : retirée,
+jugée de peu de valeur par l'utilisateur. Seul le départ est revenu, à sa demande.
+
+⚠️ Un départ absent ne se signale pas : une pose sortie de l'historique (il ne garde que les ordres
+récents) ou antérieure aux bougies chargées n'a simplement pas de rond. Et une capture prise juste après
+un changement de thème émulé l'a montré sans rond ni texte, revenus au premier déplacement du chart, sans
+lecture réseau entre les deux : non expliqué.

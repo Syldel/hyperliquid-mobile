@@ -3,6 +3,7 @@ import {
   parseTrailingStopCondition,
   TrailingStopConditionError,
   type HLFrontendOpenOrder,
+  type HLOid,
   type HLTrailingRetracementState,
 } from '@syldel/hl-shared-types';
 
@@ -238,6 +239,55 @@ export function trailingChartMark(
         label: `TS ${view.activation.direction === 'above' ? '≥' : '≤'} ${view.activation.px}`,
         tone: 'waiting',
       };
+    case 'unreadable':
+      return null;
+  }
+}
+
+/**
+ * D'où un trailing stop est parti : l'état de sa **pose**, lu dans `historicalOrders`, que le chart charge
+ * déjà — aucune lecture en plus.
+ *
+ * L'historique garde un enregistrement par statut, et celui du statut `open` fige l'état au moment de la
+ * pose : 65 165,9 pour le trailing de S6, resté tel quel pendant que le stop courant descendait
+ * (`nest-trading-bot/docs/hyperliquid/live-check.md`). C'est donc une valeur **exacte** du point de départ
+ * — pas l'escalier entre les deux, que l'API ne garde nulle part (relevé le 2026-11-17).
+ *
+ * - posé en suivi : le stop de la pose ;
+ * - posé en attente : le prix d'activation, là où le suivi devait commencer ;
+ * - `null` si la pose n'est pas dans l'historique (il ne garde que les ordres récents) ou si son état ne se
+ *   lit pas : il n'y a pas de départ sûr à dessiner. Un autre enregistrement (`canceled`, `triggered`) ne
+ *   la remplace jamais : il porte l'état de la fin.
+ */
+export interface TrailingStart {
+  /** Heure de la pose, en ms. */
+  time: number;
+  price: string;
+  waiting: boolean;
+}
+
+export function trailingStart(
+  oid: HLOid,
+  history: readonly {
+    order: TrailingOrderFields & Pick<HLFrontendOpenOrder, 'oid'>;
+    status: string;
+    statusTimestamp: number;
+  }[],
+): TrailingStart | null {
+  let pose: (typeof history)[number] | undefined;
+  for (const h of history) {
+    if (h.order.oid !== oid || h.status !== 'open') continue;
+    if (!pose || h.statusTimestamp < pose.statusTimestamp) pose = h;
+  }
+  if (!pose) return null;
+
+  const view = trailingStopView(pose.order);
+  if (!view) return null;
+  switch (view.state) {
+    case 'tracking':
+      return { time: pose.statusTimestamp, price: view.stopPx, waiting: false };
+    case 'waiting':
+      return { time: pose.statusTimestamp, price: view.activation.px, waiting: true };
     case 'unreadable':
       return null;
   }
