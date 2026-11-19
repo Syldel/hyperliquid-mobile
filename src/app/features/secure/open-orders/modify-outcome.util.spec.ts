@@ -107,8 +107,8 @@ describe('afterModify', () => {
     const filled = afterModify({ kind: 'filled', oid: null });
 
     expect(unknown.show).toBeNull();
-    expect(unknown.message).toContain('did not give its new id');
+    expect(unknown.message).toContain('no new OID given');
     expect(filled.show).toBeNull();
-    expect(filled.message).toContain('filled at once');
+    expect(filled.message).toContain('filled · no new OID given');
   });
 });

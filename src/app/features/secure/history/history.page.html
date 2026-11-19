@@ -30,13 +30,14 @@
       <ion-label>
         <div class="order-header">
           <strong>{{ displayCoin(entry.order.coin) }}</strong>
-          <ion-badge [color]="entry.order.side === 'B' ? 'success' : 'danger'">
-            {{ sideLabel(entry.order) }}
-          </ion-badge>
-          <ion-badge color="medium">{{ entry.order.orderType }}</ion-badge>
-          @if (entry.order.tif) {
-          <ion-badge color="medium">{{ tifLabel(entry.order.tif) }}</ion-badge>
-          }
+          <!-- Les badges forment un bloc : sous un nom long, ils passent à la ligne ensemble. -->
+          <span class="order-tags">
+            <app-side-badge [badge]="sideBadge(entry.order)" />
+            <app-order-type-badge [orderType]="entry.order.orderType" />
+            @if (entry.order.tif) {
+            <ion-badge color="medium">{{ tifLabel(entry.order.tif) }}</ion-badge>
+            }
+          </span>
         </div>
         <p>Limit: {{ entry.order.limitPx }} · Sz: {{ entry.order.sz }}/{{ entry.order.origSz }}</p>
         <p>

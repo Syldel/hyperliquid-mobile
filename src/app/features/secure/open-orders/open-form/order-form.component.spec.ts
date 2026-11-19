@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { toastElementStub } from '@shared/testing/ionic-stubs';
 import { ModalController, ToastController } from '@ionic/angular/standalone';
 import type { HLFrontendOpenOrder } from '@syldel/hl-shared-types';
 import { Subject, firstValueFrom, of, throwError } from 'rxjs';
@@ -80,7 +81,7 @@ describe('OrderFormComponent — price wiring', () => {
         { provide: ModalController, useValue: { dismiss: () => Promise.resolve(true) } },
         {
           provide: ToastController,
-          useValue: { create: () => Promise.resolve({ present: () => {} }) },
+          useValue: { create: () => Promise.resolve(toastElementStub()) },
         },
         { provide: HyperliquidGatewayService, useValue: {} },
         { provide: HyperliquidMarketService, useValue: marketDouble },

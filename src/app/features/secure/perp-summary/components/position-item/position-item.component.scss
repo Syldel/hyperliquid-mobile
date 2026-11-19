@@ -28,39 +28,26 @@ h2 {
   flex-shrink: 0;
 }
 
-// Le bloc SL · TP · robot · ⓘ : un élément du `h2` en flex-wrap, qui ne se coupe jamais lui-même.
+// Le bloc SL · TP : un élément du `h2` en flex-wrap, qui ne se coupe jamais lui-même. Chaque côté
+// centre son libellé et ses ronds sur un même axe, et le `h2` centre le bloc sur le badge.
 .coverage {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: nowrap;
   white-space: nowrap;
 }
 
-.bot-mark {
-  flex-shrink: 0;
-  fill: none;
-  stroke: var(--ion-color-medium);
-  stroke-width: 1.4;
-}
-
-// Un vrai bouton, pour le clavier et le lecteur d'écran ; son clic ne replie pas la carte.
-.info-button {
+.coverage__side {
   display: inline-flex;
-  padding: 0;
-  border: 0;
-  background: none;
-  font-size: 16px;
+  align-items: center;
+  gap: 3px;
+}
+
+.coverage__label {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1;
   color: var(--ion-color-medium);
-  cursor: pointer;
-}
-
-.info-button--alters {
-  color: var(--app-coverage-partial);
-}
-
-.info-notes {
-  margin: 0;
-  padding: 8px 12px 8px 24px;
-  font-size: 13px;
 }

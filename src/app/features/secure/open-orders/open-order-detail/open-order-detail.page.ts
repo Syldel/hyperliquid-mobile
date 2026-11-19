@@ -1,4 +1,5 @@
 import { DatePipe, DecimalPipe, Location } from '@angular/common';
+import { OrderToastService } from '@services/order-toast.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
@@ -20,7 +21,6 @@ import {
   IonRouterOutlet,
   ModalController,
   NavController,
-  ToastController,
 } from '@ionic/angular/standalone';
 import { AccountActivityService } from '@services/account-activity.service';
 import { AvailableCapitalService } from '@services/available-capital.service';
@@ -38,7 +38,8 @@ import {
 } from '@syldel/hl-shared-types';
 import { exchangeRefusal, extractErrorMessage } from '@utils/hl-error.utils';
 import { openOrdersDexOf, orderSideLabel } from '@utils/market-kind.util';
-import { sideBadgeLabel, tifDescription } from '@utils/order-labels.util';
+import { orderSideBadge, tifDescription } from '@utils/order-labels.util';
+import { SideBadgeComponent } from '@shared/components/side-badge/side-badge.component';
 import { addIcons } from 'ionicons';
 import { closeOutline, createOutline, trashOutline } from 'ionicons/icons';
 import { catchError, map, Observable, of, switchMap } from 'rxjs';
@@ -69,6 +70,7 @@ interface OrderDetailData {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SideBadgeComponent,
     AgentExpiryNoticeComponent,
     RefreshableLayoutComponent,
     IonButton,
@@ -98,7 +100,7 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
   private readonly market = inject(HyperliquidMarketService);
   private readonly alertCtrl = inject(AlertController);
   private readonly hlMarket = inject(HyperliquidMarketService);
-  private readonly toastCtrl = inject(ToastController);
+  private readonly orderToast = inject(OrderToastService);
   private readonly modalCtrl = inject(ModalController);
   private readonly availableCapitalService = inject(AvailableCapitalService);
   private readonly activity = inject(AccountActivityService);
@@ -204,18 +206,13 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
     return order ? this.getOrderLabel(order) : '';
   });
 
-  /** Le côté en capitales, et ce qu'un reduce-only ferme (voir `order-labels.util.ts`). */
+  /** Le côté, et ce qu'un reduce-only ferme (voir `order-labels.util.ts`). */
   readonly sideBadge = computed(() => {
     const order = this.order();
-    return order ? sideBadgeLabel(this.coin(), order.side === 'B', order.reduceOnly) : '';
+    return order ? orderSideBadge(this.coin(), order.side === 'B', order.reduceOnly) : null;
   });
 
   readonly tifDescription = tifDescription;
-
-  readonly orderSideColor = computed(() => {
-    const order = this.order();
-    return order?.side === 'B' ? 'success' : 'danger';
-  });
 
   constructor() {
     super();
@@ -396,15 +393,9 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
       });
   }
 
-  private showToast(message: string, color: 'success' | 'danger' | 'primary' = 'primary'): void {
-    this.toastCtrl
-      .create({
-        message,
-        duration: 3000,
-        position: 'top',
-        color,
-        buttons: [{ icon: 'close-outline', role: 'cancel' }],
-      })
-      .then((t) => t.present());
+  /** Les toasts d'ordre passent tous par `OrderToastService` : même forme, même vert. */
+  private showToast(message: string, color: 'success' | 'danger'): void {
+    if (color === 'danger') this.orderToast.failure(message);
+    else this.orderToast.success(message);
   }
 }

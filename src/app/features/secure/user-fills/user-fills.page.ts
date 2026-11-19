@@ -28,13 +28,15 @@ import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import { HLUserFill } from '@syldel/hl-shared-types';
-import { fillDirectionLabel } from '@utils/order-labels.util';
+import { fillSideBadge } from '@utils/order-labels.util';
+import { SideBadgeComponent } from '@shared/components/side-badge/side-badge.component';
 import { interval, Observable } from 'rxjs';
 
 @Component({
   selector: 'app-user-fills',
   standalone: true,
   imports: [
+    SideBadgeComponent,
     DatePipe,
     DecimalPipe,
     RefreshableLayoutComponent,
@@ -111,7 +113,7 @@ export class UserFillsPage extends MenuBasePage {
    * Le sens du remplissage en capitales (`CLOSE SHORT`), lu dans `dir`. La pastille disait `BUY` et
    * la ligne du dessous répétait `dir` : une seule information, dite une fois.
    */
-  readonly directionLabel = fillDirectionLabel;
+  readonly sideBadge = fillSideBadge;
 
   readonly maxDate = signal(this.getCurrentMaxDate());
   readonly startDateStr = signal(this.toLocalISO(this.daysAgo(7)));

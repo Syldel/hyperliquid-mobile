@@ -169,9 +169,20 @@ thème peut dégrader l'autre — mesuré. Seuils, pièges de mesure et chiffres
 ajouté, élargi ou écarté se contrôle à **360 px** avant d'être proposé, le volet du
 navigateur en faisant 1215 et ne refusant donc jamais rien. À cette largeur la marge est
 mince — mesuré le 2026-10-14, le tableau du rapport de backtest occupe 328 px sur 360 avec
-ses colonnes déjà au minimum, et 12 px de marge ailleurs ont coûté une ligne de plus. Ce
-qui se mesure, les largeurs de référence et ce qu'elles valent vraiment :
+ses colonnes déjà au minimum, et 12 px de marge ailleurs ont coûté une ligne de plus.
+**Et avec un nom de paire long** : une vérification à 360 px se fait avec `xyz:BRENTOIL`
+(un perp HIP-3), jamais seulement avec `ETH` ou `BTC`. Sur le téléphone, le 2026-11-18,
+Trade History coupait `OPEN SHORT` à droite et renvoyait `HIP-3` à la ligne — invisible avec
+un nom court. Ce qui se mesure, les largeurs de référence et ce qu'elles valent vraiment :
 [docs/conventions.md](docs/conventions.md#la-largeur-se-vérifie-et-sur-des-largeurs-réelles).
+
+**Le navigateur n'est pas le téléphone.** L'écran final est un vrai téléphone Android
+(Chrome, police **Roboto**), et le PC de développement rend en Arial, faute de Roboto. Un
+alignement au pixel (texte dans un badge, glyphe à côté d'un texte) se règle par une
+construction qui ne dépend pas des métriques de la police, se mesure sur Roboto chargé, et
+ne se déclare juste qu'après une capture du téléphone : le 2026-11-18, un badge centré à
+0,00 px dans le navigateur avait son texte 1 à 2 px trop bas sur l'appareil. Voir
+[docs/conventions.md](docs/conventions.md#lécran-de-référence-est-un-vrai-téléphone-pas-le-navigateur-de-développement).
 
 **Vérifier l'état réel avant de ré-implémenter.** Lire le fichier et l'historique git
 avant de refaire une étape supposée manquante.

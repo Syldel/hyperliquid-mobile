@@ -15,13 +15,17 @@ import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import { HLOrderStatusData, HLOrderStatusDetails } from '@syldel/hl-shared-types';
-import { sideBadgeLabel, tifLabel } from '@utils/order-labels.util';
+import { orderSideBadge, tifLabel } from '@utils/order-labels.util';
+import { OrderTypeBadgeComponent } from '@shared/components/order-type-badge/order-type-badge.component';
+import { SideBadgeComponent } from '@shared/components/side-badge/side-badge.component';
 import { Observable } from 'rxjs';
 
 @Component({
   selector: 'app-history',
   standalone: true,
   imports: [
+    SideBadgeComponent,
+    OrderTypeBadgeComponent,
     RefreshableLayoutComponent,
     IonList,
     IonItem,
@@ -43,8 +47,8 @@ export class HistoryPage extends MenuBasePage {
   historicalOrders = signal<HLOrderStatusData[]>([]);
 
   /** Le côté, avec la règle du reste de l'app : l'historique écrivait « Buy » même sur un perp. */
-  readonly sideLabel = (order: HLOrderStatusDetails) =>
-    sideBadgeLabel(order.coin, order.side === 'B', order.reduceOnly);
+  readonly sideBadge = (order: HLOrderStatusDetails) =>
+    orderSideBadge(order.coin, order.side === 'B', order.reduceOnly);
   readonly tifLabel = tifLabel;
   coinFilter = signal<string>('');
   coinsResolved = signal(false);

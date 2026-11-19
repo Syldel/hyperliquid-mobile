@@ -62,20 +62,19 @@ export function afterModify(outcome: Exclude<ModifyOutcome, { kind: 'refused' }>
     case 'resting':
       return {
         show: outcome.oid,
-        message: `Order updated. Hyperliquid replaced it with order ${outcome.oid}.`,
+        message: `Order updated · OID ${outcome.oid}`,
       };
     case 'filled':
       return outcome.oid === null
         ? {
             show: null,
-            message:
-              'Order updated, and filled at once. Its new id was not given: here are the open orders.',
+            message: 'Order updated and filled · no new OID given',
           }
-        : { show: outcome.oid, message: 'Order updated, and filled at once.' };
+        : { show: outcome.oid, message: 'Order updated and filled at once' };
     case 'unknown':
       return {
         show: null,
-        message: 'Order updated, but the reply did not give its new id: here are the open orders.',
+        message: 'Order updated · no new OID given',
       };
   }
 }

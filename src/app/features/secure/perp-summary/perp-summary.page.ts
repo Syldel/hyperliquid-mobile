@@ -19,7 +19,8 @@ import {
   HLPerpMarginSummary,
   HLPerpPositionDetail,
 } from '@syldel/hl-shared-types';
-import { catchError, forkJoin, map, Observable, of } from 'rxjs';
+import { catchError, forkJoin, map, Observable, of, switchMap } from 'rxjs';
+import { ACCOUNT_RELOAD_THROTTLE_MS } from '@services/hyperliquid-cache.service';
 import { MarginSummaryComponent } from './components/margin-summary/margin-summary.component';
 import { PositionItemComponent } from './components/position-item/position-item.component';
 import {
@@ -52,8 +53,6 @@ interface PerpSummaryData {
 export interface PositionRow {
   position: HLPerpPositionDetail;
   protection: PositionProtection;
-  /** `null` : on ne sait pas, le profil n'a pas pu être lu. */
-  botManaged: boolean | null;
 }
 
 @Component({
@@ -89,8 +88,12 @@ export class PerpSummaryPage extends MenuBasePage {
   constructor() {
     super();
     effect(() => {
-      this.lifecycle.foregroundCount();
+      const foreground = this.lifecycle.foregroundCount();
       untracked(() => {
+        // Un retour au premier plan relit au plus une fois par minute, comme le cache du chart : une
+        // relecture coûte 22 de poids par dex coché. Le tirer-pour-rafraîchir, un changement de dex et
+        // l'après-ordre (`reload`) passent outre.
+        if (foreground > 0 && Date.now() - this.loadedAt < ACCOUNT_RELOAD_THROTTLE_MS) return;
         this.fetchFn.set(this.buildFetchFn());
       });
     });
@@ -119,14 +122,27 @@ export class PerpSummaryPage extends MenuBasePage {
       });
   }
 
+  /**
+   * L'état du dex d'abord (poids 2), ses ordres (poids 20) **seulement s'il porte une position** : les
+   * ordres ne servent ici qu'à la couverture des positions. Avec deux dex cochés et une position sur un
+   * seul, c'était 20 de poids pour rien à chaque lecture (relevé le 2026-11-18). Le prix : un aller-retour
+   * de plus sur un dex qui a une position.
+   */
   private readDex(dex: string | undefined): Observable<DexReading> {
-    const orders = this.hlInfo.getFrontendOpenOrders(dex).pipe(
-      catchError((error: unknown) => {
-        console.error(`[PerpSummary] open orders of dex "${dex ?? ''}" unreadable`, error);
-        return of(null);
+    return this.hlInfo.getClearinghouseState(dex).pipe(
+      switchMap((state) => {
+        if (!state.assetPositions.some((ap) => ap.position !== null)) {
+          return of({ state, orders: [] });
+        }
+        return this.hlInfo.getFrontendOpenOrders(dex).pipe(
+          catchError((error: unknown) => {
+            console.error(`[PerpSummary] open orders of dex "${dex ?? ''}" unreadable`, error);
+            return of(null);
+          }),
+          map((orders) => ({ state, orders })),
+        );
       }),
     );
-    return forkJoin({ state: this.hlInfo.getClearinghouseState(dex), orders });
   }
 
   clearinghouseState = computed((): HLClearinghouseState | undefined => {
@@ -180,8 +196,13 @@ export class PerpSummaryPage extends MenuBasePage {
         .filter((ap) => ap.position !== null)
         .map((ap) => ({
           position: ap.position!,
-          protection: positionProtection(ap.position!, orders),
-          botManaged: botPairs === null ? null : botPairs.has(ap.position!.coin),
+          // Profil illisible : les ordres ordinaires se disent manuels. ⚠️ Un SL du bot perd alors son
+          // robot ; la couverture, elle, reste juste. La cause est dans la console.
+          protection: positionProtection(
+            ap.position!,
+            orders,
+            botPairs?.has(ap.position!.coin) ?? false,
+          ),
         })),
     );
   });
@@ -192,6 +213,14 @@ export class PerpSummaryPage extends MenuBasePage {
   }
 
   /** Après une fermeture : relit les positions. */
+  /** L'heure de la dernière lecture reçue, pour limiter les relectures au premier plan. */
+  private loadedAt = 0;
+
+  onDataLoaded(data: PerpSummaryData): void {
+    this.loadedAt = Date.now();
+    this.data.set(data);
+  }
+
   reload(): void {
     this.fetchFn.set(this.buildFetchFn());
   }

@@ -289,14 +289,36 @@ export class AlertControllerStub {
   }
 }
 
-/** `ToastController` : seul `create().present()` est appelé par les composants du repo. */
+/**
+ * Un toast tel qu'Ionic le rend (`HTMLIonToastElement`), réduit à ce que le repo appelle :
+ * `present`, `dismiss`, et `onDidDismiss` (`OrderToastService` regroupe ses lignes jusqu'à la
+ * fermeture). Comme le vrai, `onDidDismiss` ne se résout qu'à la fermeture.
+ */
+export function toastElementStub(): {
+  present: () => Promise<void>;
+  dismiss: () => Promise<boolean>;
+  onDidDismiss: () => Promise<{ role?: string }>;
+} {
+  let closed!: (detail: { role?: string }) => void;
+  const didDismiss = new Promise<{ role?: string }>((resolve) => (closed = resolve));
+  return {
+    present: async () => {},
+    dismiss: async () => {
+      closed({ role: undefined });
+      return true;
+    },
+    onDidDismiss: () => didDismiss,
+  };
+}
+
+/** `ToastController` : `create()` rend un toast qui se présente et se ferme comme celui d'Ionic. */
 @Injectable({ providedIn: 'root' })
 export class ToastControllerStub {
   readonly messages: string[] = [];
 
-  async create(options: { message: string }): Promise<{ present: () => Promise<void> }> {
+  async create(options: { message: string }): Promise<ReturnType<typeof toastElementStub>> {
     this.messages.push(options.message);
-    return { present: async () => {} };
+    return toastElementStub();
   }
 }
 

@@ -110,9 +110,7 @@
               <ion-badge color="medium" class="fill-dex">HIP-3</ion-badge>
               }
             </span>
-            <ion-badge [color]="fill.side === 'B' ? 'success' : 'danger'">
-              {{ directionLabel(fill) }}
-            </ion-badge>
+            <app-side-badge [badge]="sideBadge(fill)" />
           </div>
           <div class="fill-row">
             <span>{{ fill.px }} · {{ fill.sz }}</span>

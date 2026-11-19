@@ -70,11 +70,21 @@ ion-item {
   --padding-start: 12px;
   --inner-padding-end: 12px;
 
+  /* Le marché et le badge se partagent une demi-largeur (159 px à 360). Sans
+     retour à la ligne, `xyz:BRENTOIL` (113 px) **chevauchait** le badge de 12 px
+     (mesuré le 2026-11-18). L'en-tête passe donc à la ligne : le marché garde sa
+     puce HIP-3 sur sa ligne, et le badge descend, aligné à droite. */
   .fill-header {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
+    gap: 2px 6px;
     margin-bottom: 2px;
+
+    app-side-badge {
+      margin-left: auto;
+    }
   }
 
   .fill-body {
@@ -117,8 +127,9 @@ ion-item {
   .fill-dex {
     /* ⚠️ Sans cela, elle est **rognée** : mesuré à 360 px sur `xyz:BRENTOIL`,
        il ne restait que « H ». Le nom d'un marché HIP-3 est long par nature —
-       il porte son préfixe de dex —, donc c'est la puce qui passe à la ligne,
-       jamais elle qui se coupe. */
+       il porte son préfixe de dex. Depuis le 2026-11-18 la puce reste sur la
+       ligne du nom, et c'est le badge de côté qui passe à la ligne
+       (`.fill-header`) ; elle ne se coupe jamais. */
     flex: 0 0 auto;
     font-size: 0.62rem;
     font-weight: 600;

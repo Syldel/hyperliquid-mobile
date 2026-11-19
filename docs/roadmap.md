@@ -386,7 +386,7 @@ l'app**, **en plus** du stop intelligent du bot, jamais à sa place (décidé le
    plus. Deux ronds de 14 px à côté de LONG / SHORT (`perp-summary/components/coverage-pie`), lus dans
    `frontendOpenOrders` de son dex (`perp-summary/position-protection.util.ts`, la règle de couverture du bot recopiée,
    deux écarts écrits en tête du fichier) :
-   - **SL** : vide rouge, part orange avec son pourcentage, plein vert ;
+   - **SL** : vide rouge, part orange, plein vert (le pourcentage écrit à côté a été retiré le 2026-11-18) ;
    - **TP** : vide gris (l'absence est un choix, pas une alerte), part ou plein vert ;
    - gris en pointillé quand les ordres n'ont pas pu être lus ;
    - un **robot** sur les paires que le bot gère (profil utilisateur, sa règle `enabled` stricte) : ses ordres n'ont pas
@@ -409,7 +409,68 @@ l'app**, **en plus** du stop intelligent du bot, jamais à sa place (décidé le
    position couverte par le stop du bot. ⚠️ La page ne lit que les dex **cochés** dans son sélecteur : la position
    n'apparaissait pas tant que `xyz` n'y était pas — ce n'est pas une absence de position, c'est un filtre, et la
    page ne le dit pas. ⚠️ Le sens du seuil d'un **take-profit** (`Price above` pour fermer un long) est
-   déduit par symétrie de celui du stop, mesuré : un désaccord ne compte pas et s'écrit dans la bulle.
+   déduit par symétrie de celui du stop, mesuré : un désaccord ne compte pas (et ne se voit plus que comme un rond
+   rouge, depuis le retrait de la bulle).
+
+   **Revu le 2026-11-18, après usage sur le téléphone**, à la demande de l'utilisateur :
+   - la carte ne garde que les ronds : ⓘ, sa bulle et la ligne `SL … · TP …` retirés. Le robot n'est plus une icône à
+     part : **un rond par source**, avec une pastille posée dessus — robot pour le bot, **escalier** pour le trailing
+     natif (choisi parmi six), rien pour un ordre manuel. Le stop du bot et un trailing qui cohabitent font deux ronds
+     SL, chacun avec sa part. ⚠️ Profil illisible : les ordres ordinaires se disent manuels (le robot manque, la
+     couverture reste juste) ;
+   - les badges de côté perdent `OPEN` / `CLOSE` au profit d'un glyphe plein, ▶ ouvre, ■ ferme (`app-side-badge`), et
+     **la couleur suit le mot** : `■ SHORT` est rouge, comme le short qu'il ferme. Open Orders, détail, History, Trade
+     History, positions ;
+   - les toasts d'ordre passent par `OrderToastService` : un seul toast par envoi, une ligne par ordre, vert si tout
+     est passé, rouge dès qu'une ligne échoue. Ionic présentait chaque toast au même endroit, le dernier masquant les
+     autres ;
+   - la page des positions ne lit plus les ordres d'un dex **sans position** (20 de poids par dex coché), et ne relit
+     au premier plan qu'une fois par minute.
+
+   **Mesuré dans le navigateur le 2026-11-18**, à 360 px, en clair et en sombre, sur la vraie position `xyz:NVDA` et
+   des cas injectés (`xyz:BRENTOIL`, paires du bot) : centres du badge, de son glyphe, des libellés, des ronds et des
+   pourcentages alignés au dixième de pixel près (l'encre des capitales Roboto est 0,15 px au-dessus du centre de sa
+   boîte) ; pastilles 6,37:1 en clair et 6,00:1 en sombre sur leur fond, qui se détache à 6,26:1 et 8,65:1 du rond
+   vert ; un toast de trois lignes fait trois lignes (60 px pour 20 de hauteur de ligne). La vérification avec
+   `xyz:BRENTOIL` a trouvé un défaut plus ancien : dans Trade History, le nom **chevauchait** le badge de 12 px.
+   L'en-tête passe désormais à la ligne, badge en dessous à droite. ⚠️ Le regroupement des toasts n'est vu qu'en
+   test et avec un toast présenté à la main : aucun ordre n'a été posé.
+
+   **Repris le même soir, après un second passage sur le téléphone** : les badges ▶ / ■ mesuraient **21,2 px** contre
+   18,02 pour `Limit` ou `ALO`. Le composant passait l'`ion-badge` en `flex`, ce qui annule le rognage global sur les
+   capitales (`text-box: trim-both cap alphabetic`, `styles.scss`). Le badge redevient un `ion-badge` ordinaire et le
+   glyphe un SVG en ligne, relevé de `0,3555em − 3,5px` (demi-hauteur des capitales Roboto moins demi-glyphe). Mesuré à
+   360 px, en clair et en sombre, sur Open Orders, History et la carte de position, pour ▶ et ■, LONG et SHORT :
+   18,02 px partout, glyphe à 0,00 px du centre des capitales, texte à 0,03 px du centre du badge, 4 px de chaque côté.
+   Dans Open Orders et History, **les badges forment un bloc insécable** (`.order-tags`) qui passe à la ligne entier
+   sous un nom long : avec `xyz:BRENTOIL` et `Trailing Stop Market` / `Take Profit Market`, tous à x = 16 sur la
+   seconde ligne. Les ronds de protection ne portent plus de pourcentage : la part et la couleur suffisent.
+
+   **Puis, vu sur le téléphone : « tous les textes trop bas de 1 à 2 px, sauf HIP-3 ».** Dans le navigateur de
+   développement, le chemin `text-box` est centré (0,01 px, encre mesurée, en Arial comme en Roboto chargé). Le
+   **repli** ne l'était pas : réglé sans le savoir sur Arial (Roboto manque au PC de développement), il laissait sur
+   Roboto le texte 0,69 px trop bas, 0,29 sur HIP-3 — la même forme que ce qui a été vu, et la première explication
+   donnée. **Elle était fausse** : le téléphone (Xperia 1 III, Android 13, Chrome 157, relevé le 2026-11-19) gère
+   `text-box` et ne lit pas le repli. Le repli reste corrigé (0,09 et 0,18 px sur Roboto), mais l'écart vu sur
+   l'appareil n'est **pas expliqué**. L'utilisateur précise que les badges d'avant ▶ / ■ y étaient bien centrés.
+   Plutôt qu'un troisième réglage fin, le glyphe sort du flux du texte (absolu, centré sur la boîte) : la ligne
+   d'un badge redevient son seul texte, comme avant ▶ / ■. ⚠️ **Pas encore vu sur le téléphone** : à confirmer
+   sur une capture native, mesurée au pixel. Le même jour, les badges gris d'un trailing stop natif (`Trailing`, `Trailing Stop
+Market`) prennent l'escalier de la pastille du rond (`app-order-type-badge`), en trois marches à 7 px.
+
+   **Le 2026-11-19** : l'escalier passe à 9 px (un trait fin pesait moins que ▶ et ■ à 7 px) ; un TIF hors de `Gtc` /
+   `Alo` / `Ioc` s'affiche tel que l'API l'écrit (`FrontendMarket`, et non plus `FRONTENDMARKET`) ; et l'ouverture
+   prend ▲ pour un LONG (un achat) et ▼ pour un SHORT (une vente) au lieu de ▶, la convention des marqueurs d'achat et
+   de vente de TradingView et déjà celle des exécutions sur le chart de la watchlist. ■ ferme, inchangé. Écartés : le
+   texte de l'API en toutes lettres (`Open Long`, `Close Short`, qui tenait à 360 px sur History, mesuré),
+   `BTO` / `STO` / `BTC` / `STC` des options américaines. ⚠️ **Incohérence ouverte** : les marqueurs de stratégie du
+   chart (`strategy-markers.util.ts`) disent flèche haute = entrée, flèche basse = sortie, quel que soit le côté ; un
+   ▼ y veut dire « sortie », dans un badge « ouvre un short ». Toujours ouverte, **pas prioritaire**. Essayé le
+   2026-11-19 puis annulé : ▲ / ▼ pour une entrée dans le sens de l'ordre, ■ pour une sortie, achat sous la bougie
+   et vente au-dessus. Sur une stratégie qui se retourne (HMA 9/21), chaque croisement empile un ■ et une flèche,
+   et le chart était **trop chargé** en vue dense (1W / 1H, vu à 360 px). Le carré ne peut pas y être allégé :
+   lightweight-charts 5.2 le dessine à 0,7 fois la flèche (9 px contre 13), et son option `size` est bornée par
+   un minimum de 12 px. Une reprise devra d'abord répondre à cette densité.
 
    **Sur une paire du bot, le bouton « Trail »** : la cohabitation est mesurée (2026-11-16,
    `nest-trading-bot/docs/known-gaps.md`), mais un trailing plus serré que le stop du bot devance la sortie que le

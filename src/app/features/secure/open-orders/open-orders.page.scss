@@ -63,3 +63,13 @@
     font-weight: 600;
   }
 }
+
+/* Le bloc des badges : insécable, il passe à la ligne entier sous un nom long (`xyz:BRENTOIL`)
+   au lieu de laisser le côté sur la ligne du nom et le type sur la suivante (2026-11-18). */
+.order-tags {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}

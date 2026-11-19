@@ -34,7 +34,9 @@ import { DexSelectorComponent } from '@shared/components/dex-selector/dex-select
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import { HLFrontendOpenOrder } from '@syldel/hl-shared-types';
 import { marketKindLabel, openOrdersDexOf } from '@utils/market-kind.util';
-import { sideBadgeLabel, tifLabel } from '@utils/order-labels.util';
+import { orderSideBadge, tifLabel } from '@utils/order-labels.util';
+import { OrderTypeBadgeComponent } from '@shared/components/order-type-badge/order-type-badge.component';
+import { SideBadgeComponent } from '@shared/components/side-badge/side-badge.component';
 import { addIcons } from 'ionicons';
 import { addOutline, createOutline } from 'ionicons/icons';
 import { forkJoin, map, Observable } from 'rxjs';
@@ -46,6 +48,8 @@ import { trailingStopSummary, trailingStopView } from './trailing-stop-view.util
   selector: 'app-open-orders',
   standalone: true,
   imports: [
+    SideBadgeComponent,
+    OrderTypeBadgeComponent,
     RefreshableLayoutComponent,
     DexSelectorComponent,
     IonList,
@@ -112,8 +116,8 @@ export class OpenOrdersPage extends MenuBasePage implements OnInit {
     return (coin ? this.openOrders().filter((o) => o.coin === coin) : this.openOrders()).map(
       (o) => ({
         ...o,
-        // LONG / SHORT sur un perp, BUY / SELL ailleurs, CLOSE … pour un reduce-only (`order-labels.util.ts`).
-        sideLabel: sideBadgeLabel(o.coin, o.side === 'B', o.reduceOnly),
+        // ▲ / ▼ / ■ LONG / SHORT sur un perp, BUY / SELL ailleurs (`order-labels.util.ts`).
+        sideBadge: orderSideBadge(o.coin, o.side === 'B', o.reduceOnly),
       }),
     );
   });

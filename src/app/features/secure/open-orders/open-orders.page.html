@@ -39,15 +39,19 @@
         <ion-label>
           <div class="order-header">
             <strong>{{ displayCoin(openOrder.coin) }}</strong>
-            <ion-badge [color]="openOrder.side === 'B' ? 'success' : 'danger'">
-              {{ openOrder.sideLabel }}
-            </ion-badge>
-            <ion-badge color="medium">{{ trailing ? 'Trailing' : openOrder.orderType }}</ion-badge>
-            @if (openOrder.tif) {
-            <ion-badge color="medium">{{ tifLabel(openOrder.tif) }}</ion-badge>
-            } @if (isStuckTriggered(openOrder)) {
-            <ion-badge color="danger">Triggered</ion-badge>
-            }
+            <!-- Les badges forment un bloc : sous un nom long, ils passent à la ligne ensemble. -->
+            <span class="order-tags">
+              <app-side-badge [badge]="openOrder.sideBadge" />
+              <app-order-type-badge
+                [orderType]="openOrder.orderType"
+                [label]="trailing ? 'Trailing' : openOrder.orderType"
+              />
+              @if (openOrder.tif) {
+              <ion-badge color="medium">{{ tifLabel(openOrder.tif) }}</ion-badge>
+              } @if (isStuckTriggered(openOrder)) {
+              <ion-badge color="danger">Triggered</ion-badge>
+              }
+            </span>
           </div>
           @if (trailing) {
           <p

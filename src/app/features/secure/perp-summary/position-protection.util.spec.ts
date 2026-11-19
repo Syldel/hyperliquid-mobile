@@ -1,6 +1,11 @@
 import type { HLFrontendOpenOrder } from '@syldel/hl-shared-types';
 import type { IExchange } from '@syldel/trading-shared-types';
-import { botManagedPairs, positionProtection, type Coverage } from './position-protection.util';
+import {
+  botManagedPairs,
+  positionProtection,
+  type Coverage,
+  type SourceCoverage,
+} from './position-protection.util';
 
 /**
  * Les formes viennent d'ordres lus sur le compte de développement : le stop du bot
@@ -68,10 +73,15 @@ const read = (position: typeof LONG, orders: HLFrontendOpenOrder[]) => {
   if (result.verdict !== 'read') throw new Error(`expected a reading, got ${result.reason}`);
   return result;
 };
+/** La couverture d'un côté qui n'a qu'une source : la plupart des cas. */
+const only = (list: SourceCoverage[]): Coverage => {
+  if (list.length !== 1) throw new Error(`expected one source, got ${list.length}`);
+  return list[0].coverage;
+};
 const slOf = (orders: HLFrontendOpenOrder[], position = LONG): Coverage =>
-  read(position, orders).sl;
+  only(read(position, orders).sl);
 const tpOf = (orders: HLFrontendOpenOrder[], position = LONG): Coverage =>
-  read(position, orders).tp;
+  only(read(position, orders).tp);
 
 describe('positionProtection', () => {
   describe('the stop-loss', () => {
@@ -109,7 +119,8 @@ describe('positionProtection', () => {
     });
 
     it('names the stop the price reaches first: the highest for a long', () => {
-      const sl = slOf([TRAILING_TRACKING, STOP]);
+      const lower = { ...STOP, oid: 8, triggerPx: '1700', triggerCondition: 'Price below 1700' };
+      const sl = slOf([lower, STOP]);
       expect(sl.state === 'full' && sl.nearest.oid).toBe(1);
     });
 
@@ -186,11 +197,43 @@ describe('positionProtection', () => {
     });
   });
 
+  describe('who placed it: one pie per source', () => {
+    const sources = (list: SourceCoverage[]) => list.map((c) => [c.source, c.coverage.state]);
+
+    it('calls ordinary orders manual on a pair the bot does not manage', () => {
+      expect(sources(read(LONG, [STOP, TAKE_PROFIT]).sl)).toEqual([['manual', 'full']]);
+    });
+
+    // Sur ses paires le bot tient tous les SL/TP ordinaires (`classifyPairOrders`).
+    it('gives ordinary orders to the bot on a pair it manages', () => {
+      const result = positionProtection(LONG, [STOP, TAKE_PROFIT], true);
+      expect(result.verdict === 'read' && sources(result.sl)).toEqual([['bot', 'full']]);
+      expect(result.verdict === 'read' && sources(result.tp)).toEqual([['bot', 'full']]);
+    });
+
+    // Un trailing natif n'est jamais au bot : il est `unmanaged` chez lui.
+    it('keeps the bot stop and a native trailing apart, each with its own share', () => {
+      const result = positionProtection(LONG, [{ ...STOP, sz: '0.003' }, TRAILING_TRACKING], true);
+      expect(result.verdict === 'read' && sources(result.sl)).toEqual([
+        ['bot', 'partial'],
+        ['trailing', 'full'],
+      ]);
+    });
+
+    it('shows one empty pie at the source that should have placed it', () => {
+      const bot = positionProtection(LONG, [], true);
+      expect(bot.verdict === 'read' && bot.sl).toEqual([
+        { source: 'bot', coverage: { state: 'none' } },
+      ]);
+      expect(read(LONG, []).tp).toEqual([{ source: 'manual', coverage: { state: 'none' } }]);
+    });
+  });
+
   describe('the notes, a few words each', () => {
     // 2026-10-18 : un Stop Limit déclenché est resté 826 s au carnet, la position nue.
     it('says a triggered stop still resting does not count, and that it alters the reading', () => {
       const result = read(LONG, [STUCK_STOP]);
-      expect(result.sl).toEqual({ state: 'none' });
+      expect(only(result.sl)).toEqual({ state: 'none' });
       expect(result.notes).toEqual([{ text: 'SL triggered, still resting', alters: true }]);
     });
 
@@ -201,21 +244,21 @@ describe('positionProtection', () => {
 
     it('says what a waiting trailing stop waits for, without counting it', () => {
       const result = read(LONG, [TRAILING_WAITING]);
-      expect(result.sl).toEqual({ state: 'none' });
+      expect(only(result.sl)).toEqual({ state: 'none' });
       expect(result.notes).toEqual([{ text: 'Trailing waits > 2355', alters: false }]);
     });
 
     // Le nom et le sens du seuil doivent s'accorder : sinon l'ordre ne se devine pas.
     it('says an order whose trigger direction contradicts its role is not counted', () => {
       const result = read(LONG, [{ ...STOP, triggerCondition: 'Price above 1788.6' }]);
-      expect(result.sl).toEqual({ state: 'none' });
+      expect(only(result.sl)).toEqual({ state: 'none' });
       expect(result.notes[0]?.text).toBe('SL "Price above 1788.6" not counted');
     });
 
     it('says a size that is zero or unreadable is not counted', () => {
       for (const sz of ['0.0', 'abc']) {
         const result = read(LONG, [{ ...STOP, sz }]);
-        expect(result.sl).toEqual({ state: 'none' });
+        expect(only(result.sl)).toEqual({ state: 'none' });
         expect(result.notes[0]?.text).toBe(`SL size "${sz}" not counted`);
       }
     });

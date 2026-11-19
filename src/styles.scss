@@ -63,14 +63,56 @@ ion-badge {
   text-box: trim-both cap alphabetic;
 }
 
-/* Repli pour un WebView sans `text-box` (Chrome < 133, Safari < 18.2) : le même
-   décalage, mesuré sur Roboto — 0,128 em —, reporté dans le padding. Une
-   approximation par police : ailleurs que Roboto elle peut laisser un reste. */
+/* Repli pour un WebView sans `text-box` (Chrome < 133, Safari < 18.2) : la boîte
+   de ligne n'est plus rognée, le padding le compense. Même hauteur (10 px + la
+   hauteur des capitales), et l'écart haut/bas place le milieu des capitales au
+   milieu du badge.
+
+   ⚠️ Réglé sur **Roboto**, la police d'Android. L'ancien repli (`3px + 0.128em` /
+   `4px - 0.128em`) se disait « mesuré sur Roboto », mais Roboto n'est pas installé
+   sur le PC de développement : il avait été mesuré sur **Arial**, où il centre à
+   0,02 px, et laissait sur Roboto le texte **0,69 px trop bas** (0,29 px sur la
+   puce HIP-3, plus petite). Mesuré le 2026-11-18, Roboto chargé dans la page et
+   `text-box` neutralisé : 0,09 px à 11,2 px, 0,18 px sur HIP-3. ⚠️ Ce n'est pas
+   ce qui faisait les textes trop bas vus sur le téléphone ce soir-là : son Chrome
+   (157) gère `text-box` et ne lit jamais ce repli. Sur Arial, ce repli laisse le texte ~0,7 px trop **haut** : un repli ne centre
+   qu'une police, `text-box` les centre toutes. */
 @supports not (text-box: trim-both cap alphabetic) {
   ion-badge {
-    padding-top: calc(3px + 0.128em);
-    padding-bottom: calc(4px - 0.128em);
+    padding-top: calc(5px - 0.1145em);
+    padding-bottom: calc(5px - 0.1745em);
   }
+}
+
+/* Le glyphe d'un badge (▲ / ▼ ouvre, ■ ferme, l'escalier du trailing) : **hors du flux du
+   texte**. Le badge porte la classe `badge--glyph`, qui élargit seulement son padding
+   gauche ; le glyphe y est posé en absolu et centré sur la boîte du badge, que
+   `text-box` centre déjà sur les capitales.
+
+   Pourquoi pas en ligne : un SVG en ligne, relevé d'une fraction d'em, centrait à
+   0,00 px dans le navigateur de développement, et le téléphone (Chrome 157, Roboto
+   système) a montré le texte des badges 1 à 2 px trop bas, seule la puce HIP-3, sans
+   glyphe, paraissant juste (2026-11-18, non expliqué). Ainsi, la ligne d'un
+   badge à glyphe ne contient que son texte, exactement comme avant les glyphes — ce qui
+   était juste sur le téléphone —, et le centrage du glyphe ne dépend d'aucune métrique
+   de police. */
+ion-badge.badge--glyph {
+  /* 7 px par défaut (▲, ▼, ■) ; un glyphe à trait fin peut demander plus (l'escalier). */
+  --badge-glyph-size: 7px;
+
+  position: relative;
+  /* 4 px d'Ionic, le glyphe, 4 px d'écart. */
+  padding-inline-start: calc(8px + var(--badge-glyph-size));
+}
+
+.badge-glyph {
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  width: var(--badge-glyph-size);
+  height: var(--badge-glyph-size);
+  margin-top: calc(var(--badge-glyph-size) / -2);
+  fill: currentColor;
 }
 
 /* Ionic peint le texte d'une `ion-chip` colorée avec `--ion-color-shade`, la
@@ -208,4 +250,10 @@ ion-button ion-spinner[slot='start'] {
 
 ion-button ion-spinner[slot='end'] {
   margin-inline-start: 0.4em;
+}
+
+// Les toasts d'un envoi d'ordre (`OrderToastService`) : une ligne par ordre, séparées par un saut de
+// ligne dans le message, qu'Ionic écrase sans `pre-line`.
+.order-toast::part(message) {
+  white-space: pre-line;
 }

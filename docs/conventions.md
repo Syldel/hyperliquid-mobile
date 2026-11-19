@@ -293,6 +293,21 @@ hypothèse et non une mesure.
 deux divisés par leur densité donnent 411×960. À confirmer sur l'appareil avec
 `window.innerWidth` plutôt qu'à me croire.
 
+### Avec un nom de paire long, toujours
+
+Une largeur se vérifie avec le **contenu le plus large que l'écran recevra**, et le
+nom de paire en est la première source : `ETH` tient en trois caractères,
+`xyz:BRENTOIL` (un perp HIP-3 du dex `xyz`) en douze. Toute mesure dans le navigateur
+après un changement qui touche une ligne, une cellule ou un en-tête portant un nom
+de paire se fait donc **aussi avec `xyz:BRENTOIL`** — une vraie position ou un vrai
+ordre si le compte en a, sinon une valeur injectée dans la page, et le rapport dit
+laquelle.
+
+Pourquoi c'est une règle : sur le téléphone, le 2026-11-18, Trade History coupait
+le `SHORT` de `OPEN SHORT` à droite et renvoyait l'étiquette `HIP-3` à la ligne ;
+la carte d'une position séparait ses ronds SL et TP sur deux lignes (corrigé le
+2026-11-17). Aucun des trois ne se voyait avec `ETH`.
+
 La densité de pixels, elle, ne change rien à la mise en page : tout se raisonne
 en pixels CSS. La hauteur compte moins — on fait défiler — sauf dans une modale,
 dont l'en-tête et le pied sont fixes.
@@ -347,10 +362,18 @@ La règle, pour tout élément à **une seule ligne** de texte dans une boîte �
   `min-width` égal à la hauteur, `border-radius` de la **moitié** de la hauteur.
   `border-radius: 50%` déformerait la pastille en ellipse à deux chiffres.
 - **Un repli, parce que le WebView n'est pas Chrome** : `text-box` demande
-  Chrome 133 ou Safari 18.2. Sous `@supports not`, le décalage mesuré sur Roboto
-  (0,128 em) est reporté dans le padding. C'est une approximation **par police**,
-  exacte sur Roboto et pas ailleurs : si l'appareil sert une autre police, le
-  repli peut laisser un reste, et seul `text-box` garantit l'alignement.
+  Chrome 133 ou Safari 18.2. Sous `@supports not`, le padding compense la boîte
+  de ligne non rognée (`5px - 0.1145em` / `5px - 0.1745em`, réglé sur Roboto).
+  C'est une approximation **par police** : sur Arial il laisse le texte ~0,7 px
+  trop haut, et seul `text-box` garantit l'alignement.
+- **Un glyphe dans un badge** (▲, ▼, ■, l'escalier du trailing) se pose **hors du
+  flux du texte** : la classe `badge--glyph` sur le badge élargit son padding
+  gauche, `.badge-glyph` y place un SVG de 7 px (9 pour l'escalier, `--badge-glyph-size`) en absolu, centré sur la boîte
+  (`styles.scss`). La ligne du badge ne contient ainsi que son texte, et le texte
+  se centre par la seule règle commune. Deux essais l'ont dicté, le 2026-11-18 :
+  le badge en `flex` (le rognage ne s'applique plus, 21,2 px au lieu de 18,02),
+  puis le SVG **en ligne**, relevé d'une fraction d'em — centré à 0,00 px dans le
+  navigateur de développement, texte 1 à 2 px trop bas sur le téléphone.
 
 **Se vérifie par mesure, pas à l'œil** : un demi-pixel ne se voit pas sur une
 capture, et c'est ce demi-pixel qui fait un badge bancal. Poser une sonde
@@ -358,12 +381,46 @@ capture, et c'est ce demi-pixel qui fait un badge bancal. Poser une sonde
 de la baseline ; `measureText().actualBoundingBoxAscent` donne la hauteur de
 l'encre. L'écart entre l'espace du haut et celui du bas doit tomber sous 0,1 px
 (mesuré après correctif : 0,02 px sur `BUY`, `SELL` ; 0,12 px sur le compteur à
-1, 2 et 3 chiffres). Le **repli se mesure aussi**, en forçant `text-box: none`
-et son padding sur un badge : 5,09 px / 5,09 px sur Roboto.
+1, 2 et 3 chiffres). Le **repli se mesure aussi**, en forçant `text-box: normal`
+et son padding sur un badge.
+
+⚠️ **Roboto n'est pas installé sur le PC de développement** : la page y est
+rendue en Arial, la police de repli. La première mesure du repli, notée « sur
+Roboto », avait été faite sur Arial : sur Roboto, ce repli laissait le texte
+0,69 px trop bas (0,29 sur la puce HIP-3). Pour mesurer sur Roboto, le charger dans la page
+(une feuille Google Fonts injectée, le temps de la mesure) et poser
+`font-family: Roboto` sur les badges : `document.fonts.check` répond `true`
+même pour une police absente, il ne prouve rien ; comparer une largeur
+`measureText` contre `monospace` le dit. Chiffres du 2026-11-18, repli livré :
+0,09 px à 11,2 px, 0,18 px sur HIP-3 (9,9 px) ; le reste vient de l'arrondi de
+la ligne de base aux pixels de l'écran.
 
 ⚠️ Cette mesure est celle d'une **police**, d'un **navigateur** et d'un **écran** :
 elle n'a pas été refaite sur un appareil réel (iOS, Android), où la police
 système peut différer.
+
+### L'écran de référence est un vrai téléphone, pas le navigateur de développement
+
+L'app se lit sur un **téléphone Android** — aujourd'hui un Xperia 1 III (Android 13,
+Chrome 157, écran à forte densité), la police du système étant **Roboto**. Le
+navigateur de développement n'en est qu'une approximation : autre police (Arial sur le
+PC, faute de Roboto), autre densité de pixels, autre arrondi des positions. Un écart
+d'un pixel y est invisible et devient visible sur l'appareil — vu le 2026-11-18, un
+badge centré à 0,00 px dans le navigateur, trop bas de 1 à 2 px sur le téléphone.
+
+D'où, pour tout ce qui place du texte au pixel près (badge, puce, compteur, glyphe
+à côté d'un texte) :
+
+- **la police décide de la position** : hauteur des capitales, ascendante,
+  ligne de base varient d'une police à l'autre, et un réglage exprimé en `em` ou en
+  pixels sur une police est faux sur une autre. Mesurer sur **Roboto chargé**, jamais
+  sur la police par défaut du PC ;
+- **préférer une construction qui ne dépend d'aucune métrique de police** à un
+  réglage fin : `text-box` plutôt qu'un padding calculé, un glyphe centré sur la
+  boîte plutôt que relevé sur la ligne de base ;
+- **ne pas déclarer juste ce qui n'a été vu que dans le navigateur** : la
+  vérification finale d'un alignement fin est une capture native du téléphone (PNG
+  pleine résolution), mesurée au pixel. Tant qu'elle manque, le dire.
 
 ---
 

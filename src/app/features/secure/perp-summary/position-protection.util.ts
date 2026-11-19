@@ -70,7 +70,9 @@ export type Coverage =
   | { state: 'full'; nearest: ProtectionCover; covers: ProtectionCover[] };
 
 /**
- * Ce qui explique la couverture, en quelques mots — la carte n'a pas la place d'une phrase.
+ * Ce qui explique la couverture, en quelques mots. ⚠️ Plus affichées depuis le 2026-11-18 (la bulle ⓘ a
+ * été retirée de la carte, à la demande de l'utilisateur) : gardées pour la bulle qui pourra revenir, et
+ * parce qu'un rond rouge sans sa raison reste au moins visible.
  * `alters` : la note change ce qu'il faut comprendre (un stop déclenché qui ne protège plus), et
  * pas seulement ce qu'on voit (un trailing qui attend).
  */
@@ -79,9 +81,31 @@ export interface ProtectionNote {
   alters: boolean;
 }
 
+/**
+ * Qui a posé les ordres d'un rond, pour l'icône posée dessus (2026-11-18) :
+ *
+ * - `bot` : un SL ou un TP ordinaire sur une paire que le bot gère — il les tient tous
+ *   (`botManagedPairs`), y compris un TP/SL de position ;
+ * - `trailing` : le trailing stop natif, jamais au bot ;
+ * - `manual` : un ordre ordinaire sur une paire que le bot ne gère pas.
+ *
+ * Quand deux sources couvrent le même côté, chacune a **son** rond et sa propre part : le stop du bot et un
+ * trailing qui cohabitent se lisent l'un à côté de l'autre, au lieu d'une somme qui cacherait lequel
+ * couvre quoi.
+ */
+export type CoverSource = 'bot' | 'manual' | 'trailing';
+
+export interface SourceCoverage {
+  source: CoverSource;
+  coverage: Coverage;
+}
+
 export type PositionProtection =
-  | { verdict: 'read'; sl: Coverage; tp: Coverage; notes: ProtectionNote[] }
+  | { verdict: 'read'; sl: SourceCoverage[]; tp: SourceCoverage[]; notes: ProtectionNote[] }
   | { verdict: 'unknown'; reason: string };
+
+/** Les sources dans l'ordre d'affichage : celui qui gère la paire d'abord, le trailing en dernier. */
+const SOURCE_ORDER: CoverSource[] = ['bot', 'manual', 'trailing'];
 
 type PositionFields = { coin: string; szi: string };
 
@@ -92,6 +116,8 @@ type PositionFields = { coin: string; szi: string };
 export function positionProtection(
   position: PositionFields,
   orders: readonly HLFrontendOpenOrder[] | null,
+  /** La paire est au bot : ses SL et TP ordinaires sont les siens. */
+  botManaged = false,
 ): PositionProtection {
   if (orders === null) {
     return { verdict: 'unknown', reason: 'Open orders unreadable' };
@@ -103,8 +129,13 @@ export function positionProtection(
   const isLong = !NEGATIVE.test(position.szi);
   const closingSide = isLong ? 'A' : 'B';
 
-  const sl = new Tally('SL');
-  const tp = new Tally('TP');
+  const tallies = new Map<string, Tally>();
+  const tally = (role: 'SL' | 'TP', source: CoverSource): Tally => {
+    const key = `${role}:${source}`;
+    if (!tallies.has(key)) tallies.set(key, new Tally(role));
+    return tallies.get(key)!;
+  };
+  const ordinary: CoverSource = botManaged ? 'bot' : 'manual';
   const notes: ProtectionNote[] = [];
 
   for (const order of orders) {
@@ -122,7 +153,11 @@ export function positionProtection(
     if (order.orderType === HL_ORDER_TYPE.trailingStopMarket) {
       const view = trailingStopView(order);
       if (view?.state === 'tracking') {
-        sl.add({ kind: 'TS', px: view.stopPx, oid: order.oid }, order.sz, notes);
+        tally('SL', 'trailing').add(
+          { kind: 'TS', px: view.stopPx, oid: order.oid },
+          order.sz,
+          notes,
+        );
       } else if (view?.state === 'waiting') {
         const sign = view.activation.direction === 'above' ? '>' : '<';
         notes.push({ text: `Trailing waits ${sign} ${view.activation.px}`, alters: false });
@@ -142,19 +177,33 @@ export function positionProtection(
       continue;
     }
 
-    const tally = role === 'SL' ? sl : tp;
+    const target = tally(role, ordinary);
     if (order.isPositionTpsl) {
-      tally.addWhole({ kind: `Position ${role}`, px: order.triggerPx, oid: order.oid });
+      target.addWhole({ kind: `Position ${role}`, px: order.triggerPx, oid: order.oid });
     } else {
-      tally.add({ kind: role, px: order.triggerPx, oid: order.oid }, order.sz, notes);
+      target.add({ kind: role, px: order.triggerPx, oid: order.oid }, order.sz, notes);
     }
   }
+
+  /**
+   * Un rond par source qui a au moins un ordre compté. Aucune : un seul rond vide, à la source qui
+   * aurait dû le poser — sur une paire du bot, le robot sur un SL vide dit que **le bot** ne la
+   * protège pas.
+   */
+  const side = (role: 'SL' | 'TP', nearestIs: 'highest' | 'lowest'): SourceCoverage[] => {
+    const found = SOURCE_ORDER.flatMap((source) => {
+      const t = tallies.get(`${role}:${source}`);
+      const coverage = t?.coverage(size, nearestIs);
+      return coverage && coverage.state !== 'none' ? [{ source, coverage }] : [];
+    });
+    return found.length > 0 ? found : [{ source: ordinary, coverage: { state: 'none' } }];
+  };
 
   return {
     verdict: 'read',
     // Le stop le plus proche est le plus haut pour un long ; le take-profit le plus proche, le plus bas.
-    sl: sl.coverage(size, isLong ? 'highest' : 'lowest'),
-    tp: tp.coverage(size, isLong ? 'lowest' : 'highest'),
+    sl: side('SL', isLong ? 'highest' : 'lowest'),
+    tp: side('TP', isLong ? 'lowest' : 'highest'),
     notes,
   };
 }

@@ -1,4 +1,5 @@
 import { signal } from '@angular/core';
+import { toastElementStub } from '@shared/testing/ionic-stubs';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ModalController, ToastController } from '@ionic/angular/standalone';
 import { readPerpMarketMeta } from '@utils/market-meta.util';
@@ -77,7 +78,7 @@ describe('OrderFormComponent — market order', () => {
         { provide: ModalController, useValue: { dismiss, create: modalCreate } },
         {
           provide: ToastController,
-          useValue: { create: () => Promise.resolve({ present: () => {} }) },
+          useValue: { create: () => Promise.resolve(toastElementStub()) },
         },
         { provide: HyperliquidGatewayService, useValue: { placeOrders } },
         {

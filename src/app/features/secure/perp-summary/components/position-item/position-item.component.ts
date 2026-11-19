@@ -1,40 +1,28 @@
 import { DecimalPipe, PercentPipe } from '@angular/common';
 import { Component, computed, inject, input, output, signal } from '@angular/core';
-import {
-  IonBadge,
-  IonButton,
-  IonIcon,
-  IonItem,
-  IonLabel,
-  IonPopover,
-  IonText,
-  ModalController,
-} from '@ionic/angular/standalone';
-import { addIcons } from 'ionicons';
-import { informationCircleOutline } from 'ionicons/icons';
+import { IonButton, IonItem, IonLabel, IonText, ModalController } from '@ionic/angular/standalone';
 import { SmartDecimalPipe } from '@pipes/smart-decimal.pipe';
 import { MiniChartComponent } from '@shared/components/mini-chart/mini-chart.component';
 import { HLPerpPositionDetail } from '@syldel/hl-shared-types';
 import { ClosePositionComponent } from '../../../open-orders/market-order/close-position.component';
-import { sideBadgeLabel } from '@utils/order-labels.util';
+import { positionSideBadge } from '@utils/order-labels.util';
+import { SideBadgeComponent } from '@shared/components/side-badge/side-badge.component';
 import {
   OrderFormComponent,
   type ClosePreset,
 } from '../../../open-orders/open-form/order-form.component';
-import type { Coverage, PositionProtection, ProtectionNote } from '../../position-protection.util';
+import type { PositionProtection, SourceCoverage } from '../../position-protection.util';
 import { CoveragePieComponent } from '../coverage-pie/coverage-pie.component';
 
 @Component({
   selector: 'app-position-item',
   standalone: true,
   imports: [
+    SideBadgeComponent,
     IonItem,
     IonLabel,
-    IonBadge,
     IonText,
     IonButton,
-    IonIcon,
-    IonPopover,
     CoveragePieComponent,
     MiniChartComponent,
     DecimalPipe,
@@ -51,60 +39,26 @@ export class PositionItemComponent {
   /** Ce que le carnet dit de sa protection, lu par la page (`position-protection.util.ts`). */
   protection = input.required<PositionProtection>();
 
-  /** Les paires que le bot gère, lues dans le profil ; `null` si le profil n'a pas pu être lu. */
-  botManaged = input.required<boolean | null>();
-
-  constructor() {
-    addIcons({ informationCircleOutline });
-  }
-
-  /** `null` : les ordres n'ont pas pu être lus — le rond le dit, en gris pointillé. */
-  readonly sl = computed((): Coverage | null => {
+  /**
+   * Un rond par source, de chaque côté ; `null` : les ordres n'ont pas pu être lus, et le rond le dit en
+   * gris pointillé. La carte n'en montre pas davantage (2026-11-18) : la raison d'un rond rouge et les
+   * niveaux se lisent dans Open Orders et sur le chart.
+   */
+  readonly sl = computed((): SourceCoverage[] | null => {
     const p = this.protection();
     return p.verdict === 'read' ? p.sl : null;
   });
-  readonly tp = computed((): Coverage | null => {
+  readonly tp = computed((): SourceCoverage[] | null => {
     const p = this.protection();
     return p.verdict === 'read' ? p.tp : null;
   });
-
-  /**
-   * Ce que la bulle ⓘ explique. La carte n'en montre que l'icône : une phrase y prenait deux lignes
-   * à 360 px (vu le 2026-11-17). Sans note, pas d'icône.
-   */
-  readonly notes = computed((): ProtectionNote[] => {
-    const p = this.protection();
-    const notes = p.verdict === 'read' ? [...p.notes] : [{ text: p.reason, alters: true }];
-    if (this.botManaged() === null) notes.push({ text: 'Bot pairs unreadable', alters: false });
-    return notes;
-  });
-  /** Une note change la lecture (un stop déclenché qui ne protège plus) : l'icône prend l'orange. */
-  readonly notesAlter = computed(() => this.notes().some((n) => n.alters));
-
-  /**
-   * Les niveaux, dans le bloc déplié : le stop et le take-profit les plus proches du prix, pour
-   * comparer les positions d'un coup d'œil. `+1` : un autre ordre couvre aussi.
-   */
-  readonly levels = computed((): string | null => {
-    const parts = [levelOf(this.sl()), levelOf(this.tp())].filter((l): l is string => l !== null);
-    return parts.length > 0 ? parts.join(' · ') : null;
-  });
-
-  readonly infoOpen = signal(false);
-  readonly infoEvent = signal<Event | null>(null);
-
-  openInfo(event: Event): void {
-    event.stopPropagation();
-    this.infoEvent.set(event);
-    this.infoOpen.set(true);
-  }
 
   readonly clicked = output<string>();
   /** Une action a peut-être changé la position : la page relit le compte. */
   readonly changed = output<void>();
 
   isLong = () => parseFloat(this.position().szi) > 0;
-  sideLabel = () => sideBadgeLabel(this.position().coin, this.isLong());
+  sideBadge = computed(() => positionSideBadge(this.position().coin, this.isLong()));
 
   pnlColor = computed(() => {
     const pnl = parseFloat(this.position().unrealizedPnl);
@@ -164,13 +118,4 @@ export class PositionItemComponent {
     const abs = Math.abs(n).toFixed(2);
     return n >= 0 ? `-${abs}` : `${abs}`;
   }
-}
-
-/** `SL 1788.6 +1` ; un TP/SL de position garde son rôle, un trailing s'écrit `TS`. */
-function levelOf(coverage: Coverage | null): string | null {
-  if (coverage === null || coverage.state === 'none') return null;
-  const { kind, px } = coverage.nearest;
-  const label = kind.replace('Position ', '');
-  const more = coverage.covers.length > 1 ? ` +${coverage.covers.length - 1}` : '';
-  return `${label} ${px}${more}`;
 }

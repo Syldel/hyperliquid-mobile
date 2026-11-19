@@ -1,4 +1,5 @@
 import { DecimalPipe } from '@angular/common';
+import { OrderToastService } from '@services/order-toast.service';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -22,7 +23,6 @@ import {
   IonTitle,
   IonToolbar,
   ModalController,
-  ToastController,
 } from '@ionic/angular/standalone';
 import { AvailableCapitalService } from '@services/available-capital.service';
 import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
@@ -89,7 +89,7 @@ import { MarketOrderService } from './market-order.service';
 })
 export class ClosePositionComponent implements OnInit {
   private readonly modalCtrl = inject(ModalController);
-  private readonly toastCtrl = inject(ToastController);
+  private readonly orderToast = inject(OrderToastService);
   private readonly hlMarket = inject(HyperliquidMarketService);
   private readonly hlInfo = inject(HyperliquidInfoService);
   private readonly marketOrders = inject(MarketOrderService);
@@ -273,14 +273,9 @@ export class ClosePositionComponent implements OnInit {
       case 'filled':
         this.locked.set(true);
         this.capital.invalidate();
-        this.toastCtrl
-          .create({
-            message: `${this.actionLabel()} filled · ${outcome.totalSz} @ ${outcome.avgPx}`,
-            duration: 3000,
-            position: 'top',
-            color: 'success',
-          })
-          .then((toast) => toast.present());
+        this.orderToast.success(
+          `${this.actionLabel()} filled · ${outcome.totalSz} @ ${outcome.avgPx}`,
+        );
         this.modalCtrl.dismiss(null, 'confirm');
         return;
     }

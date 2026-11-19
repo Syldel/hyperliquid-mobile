@@ -1,19 +1,22 @@
 :host {
   display: inline-flex;
+  align-items: center;
 }
 
 .pie {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  font-size: 11px;
-  font-weight: 400;
   line-height: 1;
-  color: var(--ion-color-medium);
 
-  // La couleur du rond suit le ton ; le libellé et le pourcentage restent en texte atténué, qui
-  // tient 4,5:1 dans les deux thèmes (docs/theming.md).
+  // La couleur du rond suit le ton.
   --pie-color: var(--ion-color-medium);
+  // Le fond de la pastille : celui de la carte, pour qu'elle découpe le rond au lieu de s'y fondre.
+  --pie-mark-bg: var(--ion-item-background, var(--ion-background-color, #fff));
+}
+
+// La pastille déborde de 4 px à droite : la place lui est réservée, le rond suivant ne la touche pas.
+.pie--marked .pie__disc {
+  margin-right: 4px;
 }
 
 .pie[data-tone='alert'] {
@@ -26,6 +29,17 @@
 
 .pie[data-tone='covered'] {
   --pie-color: var(--ion-color-success);
+}
+
+.pie__disc {
+  position: relative;
+  display: block;
+  width: 14px;
+  height: 14px;
+
+  > svg:first-child {
+    display: block;
+  }
 }
 
 .pie__ring {
@@ -42,4 +56,38 @@
   fill: none;
   stroke: var(--pie-color);
   stroke-width: 5.5;
+}
+
+.pie__mark {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  display: block;
+}
+
+.pie__mark-bg {
+  fill: var(--pie-mark-bg);
+  stroke: var(--ion-color-medium);
+  stroke-width: 0.6;
+}
+
+.pie__mark-fg {
+  fill: var(--ion-color-medium);
+}
+
+.pie__mark-hole {
+  fill: var(--pie-mark-bg);
+}
+
+.pie__mark-line {
+  stroke: var(--ion-color-medium);
+  stroke-width: 1;
+}
+
+.pie__mark-stairs {
+  fill: none;
+  stroke: var(--ion-color-medium);
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
 }

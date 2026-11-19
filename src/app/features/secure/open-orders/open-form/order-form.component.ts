@@ -23,11 +23,11 @@ import {
   IonSpinner,
   IonToggle,
   ModalController,
-  ToastController,
 } from '@ionic/angular/standalone';
 import { AvailableCapitalService } from '@services/available-capital.service';
 import { describeCapitalGap, type AvailableCapital } from '@utils/available-capital.utils';
 import { HyperliquidGatewayService } from '@services/hyperliquid-gateway.service';
+import { OrderToastService } from '@services/order-toast.service';
 import { HyperliquidInfoService } from '@services/hyperliquid-info.service';
 import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { isPerpMarket, isSpotMarket } from '@utils/market-kind.util';
@@ -176,7 +176,7 @@ export class OrderFormComponent implements OnInit {
   private readonly hlGateway = inject(HyperliquidGatewayService);
   private readonly hlMarket = inject(HyperliquidMarketService);
   private readonly hlInfo = inject(HyperliquidInfoService);
-  private readonly toastCtrl = inject(ToastController);
+  private readonly orderToast = inject(OrderToastService);
   private readonly availableCapitalService = inject(AvailableCapitalService);
   private readonly marketOrders = inject(MarketOrderService);
 
@@ -1066,30 +1066,20 @@ export class OrderFormComponent implements OnInit {
       return;
     }
 
-    const oid = status.resting?.oid ?? status.filled?.oid;
-    let message: string;
+    // Une ligne à 360 px : un ordre rempli dit sa taille et son prix, pas son OID (il n'est plus au
+    // carnet) ; un ordre posé dit son OID. Vert dans les deux cas (`OrderToastService`).
     if (status.filled) {
       const { totalSz, avgPx } = status.filled;
-      message = oid
-        ? `${label} filled · sz ${totalSz} @ ${avgPx} · OID ${oid}`
-        : `${label} filled · sz ${totalSz} @ ${avgPx}`;
-    } else {
-      message = oid ? `${label} placed · OID ${oid}` : `${label} placed`;
+      this.presentToast(`${label} filled · ${totalSz} @ ${avgPx}`, 'success');
+      return;
     }
-
-    this.presentToast(message, status.filled ? 'success' : 'primary');
+    const oid = status.resting?.oid;
+    this.presentToast(oid ? `${label} placed · OID ${oid}` : `${label} placed`, 'success');
   }
 
-  private presentToast(message: string, color: string): void {
-    this.toastCtrl
-      .create({
-        message,
-        duration: 3000,
-        position: 'top',
-        color,
-        buttons: [{ icon: 'close-outline', role: 'cancel' }],
-      })
-      .then((t) => t.present());
+  private presentToast(message: string, color: 'success' | 'danger'): void {
+    if (color === 'danger') this.orderToast.failure(message);
+    else this.orderToast.success(message);
   }
 
   /**
@@ -1443,10 +1433,7 @@ export class OrderFormComponent implements OnInit {
             text: `Partially filled: ${outcome.totalSz} of ${outcome.requestedSz} @ ${outcome.avgPx}. The rest was cancelled: the book did not hold it within the max slippage.`,
           });
         } else {
-          this.presentToast(
-            `Market order filled · ${outcome.totalSz} @ ${outcome.avgPx}`,
-            'success',
-          );
+          this.presentToast(`Market filled · ${outcome.totalSz} @ ${outcome.avgPx}`, 'success');
         }
 
         const items = sent.reduceOnly ? [] : this.protectiveOrders();
