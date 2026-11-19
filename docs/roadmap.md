@@ -487,8 +487,11 @@ depuis le même jour (400), l'app devra le dire dès la saisie. Et un 400 du gat
 ⚠️ **Pas mesuré** : l'activation et le déclenchement d'un trailing, un achat, un dex HIP-3.
 **Vu le 2026-11-17 au soir** : un trailing natif **existe sur un dex HIP-3**. Un achat reduce-only sur `xyz:NVDA`, posé
 depuis l'interface officielle, se lit dans `frontendOpenOrders` du dex `xyz` sous la même forme qu'au dex principal
-(`limitPx` 183.18 ≈ stop × 1,1). Le gateway et `planTrailingEntry` refusent encore les dex HIP-3 : la **pose** n'y est
-pas mesurée.
+(`limitPx` 183.18 ≈ stop × 1,1). **La pose y est mesurée le 2026-11-19** (`xyz:BRENTOIL`, S7 de
+`nest-trading-bot/docs/hyperliquid/live-check.md`) : le gateway l'accepte depuis `d7f8273` et lit le marqué du contrôle
+d'activation sur le dex de la paire ; l'exchange a accepté notre signature pour l'actif 110049, le trailing a suivi
+(stop = best × 0,9) et s'est annulé par la route ordinaire. ⚠️ `planTrailingEntry` refuse **encore** HIP-3 : à lever
+avec le formulaire Trail. Non mesurés sur HIP-3 : une activation atteinte, un déclenchement, un achat.
 
 ---
 
