@@ -539,6 +539,11 @@ Market`) prennent l'escalier de la pastille du rond (`app-order-type-badge`), en
    clair et en sombre (contrastes ≥ 6:1), sans rien envoyer. ⚠️ Ce qu'un trailing plus grand que la position
    **restante** fait à son déclenchement n'est pas mesuré.
 
+   **Deux paliers posés en réel, le 2026-11-19 à 23:15** : la position portée à 0,3, le 5 % existant (0,15, oid 610455230013) couvrait 50 %. Le formulaire présélectionnait **Rest = 0.15** et annonçait « With this one: 0.3
+   (100 %) » sans orange. Une seule pose dans le journal du gateway (8 %, oid 610708645016). Relu ensuite : deux
+   trailings, chacun avec son plus haut (90,281 et 90,129), et une couverture de 0,3 sur 0,3. ⚠️ Reste à voir le
+   déclenchement d'un palier : l'autre doit rester ouvert pour la moitié restante.
+
    ⚠️ **Pas encore vu en réel** : une annulation refusée. Et le texte reconnu pour `gone` (« Order was never placed,
    already canceled, or filled. ») vient de la doc, pas d'une mesure.
 
