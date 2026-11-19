@@ -37,7 +37,10 @@ import {
 import { extractErrorMessage } from '@utils/hl-error.utils';
 import { addIcons } from 'ionicons';
 import { closeOutline } from 'ionicons/icons';
-import { positionProtection } from '../../perp-summary/position-protection.util';
+import {
+  ordinaryProtections,
+  positionProtection,
+} from '../../perp-summary/position-protection.util';
 import { CLOSE_PERCENTS, closeSize } from '../market-order/close-position.util';
 import {
   botStopNotice,
@@ -87,6 +90,10 @@ import {
  * (`trailingCoverage`), « Rest » remplit la part sans trailing, et chaque trailing listé se remplace d'ici —
  * au premier essai réel (2026-11-19), « Trail » depuis la carte a ajouté un 8 % à côté du 10 % qu'on voulait
  * remplacer, faute de chemin vers le remplacement depuis cet écran.
+ *
+ * **Un stop-loss ordinaire se remplace aussi** par un trailing (2026-11-19), par le même circuit : poser,
+ * puis annuler. Comme l'interface d'Hyperliquid, qui n'attache pas de trailing à un ordre d'entrée mais le
+ * pose pour lui-même : c'est ici qu'on décide de passer du stop fixe au stop suiveur. Jamais le stop du bot.
  *
  * Les champs restent ceux de l'API, unités écrites : un pourcentage n'est pas une distance en prix, et une
  * saisie prise pour l'autre a été refusée par l'exchange pendant la mesure (2026-11-17).
@@ -226,6 +233,30 @@ export class TrailingStopFormComponent implements OnInit {
       })),
   );
 
+  /**
+   * Les stops et take-profits ordinaires de la position. Seul un stop-loss se remplace par un trailing, et
+   * seulement sur une paire que le bot ne gère pas (`botManaged === false`) : le trailing s'ajoute au stop
+   * du bot, jamais à sa place (décidé le 2026-11-16). Profil illisible ou non demandé : on ne sait pas
+   * qui l'a posé, il ne se remplace pas d'ici.
+   */
+  readonly stops = computed(() => {
+    const orders = this.orders();
+    if (orders === null) return [];
+    const bot = this.botManaged() === true;
+    return ordinaryProtections(this.position(), orders).map((p) => ({
+      ...p,
+      text: `${p.role} ${p.px} · ${p.orderType} · ${p.wholePosition ? 'whole position' : p.sz}${bot ? ' · bot' : ''}`,
+      replaceable: p.role === 'SL' && this.botManaged() === false,
+      replaced: p.oid === this.target(),
+    }));
+  });
+
+  /** Le stop-loss ordinaire en cours de remplacement, ou `null` (un trailing, ou une pose simple). */
+  readonly replacingStop = computed(() => this.stops().find((s) => s.replaced) ?? null);
+
+  /** Ce qui est remplacé, en mots, pour les textes. */
+  readonly replacedLabel = computed(() => (this.replacingStop() ? 'stop loss' : 'trailing stop'));
+
   /** L'ancien, tel que la liste le donne **maintenant** : son état courant, pas celui de sa pose. */
   readonly replacing = computed(() => {
     const oid = this.target();
@@ -240,7 +271,9 @@ export class TrailingStopFormComponent implements OnInit {
   readonly change = computed(() => {
     const plan = this.plan();
     const old = this.replacing();
-    return plan && old ? stopChange(trailingStopView(old), plan) : null;
+    if (!plan || !old) return null;
+    const stop = this.replacingStop();
+    return stopChange(stop ? { state: 'fixed', stopPx: stop.px } : trailingStopView(old), plan);
   });
 
   /** Ce que les trailings de la paire couvrent de la position, l'ancien exclu en remplacement. */
@@ -328,6 +361,11 @@ export class TrailingStopFormComponent implements OnInit {
   /** « Replace » sur un trailing listé : la feuille passe en remplacement de celui-là, pré-remplie. */
   replaceOne(oid: HLOid): void {
     if (this.locked() || this.sending()) return;
+    // Public : le refus ne dépend pas du seul bouton. Un stop du bot ou un take-profit ne se remplace pas.
+    const allowed =
+      this.existing().some((e) => e.oid === oid) ||
+      this.stops().some((s) => s.oid === oid && s.replaceable);
+    if (!allowed) return;
     this.error.set(null);
     this.target.set(oid);
     this.prefilled = false;
@@ -359,7 +397,7 @@ export class TrailingStopFormComponent implements OnInit {
     const replacing = this.target();
     const change = this.change();
     const alert = await this.alertCtrl.create({
-      header: replacing === null ? 'Place trailing stop' : 'Replace trailing stop',
+      header: replacing === null ? 'Place trailing stop' : `Replace ${this.replacedLabel()}`,
       message:
         `${this.orderSide()} ${plan.body.sz} ${this.coin()}, reduce-only · retracement ${retracement} · ` +
         (plan.activation
@@ -430,7 +468,7 @@ export class TrailingStopFormComponent implements OnInit {
       this.oldCancelFailed.set(true);
       this.outcome.set({
         tone: 'high',
-        text: `Two trailing stops now protect this position: the new one (OID ${placed.oid}) and the old one (OID ${old}), whose cancel failed: ${why}`,
+        text: `Two stops now protect this position: the new trailing stop (OID ${placed.oid}) and the old ${this.replacedLabel()} (OID ${old}), whose cancel failed: ${why}`,
       });
     };
     this.gateway.cancelOrder([{ asset: placed.asset, oid: old }]).subscribe({
@@ -482,6 +520,14 @@ export class TrailingStopFormComponent implements OnInit {
     const old = this.replacing();
     if (this.prefilled || !old) return;
     this.prefilled = true;
+    // Un stop-loss remplacé : sa taille seulement. Le repli n'a pas d'équivalent dans un seuil fixe.
+    const stop = this.replacingStop();
+    if (stop) {
+      const sz = stop.wholePosition ? String(this.positionSz()) : stop.sz;
+      this.sz.set(sz);
+      this.percent.set(Number(sz) === this.positionSz() ? 100 : null);
+      return;
+    }
     const prefill = trailingPrefill(old);
     if (!prefill) return;
     this.sz.set(prefill.sz);

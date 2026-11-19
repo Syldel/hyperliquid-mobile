@@ -2,6 +2,7 @@ import type { HLFrontendOpenOrder } from '@syldel/hl-shared-types';
 import type { IExchange } from '@syldel/trading-shared-types';
 import {
   botManagedPairs,
+  ordinaryProtections,
   positionProtection,
   type Coverage,
   type SourceCoverage,
@@ -296,5 +297,49 @@ describe('botManagedPairs', () => {
     expect(botManagedPairs(settings({ enabled: false, pairs: [pair('ETH', true)] })).size).toBe(0);
     expect(botManagedPairs(settings({ pairs: [pair('ETH', true)] })).size).toBe(0);
     expect(botManagedPairs(undefined).size).toBe(0);
+  });
+});
+
+describe('ordinaryProtections', () => {
+  it('lists the stops and take-profits that close the position, not its trailing stops', () => {
+    expect(ordinaryProtections(LONG, [STOP, TRAILING_TRACKING, TAKE_PROFIT])).toEqual([
+      {
+        oid: 1,
+        role: 'SL',
+        orderType: 'Stop Market',
+        px: '1788.6',
+        sz: '0.0065',
+        wholePosition: false,
+      },
+      {
+        oid: 5,
+        role: 'TP',
+        orderType: 'Take Profit Market',
+        px: '2100',
+        sz: '0.0065',
+        wholePosition: false,
+      },
+    ]);
+  });
+
+  // Ce que la couverture ne compte pas ne s'offre pas au remplacement.
+  it('leaves out what the coverage does not count', () => {
+    const otherCoin = { ...STOP, oid: 6, coin: 'BTC' };
+    const notReduceOnly = { ...STOP, oid: 7, reduceOnly: false };
+    const opening = { ...STOP, oid: 8, side: 'B' as const };
+    const wrongSide = { ...STOP, oid: 9, triggerCondition: 'Price above 1788.6' };
+    expect(
+      ordinaryProtections(LONG, [otherCoin, notReduceOnly, opening, wrongSide, STUCK_STOP]),
+    ).toEqual([]);
+  });
+
+  it('reads a short by the buy side and the opposite thresholds', () => {
+    const shortStop = { ...STOP, side: 'B' as const, triggerCondition: 'Price above 2100' };
+    expect(ordinaryProtections(SHORT, [shortStop]).map((p) => p.oid)).toEqual([1]);
+  });
+
+  it('marks a position TP/SL as covering the whole position', () => {
+    const whole = { ...STOP, isPositionTpsl: true, sz: '0.0' };
+    expect(ordinaryProtections(LONG, [whole])[0]).toMatchObject({ wholePosition: true });
   });
 });

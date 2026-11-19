@@ -209,6 +209,51 @@ export function positionProtection(
 }
 
 /** Comparés à l'exact : un libellé voisin n'est pas un stop (voir `HL_ORDER_TYPE`). */
+/**
+ * Les stops et take-profits **ordinaires** (pas les trailings) qui ferment cette position, un par ordre,
+ * pour le formulaire Trail qui les liste et propose d'en remplacer un (2026-11-19). Ce sont exactement ceux
+ * que `positionProtection` compte : reduce-only, du côté qui ferme, armés, et dont le nom et le sens du
+ * seuil s'accordent. Un ordre écarté par la couverture ne s'offre pas au remplacement : on ne remplace pas
+ * ce qu'on ne sait pas lire.
+ */
+export interface OrdinaryProtection {
+  oid: HLOid;
+  role: 'SL' | 'TP';
+  orderType: string;
+  /** Le prix qui déclenche, tel que l'exchange l'écrit. */
+  px: string;
+  /** La taille de l'ordre ; un TP/SL de position vaut toute la position (`wholePosition`). */
+  sz: string;
+  wholePosition: boolean;
+}
+
+export function ordinaryProtections(
+  position: PositionFields,
+  orders: readonly HLFrontendOpenOrder[],
+): OrdinaryProtection[] {
+  const isLong = !NEGATIVE.test(position.szi);
+  const closingSide = isLong ? 'A' : 'B';
+  return orders.flatMap((order) => {
+    if (order.coin !== position.coin) return [];
+    if (order.reduceOnly !== true || order.side !== closingSide) return [];
+    if (order.orderType === HL_ORDER_TYPE.trailingStopMarket) return [];
+    const role = roleOf(order.orderType);
+    if (role === null || order.isTrigger !== true || isStuckTriggeredOrder(order)) return [];
+    const below = (role === 'SL') === isLong;
+    if (!order.triggerCondition.startsWith(below ? 'Price below ' : 'Price above ')) return [];
+    return [
+      {
+        oid: order.oid,
+        role,
+        orderType: order.orderType,
+        px: order.triggerPx,
+        sz: order.sz,
+        wholePosition: order.isPositionTpsl === true,
+      },
+    ];
+  });
+}
+
 function roleOf(orderType: string): 'SL' | 'TP' | null {
   switch (orderType) {
     case HL_ORDER_TYPE.stopMarket:

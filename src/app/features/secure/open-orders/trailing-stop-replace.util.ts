@@ -86,8 +86,17 @@ export type StopChange =
   | { kind: 'old-waiting'; text: string }
   | { kind: 'old-unknown'; text: string };
 
+/**
+ * Un stop-loss ordinaire remplacé par un trailing (2026-11-19) : son seuil est fixe, et c'est lui qu'on
+ * compare au départ du trailing.
+ */
+export interface FixedStop {
+  state: 'fixed';
+  stopPx: string;
+}
+
 export function stopChange(
-  old: TrailingStopView | null,
+  old: TrailingStopView | FixedStop | null,
   plan: Pick<TrailingEntryPlan, 'isBuy' | 'stopAtStart' | 'activation'>,
 ): StopChange {
   if (old === null || old.state === 'unreadable') {
@@ -107,12 +116,16 @@ export function stopChange(
   // Fermer un long (vente) : un stop plus bas est plus lâche. Fermer un short (achat) : plus haut.
   const looser = plan.isBuy ? plan.stopAtStart > from : plan.stopAtStart < from;
   const start = plan.activation ? 'once it activates' : 'at the start';
+  const fixed = old.state === 'fixed';
   return {
     kind: 'compare',
     from: old.stopPx,
     to,
     looser,
-    text: `Your stop moves from ${old.stopPx} (now) to ${to} ${start}: ${looser ? 'looser, further from the price' : 'tighter, closer to the price'}. Tracking starts over from the current mark.`,
+    text:
+      `Your stop moves from ${old.stopPx} (${fixed ? 'the stop loss' : 'now'}) to ${to} ${start}: ` +
+      `${looser ? 'looser, further from the price' : 'tighter, closer to the price'}. ` +
+      (fixed ? 'From there it follows the price.' : 'Tracking starts over from the current mark.'),
   };
 }
 

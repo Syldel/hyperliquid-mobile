@@ -92,6 +92,16 @@ describe('stopChange', () => {
     expect(stopChange(old, sell(80.1)).text).toContain('starts over from the current mark');
   });
 
+  // Un stop-loss ordinaire remplacé : son seuil fixe est comparé, dans le même sens qu'un trailing.
+  it('compares a fixed stop loss with where the trailing stop starts', () => {
+    const fixed = { state: 'fixed' as const, stopPx: '84.5' };
+    const change = stopChange(fixed, sell(85.6));
+    expect(change).toMatchObject({ kind: 'compare', from: '84.5', looser: false });
+    expect(change.text).toContain('(the stop loss)');
+    expect(change.text).toContain('From there it follows the price.');
+    expect(stopChange(fixed, sell(83))).toMatchObject({ looser: true });
+  });
+
   it('says an old one still waiting protects nothing yet', () => {
     expect(stopChange(trailingStopView(S2_WAITING), sell(80))).toMatchObject({
       kind: 'old-waiting',

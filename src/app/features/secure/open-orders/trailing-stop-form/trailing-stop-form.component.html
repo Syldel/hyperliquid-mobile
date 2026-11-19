@@ -1,6 +1,9 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>{{ target() === null ? 'Trail' : 'Replace trail' }} {{ coin() }}</ion-title>
+    <ion-title>
+      {{ target() === null ? 'Trail' : replacingStop() ? 'Replace SL' : 'Replace trail' }}
+      {{ coin() }}
+    </ion-title>
     <ion-buttons slot="end">
       <ion-button (click)="dismiss()" aria-label="Close">
         <ion-icon slot="icon-only" name="close-outline" />
@@ -21,8 +24,13 @@
   </p>
   @if (target(); as old) {
     <p class="muted small">
-      Places a new trailing stop, then cancels OID {{ old }}. The new one tracks from the current
-      mark price, not from the old one's best price.
+      @if (replacingStop()) {
+        Places a trailing stop, then cancels the stop loss OID {{ old }}. It tracks from the current
+        mark price.
+      } @else {
+        Places a new trailing stop, then cancels OID {{ old }}. The new one tracks from the current
+        mark price, not from the old one's best price.
+      }
     </p>
   } @else {
     <p class="muted small">
@@ -163,7 +171,7 @@
     <p class="notice" [class.notice--caution]="notice.tighter" role="status">{{ notice.text }}</p>
   }
 
-  <p class="section-label">Trailing stops on {{ coin() }}</p>
+  <p class="section-label">Stops on {{ coin() }}</p>
   @if (ordersError(); as message) {
     <p class="notice notice--high">{{ message }}</p>
   } @else if (orders() === null) {
@@ -171,10 +179,29 @@
       <ion-spinner name="crescent" />
       Reading the open orders…
     </p>
-  } @else if (existing().length === 0) {
+  } @else if (existing().length === 0 && stops().length === 0) {
     <p class="muted small">None yet.</p>
   } @else {
     <ul class="protective">
+      @for (s of stops(); track s.oid) {
+        <li>
+          <span>{{ s.text }}</span>
+          <span class="oid-row">
+            <span class="muted small">OID {{ s.oid }}{{ s.replaced ? ' · to replace' : '' }}</span>
+            @if (s.replaceable && !s.replaced && !locked()) {
+              <ion-button
+                size="small"
+                fill="outline"
+                color="medium"
+                [disabled]="sending()"
+                (click)="replaceOne(s.oid)"
+              >
+                Replace
+              </ion-button>
+            }
+          </span>
+        </li>
+      }
       @for (e of existing(); track e.oid) {
         <li>
           <span>{{ e.text }}</span>

@@ -89,6 +89,12 @@ describe('trailingCoverage', () => {
     ).toBeNull();
   });
 
+  // Un stop-loss remplacé n'est pas un trailing : aucun n'est écarté, ce ne sont pas « les autres ».
+  it('says trailing stops, not the other ones, when the replaced order is not one of them', () => {
+    const c = trailingCoverage({ ...base, trailings: [{ oid: 1, sz: '0.07' }], excludeOid: 99 });
+    expect(c!.text).toBe('Trailing stops cover 0.07 of 0.15 (47 %) · 0.08 left.');
+  });
+
   it('ignores an empty or unreadable new size instead of guessing it', () => {
     for (const newSz of ['', '  ', 'abc']) {
       const c = trailingCoverage({ ...base, trailings: [{ oid: 1, sz: '0.07' }], newSz });

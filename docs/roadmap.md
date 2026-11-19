@@ -544,6 +544,29 @@ Market`) prennent l'escalier de la pastille du rond (`app-order-type-badge`), en
    trailings, chacun avec son plus haut (90,281 et 90,129), et une couverture de 0,3 sur 0,3. ⚠️ Reste à voir le
    déclenchement d'un palier : l'autre doit rester ouvert pour la moitié restante.
 
+   **Un stop-loss ordinaire se remplace aussi par un trailing, depuis le formulaire Trail (2026-11-19).**
+   L'interface d'Hyperliquid n'attache pas de trailing à un ordre d'entrée (sa case TP/SL n'en propose
+   pas) : elle le pose pour lui-même, dans « Pro ». On reste cohérent avec elle : rien dans New Order, et
+   c'est le formulaire Trail qui permet de passer du stop fixe au stop suiveur.
+   - la liste devient « Stops on … » : les SL et TP ordinaires de la position (`ordinaryProtections`, la
+     même règle que la couverture de la carte), puis les trailings ;
+   - **Replace sur un SL** : on pose le trailing, puis on annule ce SL, par le même circuit que le
+     remplacement d'un trailing. La taille du SL est reprise, et `stopChange` compare son seuil fixe au
+     départ du trailing ;
+   - **jamais sur un TP**, ni sur une paire du bot (`botManaged !== false`) : le trailing s'ajoute au stop du
+     bot, jamais à sa place.
+
+   Vérifié dans le navigateur avec un SL et un TP **injectés** dans la page (le compte n'en a pas), à
+   360 px, en clair et en sombre, sans rien envoyer. Le refus sur une paire
+   du bot n'a pas été vu à l'écran (le compte n'en a pas) : il repose sur `replaceable` et sur la garde de
+   `replaceOne`.
+
+   **Envoyé en réel le 2026-11-20 à 00:09** : SL `Stop Market` 0,3 « Price below 83 » (oid 610732237592) remplacé
+   par un trailing 5 % de 0,3. Le formulaire annonçait le départ à 85,5874 (marqué 90,092), « tighter ». Une
+   seule pose dans le journal du gateway (oid 610736354584), annulation `success`. Relu ensuite : plus de SL,
+   trois trailings, le nouveau à 85,5713 (le marqué avait reculé entre la saisie et la pose : 85,5713 / 0,95 =
+   90,075). Un `POST /orders/trailing-stop` en **401** « User token missing » précède la pose réussie : la session avait expiré, l'utilisateur s'est reconnecté et a refait le formulaire. Rejeté par le gateway avant toute signature (`trailingSendFailure` le classe `nothing-placed`, l'intercepteur déconnecte sans rejouer).
+
    ⚠️ **Pas encore vu en réel** : une annulation refusée. Et le texte reconnu pour `gone` (« Order was never placed,
    already canceled, or filled. ») vient de la doc, pas d'une mesure.
 

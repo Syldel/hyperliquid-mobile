@@ -66,7 +66,9 @@ export function trailingCoverage(input: TrailingCoverageInput): TrailingCoverage
   const covered = sizes.reduce((a, b) => a + b, 0);
   const pct = (u: number): number => Math.round((u * 100) / position);
   const rest = Math.max(position - covered, 0);
-  const others = input.excludeOid === null ? 'Trailing stops' : 'The other trailing stops';
+  // « Les autres » seulement quand un trailing compté est écarté : un stop-loss remplacé n'en écarte aucun.
+  const replacingOne = input.trailings.some((t) => t.oid === input.excludeOid);
+  const others = replacingOne ? 'The other trailing stops' : 'Trailing stops';
 
   let text = `${others} cover ${show(covered)} of ${show(position)} (${pct(covered)} %)`;
   text +=
