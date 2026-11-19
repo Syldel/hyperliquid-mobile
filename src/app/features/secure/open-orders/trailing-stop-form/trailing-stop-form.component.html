@@ -1,6 +1,6 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>Trail {{ coin() }}</ion-title>
+    <ion-title>{{ replacingOid() === null ? 'Trail' : 'Replace trail' }} {{ coin() }}</ion-title>
     <ion-buttons slot="end">
       <ion-button (click)="dismiss()" aria-label="Close">
         <ion-icon slot="icon-only" name="close-outline" />
@@ -19,10 +19,22 @@
       <span class="muted">· mark {{ m.markPx }}</span>
     }
   </p>
-  <p class="muted small">
-    A native trailing stop: a reduce-only {{ orderSide().toLowerCase() }} that follows the mark
-    price and closes after a retracement.
-  </p>
+  @if (replacingOid(); as old) {
+    <p class="muted small">
+      Places a new trailing stop, then cancels OID {{ old }}. The new one tracks from the current
+      mark price, not from the old one's best price.
+    </p>
+  } @else {
+    <p class="muted small">
+      A native trailing stop: a reduce-only {{ orderSide().toLowerCase() }} that follows the mark
+      price and closes after a retracement.
+    </p>
+  }
+  @if (replacingMissing()) {
+    <p class="notice notice--high" role="alert">
+      OID {{ replacingOid() }} is no longer open: it triggered or was cancelled. Nothing to replace.
+    </p>
+  }
 
   @if (marketError(); as message) {
     <p class="notice notice--high" role="alert">{{ message }}</p>
@@ -127,6 +139,11 @@
   @for (warning of warnings(); track warning) {
     <p class="notice notice--caution" role="alert">{{ warning }}</p>
   }
+  @if (change(); as c) {
+    <p class="notice" [class.notice--caution]="c.kind !== 'compare' || c.looser" role="status">
+      {{ c.text }}
+    </p>
+  }
   @if (botManaged() === null) {
     <p class="notice notice--caution">
       The bot's profile could not be read: whether it manages this pair, and where its stop is, are
@@ -152,11 +169,13 @@
       @for (e of existing(); track e.oid) {
         <li>
           <span>{{ e.text }}</span>
-          <span class="muted small">OID {{ e.oid }}</span>
+          <span class="muted small">OID {{ e.oid }}{{ e.replaced ? ' · to replace' : '' }}</span>
         </li>
       }
     </ul>
-    <p class="muted small">A new one adds to these: each keeps its own best price.</p>
+    @if (replacingOid() === null) {
+      <p class="muted small">A new one adds to these: each keeps its own best price.</p>
+    }
   }
 
   @if (outcome(); as o) {
@@ -170,11 +189,20 @@
     <ion-button fill="outline" color="medium" (click)="dismiss()">
       {{ locked() ? 'Done' : 'Cancel' }}
     </ion-button>
-    <ion-button [disabled]="!canReview()" (click)="review()">
-      @if (sending()) {
-        <ion-spinner name="crescent" slot="start" />
-      }
-      Review trailing stop
-    </ion-button>
+    @if (oldCancelFailed() || cancellingOld()) {
+      <ion-button color="danger" [disabled]="cancellingOld()" (click)="cancelOld()">
+        @if (cancellingOld()) {
+          <ion-spinner name="crescent" slot="start" />
+        }
+        Cancel the old one
+      </ion-button>
+    } @else {
+      <ion-button [disabled]="!canReview()" (click)="review()">
+        @if (sending()) {
+          <ion-spinner name="crescent" slot="start" />
+        }
+        {{ replacingOid() === null ? 'Review trailing stop' : 'Review replacement' }}
+      </ion-button>
+    }
   </div>
 </ion-content>

@@ -11,7 +11,10 @@
   <ng-template #endButtons>
     <ion-button
       (click)="openEditModal()"
-      [disabled]="!order() || !!editRefusal() || !authService.isLoggedIn()"
+      [disabled]="
+        !order() || (!!editRefusal() && !canReplace()) || replacing() || !authService.isLoggedIn()
+      "
+      [attr.aria-label]="canReplace() ? 'Replace' : 'Edit'"
     >
       <ion-icon slot="icon-only" name="create-outline" />
     </ion-button>
@@ -27,7 +30,7 @@
 
   <app-agent-expiry-notice />
 
-  @if (order(); as o) { @if (editRefusal(); as refusal) {
+  @if (order(); as o) { @if (editNote(); as refusal) {
   <ion-item lines="full" class="edit-refusal">
     <ion-label class="ion-text-wrap">{{ refusal }}</ion-label>
   </ion-item>

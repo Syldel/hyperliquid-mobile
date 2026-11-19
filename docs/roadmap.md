@@ -495,6 +495,21 @@ Market`) prennent l'escalier de la pastille du rond (`app-order-type-badge`), en
 4. **Le remplacement**, qui n'est pas une modification : poser le nouveau, puis annuler l'ancien. L'écran dit que le
    suivi repart du prix marqué du moment.
 
+   **Écrit le 2026-11-19, pas encore envoyé en réel** (`open-orders/trailing-stop-replace.util.ts`, et le formulaire
+   Trail en mode `replacingOid`). Le point d'entrée est le crayon du détail d'un trailing : actif seulement s'il est
+   ouvert, reduce-only et que son état **courant** est lu (`canReplace`). Le crayon relit la position (poids 2) et
+   refuse une position fermée ou retournée depuis la pose. Le formulaire reprend la taille et le repli de l'ancien
+   (`trailingPrefill` : le pourcentage arrondi à quatre décimales, l'activation seulement s'il attend encore), et
+   compare l'ancien stop courant au nouveau stop au départ (`stopChange`) : orange s'il est plus lâche, sans bloquer.
+   L'ordre est fixe : **poser, puis annuler** ; après une pose à l'issue inconnue, l'ancien reste. Une annulation qui
+   échoue dit « Two trailing stops now protect this position » et propose « Cancel the old one », qui se renvoie sans
+   risque ; un ancien qui n'était plus ouvert se dit (`gone`). **Vu dans le navigateur** à 360 px, en clair et en sombre
+   (orange 5,43:1 et 8,68:1, rouge 6,20:1 et 6,11:1), avec l'état mesuré du trailing BRENTOIL **injecté dans la page** :
+   ce trailing n'était plus ouvert au moment de la vérification. Rien n'a été envoyé, et les écritures vers le gateway
+   étaient bloquées. L'état « deux trailings » a été posé à la main dans le composant, pour voir sa mise en page.
+   ⚠️ **Pas encore vus en réel** : un remplacement réussi, une annulation refusée. Et le texte reconnu pour `gone`
+   (« Order was never placed, already canceled, or filled. ») vient de la doc, pas d'une mesure.
+
 ⚠️ **Mesuré le 2026-11-17, à reporter dans la pose (3)** : l'exchange **accepte** une activation du mauvais côté (une vente
 activée sous le marqué) et la suit tout de suite, sans rien dire. Le client officiel refuse cette saisie ; le gateway aussi
 depuis le même jour (400), l'app devra le dire dès la saisie. Et un 400 du gateway arrive sans son code (`"message":"Validation failed"`, le texte dans

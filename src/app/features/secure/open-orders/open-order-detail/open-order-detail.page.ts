@@ -30,6 +30,7 @@ import { HyperliquidMarketService } from '@services/hyperliquid-market.service';
 import { MenuBasePage } from '@shared/components/base-page/menu-base-page';
 import { RefreshableLayoutComponent } from '@shared/components/refreshable-layout/refreshable-layout.component';
 import {
+  hlPerpDexOf,
   HLFrontendOpenOrder,
   HLOrderStatus,
   HLOrderStatusDetails,
@@ -46,6 +47,7 @@ import { catchError, map, Observable, of, switchMap } from 'rxjs';
 import { editRefusal } from '../editable-order.util';
 import { afterModify, ModifyOutcome } from '../modify-outcome.util';
 import { OrderFormComponent } from '../open-form/order-form.component';
+import { TrailingStopFormComponent } from '../trailing-stop-form/trailing-stop-form.component';
 import { describeStuckTriggered, isStuckTriggeredOrder } from '../stuck-triggered-order.util';
 import {
   activationLabel,
@@ -117,6 +119,8 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
   coinTitle = signal<string>('—');
   /** Pourquoi l'état courant d'un trailing ouvert n'a pas pu être lu (voir `liveTrailingState`). */
   trailingMissing = signal<string | null>(null);
+  /** La position est en cours de lecture, avant d'ouvrir le remplacement. */
+  readonly replacing = signal(false);
 
   fetchFn = signal(this.buildFetchFn());
 
@@ -168,6 +172,29 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
     const order = this.order();
     return order ? editRefusal(order) : null;
   });
+
+  /**
+   * Un trailing stop ne se modifie pas, il se **remplace** (étape 4, `trailing-stop-replace.util.ts`) :
+   * ouvert, reduce-only, et son état **courant** lu — sans lui, l'écran de remplacement ne pourrait pas
+   * comparer l'ancien stop au nouveau. Le statut doit venir de la lecture, pas de l'état passé par la liste.
+   */
+  readonly canReplace = computed(() => {
+    const order = this.order();
+    return (
+      !!order &&
+      isTrailingStop(order) &&
+      order.reduceOnly &&
+      this.orderStatus() === 'open' &&
+      this.trailingMissing() === null
+    );
+  });
+
+  /** Ce que dit la ligne sous l'en-tête : le remplacement quand il est possible, sinon le refus. */
+  readonly editNote = computed(() =>
+    this.canReplace()
+      ? 'A trailing stop is replaced, not edited: the pencil places a new one, then cancels this one. The new one tracks from the current mark price, not from the best price this one reached.'
+      : this.editRefusal(),
+  );
 
   /**
    * L'état d'un trailing stop natif, ou `null` (voir `trailing-stop-view.util.ts`). Il remplace les
@@ -267,6 +294,10 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
   }
 
   async openEditModal(): Promise<void> {
+    if (this.canReplace()) {
+      this.openReplace();
+      return;
+    }
     const current = this.order();
     if (!current || this.editRefusal()) return;
 
@@ -289,6 +320,60 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
     if (this.activity.lastWrite() !== writeBefore) {
       this.fetchFn.set(this.buildFetchFn());
     }
+  }
+
+  /**
+   * Le remplacement part de la position **relue** (poids 2) : le formulaire en tire le côté et la taille, et
+   * une position fermée ou retournée entre-temps se dit ici, au lieu d'ouvrir un formulaire faux.
+   */
+  private openReplace(): void {
+    const order = this.order();
+    const oid = this.oid();
+    const coin = this.coin();
+    const dex = hlPerpDexOf(coin);
+    if (!order || !oid || dex === null || this.replacing()) return;
+    this.replacing.set(true);
+    this.hlInfo.getClearinghouseState(dex).subscribe({
+      next: async (state) => {
+        this.replacing.set(false);
+        const position = state.assetPositions.find((ap) => ap.position?.coin === coin)?.position;
+        const szi = Number(position?.szi);
+        if (!position || !Number.isFinite(szi) || szi === 0) {
+          this.showToast(
+            `No open position on ${coin}: nothing for a trailing stop to close.`,
+            'danger',
+          );
+          return;
+        }
+        // Une vente ferme un long, un achat un short : sinon la position s'est retournée depuis la pose.
+        if ((order.side === 'A') !== szi > 0) {
+          this.showToast(
+            `The ${coin} position is now ${szi > 0 ? 'long' : 'short'}: this trailing stop no longer closes it.`,
+            'danger',
+          );
+          return;
+        }
+        const modal = await this.modalCtrl.create({
+          component: TrailingStopFormComponent,
+          componentProps: { position: () => position, replacingOid: () => oid },
+          breakpoints: [0, 1],
+          initialBreakpoint: 1,
+        });
+        await modal.present();
+        const { role } = await modal.onDidDismiss();
+        if (role !== 'confirm') return;
+        // Remplacé (cet oid annulé) ou issue à vérifier : la page relit, et dit ce qu'il en est.
+        this.availableCapitalService.invalidate();
+        this.fetchFn.set(this.buildFetchFn());
+      },
+      error: (error: unknown) => {
+        this.replacing.set(false);
+        this.showToast(
+          `The position could not be read (${extractErrorMessage(error as Error)}): nothing to replace from.`,
+          'danger',
+        );
+      },
+    });
   }
 
   /**

@@ -30,6 +30,7 @@ import { OrderToastService } from '@services/order-toast.service';
 import {
   hlPerpDexOf,
   type HLFrontendOpenOrder,
+  type HLOid,
   type HLPerpPositionDetail,
 } from '@syldel/hl-shared-types';
 import { extractErrorMessage } from '@utils/hl-error.utils';
@@ -48,6 +49,7 @@ import {
   type TrailingUnit,
 } from '../trailing-stop-entry.util';
 import { isTrailingStop, trailingStopSummary, trailingStopView } from '../trailing-stop-view.util';
+import { readCancelReply, stopChange, trailingPrefill } from '../trailing-stop-replace.util';
 
 /**
  * ============================================================================
@@ -67,6 +69,12 @@ import { isTrailingStop, trailingStopSummary, trailingStopView } from '../traili
  *   ailleurs avant la relecture ;
  * - **jamais de second envoi après une issue inconnue** (`trailingSendFailure`) : l'action n'a pas de `cloid`.
  *   L'écran se verrouille et relit les ordres ouverts une fois.
+ *
+ * **En remplacement** (`replacingOid`, étape 4) : la feuille reprend les valeurs de l'ancien, dit ce que le
+ * remplacement fait au stop (`stopChange` : le suivi repart du marqué du moment), pose le nouveau, puis
+ * annule l'ancien — jamais dans l'autre ordre, et jamais l'ancien après une pose à l'issue inconnue
+ * (`trailing-stop-replace.util.ts`). Une annulation qui échoue laisse deux trailings : l'écran le dit, et
+ * propose de la retenter (annuler se renvoie sans risque, poser non).
  *
  * Les champs restent ceux de l'API, unités écrites : un pourcentage n'est pas une distance en prix, et une
  * saisie prise pour l'autre a été refusée par l'exchange pendant la mesure (2026-11-17).
@@ -102,8 +110,13 @@ export class TrailingStopFormComponent implements OnInit {
 
   /** Entrées de modale (`componentProps: { position: () => p }`) : lues, jamais suivies. */
   readonly position = input.required<HLPerpPositionDetail>();
-  /** La paire est au bot ; `null` : le profil n'a pas pu être lu, on ne sait pas. */
-  readonly botManaged = input<boolean | null>(false);
+  /**
+   * La paire est au bot ; `null` : le profil n'a pas pu être lu, et l'écran le dit ; `undefined` : l'appelant
+   * ne l'a pas demandé (le détail d'un ordre), rien n'est dit du bot.
+   */
+  readonly botManaged = input<boolean | null | undefined>(undefined);
+  /** L'oid du trailing à remplacer ; `null` : une pose simple. */
+  readonly replacingOid = input<HLOid | null>(null);
 
   readonly percents = CLOSE_PERCENTS;
 
@@ -121,8 +134,14 @@ export class TrailingStopFormComponent implements OnInit {
   readonly sending = signal(false);
   readonly error = signal<string | null>(null);
   readonly outcome = signal<{ tone: 'caution' | 'high'; text: string } | null>(null);
-  /** Une issue inconnue : on ne renvoie plus rien depuis cette feuille. */
+  /** Une issue inconnue, ou un remplaçant posé : on ne pose plus rien depuis cette feuille. */
   readonly locked = signal(false);
+  /** Le remplaçant posé, et l'actif signé : de quoi annuler l'ancien, ou le retenter. */
+  private readonly placed = signal<{ oid: number; asset: number } | null>(null);
+  /** L'annulation de l'ancien a échoué : deux trailings protègent la position. */
+  readonly oldCancelFailed = signal(false);
+  readonly cancellingOld = signal(false);
+  private prefilled = false;
 
   readonly coin = computed(() => this.position().coin);
   readonly isLong = computed(() => Number(this.position().szi) > 0);
@@ -181,11 +200,37 @@ export class TrailingStopFormComponent implements OnInit {
   readonly existing = computed(() =>
     (this.orders() ?? [])
       .filter((o) => o.coin === this.coin() && isTrailingStop(o))
-      .map((o) => ({ oid: o.oid, text: trailingStopSummary(trailingStopView(o)!) })),
+      .map((o) => ({
+        oid: o.oid,
+        text: trailingStopSummary(trailingStopView(o)!),
+        replaced: o.oid === this.replacingOid(),
+      })),
   );
 
+  /** L'ancien, tel que la liste le donne **maintenant** : son état courant, pas celui de sa pose. */
+  readonly replacing = computed(() => {
+    const oid = this.replacingOid();
+    return oid === null ? null : (this.orders()?.find((o) => o.oid === oid) ?? null);
+  });
+
+  /** L'ancien n'est plus dans la liste : déclenché ou annulé entre-temps. Rien à remplacer. */
+  readonly replacingMissing = computed(
+    () => this.replacingOid() !== null && this.orders() !== null && this.replacing() === null,
+  );
+
+  readonly change = computed(() => {
+    const plan = this.plan();
+    const old = this.replacing();
+    return plan && old ? stopChange(trailingStopView(old), plan) : null;
+  });
+
   readonly canReview = computed(
-    () => this.plan() !== null && !this.sending() && !this.locked() && this.orders() !== null,
+    () =>
+      this.plan() !== null &&
+      !this.sending() &&
+      !this.locked() &&
+      this.orders() !== null &&
+      !this.replacingMissing(),
   );
 
   constructor() {
@@ -204,7 +249,8 @@ export class TrailingStopFormComponent implements OnInit {
           return;
         }
         this.market.set({ szDecimals: read.szDecimals, markPx: read.markPx });
-        this.selectPercent(100);
+        // En remplacement, la taille vient de l'ancien (`applyPrefill`), pas de 100 % de la position.
+        if (this.replacingOid() === null) this.selectPercent(100);
       },
       error: (error: unknown) =>
         this.marketError.set(
@@ -244,17 +290,22 @@ export class TrailingStopFormComponent implements OnInit {
       'pct' in plan.body.retracement
         ? `${plan.body.retracement.pct} %`
         : `${plan.body.retracement.px} $`;
+    const replacing = this.replacingOid();
+    const change = this.change();
     const alert = await this.alertCtrl.create({
-      header: 'Place trailing stop',
+      header: replacing === null ? 'Place trailing stop' : 'Replace trailing stop',
       message:
         `${this.orderSide()} ${plan.body.sz} ${this.coin()}, reduce-only · retracement ${retracement} · ` +
         (plan.activation
           ? `waits ${plan.activation.direction} ${plan.activation.px}`
           : 'tracks from now') +
-        ` · stop starts ≈ ${formatStop(plan.stopAtStart)}`,
+        ` · stop starts ≈ ${formatStop(plan.stopAtStart)}` +
+        (replacing === null
+          ? ''
+          : ` · then OID ${replacing} is cancelled. ${change ? change.text : ''}`),
       buttons: [
         { text: 'Cancel', role: 'cancel' },
-        { text: 'Place', role: 'confirm' },
+        { text: replacing === null ? 'Place' : 'Replace', role: 'confirm' },
       ],
     });
     await alert.present();
@@ -268,10 +319,17 @@ export class TrailingStopFormComponent implements OnInit {
     this.outcome.set(null);
     this.sending.set(true);
     this.gateway.placeTrailingStop(plan.body).subscribe({
-      next: ({ oid }) => {
+      next: ({ oid, action }) => {
         this.sending.set(false);
-        this.orderToast.success(`Trailing stop placed · OID ${oid}`);
-        this.modalCtrl.dismiss(null, 'confirm');
+        if (this.replacingOid() === null) {
+          this.orderToast.success(`Trailing stop placed · OID ${oid}`);
+          this.modalCtrl.dismiss(null, 'confirm');
+          return;
+        }
+        // Le remplaçant protège : l'ancien peut partir. L'actif est celui que le gateway a signé.
+        this.locked.set(true);
+        this.placed.set({ oid, asset: action.asset });
+        this.cancelOld();
       },
       error: (error: HttpErrorResponse) => {
         this.sending.set(false);
@@ -280,18 +338,86 @@ export class TrailingStopFormComponent implements OnInit {
           this.error.set(message);
           return;
         }
-        // Peut-être posé : ni renvoi, ni second bouton. On relit, une fois, et on montre.
+        // Peut-être posé : ni renvoi, ni second bouton. On relit, une fois, et on montre. En remplacement,
+        // l'ancien n'est PAS annulé : deux trailings valent mieux que zéro.
         this.locked.set(true);
-        this.error.set(`${message} It may have been placed: nothing will be sent again from here.`);
+        this.error.set(
+          `${message} It may have been placed: nothing will be sent again from here` +
+            (this.replacingOid() === null ? '.' : ', and the old trailing stop is kept.'),
+        );
         this.rereadAfterUnknown();
       },
     });
   }
 
+  /**
+   * Annule l'ancien, après la pose du remplaçant. Se retente sans risque : un second `cancel` du même oid
+   * échoue sans rien changer.
+   */
+  cancelOld(): void {
+    const placed = this.placed();
+    const old = this.replacingOid();
+    if (!placed || old === null || this.cancellingOld()) return;
+    this.cancellingOld.set(true);
+    this.oldCancelFailed.set(false);
+    const twoStops = (why: string) => {
+      this.oldCancelFailed.set(true);
+      this.outcome.set({
+        tone: 'high',
+        text: `Two trailing stops now protect this position: the new one (OID ${placed.oid}) and the old one (OID ${old}), whose cancel failed: ${why}`,
+      });
+    };
+    this.gateway.cancelOrder([{ asset: placed.asset, oid: old }]).subscribe({
+      next: (reply) => {
+        this.cancellingOld.set(false);
+        const read = readCancelReply(reply);
+        switch (read.kind) {
+          case 'cancelled':
+            this.orderToast.success(`Replaced · OID ${placed.oid} (OID ${old} cancelled)`);
+            this.modalCtrl.dismiss(null, 'confirm');
+            return;
+          case 'gone':
+            this.outcome.set({
+              tone: 'caution',
+              text: `The new trailing stop is placed (OID ${placed.oid}), but the old one was no longer open (${read.message}): it may have triggered. Check the position.`,
+            });
+            return;
+          case 'refused':
+            twoStops(read.message);
+            return;
+          case 'unknown':
+            twoStops('the reply did not say.');
+            return;
+        }
+      },
+      error: (error: HttpErrorResponse) => {
+        this.cancellingOld.set(false);
+        twoStops(extractErrorMessage(error));
+      },
+    });
+  }
+
+  /** Reprend les valeurs de l'ancien, une fois, dès qu'il est lu dans la liste. */
+  private applyPrefill(): void {
+    const old = this.replacing();
+    if (this.prefilled || !old) return;
+    this.prefilled = true;
+    const prefill = trailingPrefill(old);
+    if (!prefill) return;
+    this.sz.set(prefill.sz);
+    this.percent.set(Number(prefill.sz) === this.positionSz() ? 100 : null);
+    this.unit.set(prefill.unit);
+    this.retracement.set(prefill.value);
+    this.activation.set(prefill.activation);
+  }
+
   private readOrders(): void {
     const dex = hlPerpDexOf(this.coin()) ?? '';
     this.hlInfo.getFrontendOpenOrders(dex || undefined).subscribe({
-      next: (orders) => this.orders.set(orders),
+      next: (orders) => {
+        this.orders.set(orders);
+        this.applyPrefill();
+      },
       error: (error: unknown) =>
         this.ordersError.set(
           `The open orders could not be read (${extractErrorMessage(error as Error)}): the trailing stops already on this pair are unknown, so nothing can be sent.`,
@@ -328,7 +454,7 @@ export class TrailingStopFormComponent implements OnInit {
   }
 
   dismiss(): void {
-    // Une issue inconnue a pu changer le compte : l'appelant relit.
+    // Une issue inconnue, ou un remplaçant posé, a changé le compte : l'appelant relit.
     this.modalCtrl.dismiss(null, this.locked() ? 'confirm' : 'cancel');
   }
 }
