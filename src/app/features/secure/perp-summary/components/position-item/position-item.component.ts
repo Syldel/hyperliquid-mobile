@@ -5,6 +5,7 @@ import { SmartDecimalPipe } from '@pipes/smart-decimal.pipe';
 import { MiniChartComponent } from '@shared/components/mini-chart/mini-chart.component';
 import { HLPerpPositionDetail } from '@syldel/hl-shared-types';
 import { ClosePositionComponent } from '../../../open-orders/market-order/close-position.component';
+import { TrailingStopFormComponent } from '../../../open-orders/trailing-stop-form/trailing-stop-form.component';
 import { positionSideBadge } from '@utils/order-labels.util';
 import { SideBadgeComponent } from '@shared/components/side-badge/side-badge.component';
 import {
@@ -38,6 +39,8 @@ export class PositionItemComponent {
   position = input.required<HLPerpPositionDetail>();
   /** Ce que le carnet dit de sa protection, lu par la page (`position-protection.util.ts`). */
   protection = input.required<PositionProtection>();
+  /** La paire est au bot ; `null` : profil illisible. Passé au formulaire Trail. */
+  botManaged = input<boolean | null>(false);
 
   /**
    * Un rond par source, de chaque côté ; `null` : les ordres n'ont pas pu être lus, et le rond le dit en
@@ -107,6 +110,25 @@ export class PositionItemComponent {
     const modal = await this.modalCtrl.create({
       component: OrderFormComponent,
       componentProps: { existingOrder: null, defaultCoin: position.coin, closePreset: preset },
+    });
+    await modal.present();
+    const { role } = await modal.onDidDismiss();
+    if (role === 'confirm') this.changed.emit();
+  }
+
+  /**
+   * « Trail » : un trailing stop natif qui ferme la position, en plus de son stop (étape 3 du chantier,
+   * `docs/roadmap.md`).
+   */
+  async trail(event: Event): Promise<void> {
+    event.stopPropagation();
+    const position = this.position();
+    const botManaged = this.botManaged();
+    const modal = await this.modalCtrl.create({
+      component: TrailingStopFormComponent,
+      componentProps: { position: () => position, botManaged: () => botManaged },
+      breakpoints: [0, 1],
+      initialBreakpoint: 1,
     });
     await modal.present();
     const { role } = await modal.onDidDismiss();

@@ -75,6 +75,20 @@
           Limit
         </ion-button>
       </div>
+      <!-- Le trailing stop sur sa propre ligne : il protège, il ne ferme pas tout de suite. Et sur la ligne
+           « Close » il ne tenait pas : 276 px pour 232 à côté du mini-graphique, à 360 px (2026-11-19). -->
+      <div class="position-actions">
+        <span class="position-actions__label">Protect</span>
+        <ion-button
+          size="small"
+          fill="outline"
+          color="medium"
+          aria-label="Protect with a native trailing stop"
+          (click)="trail($event)"
+        >
+          Trail
+        </ion-button>
+      </div>
     }
   </ion-label>
 

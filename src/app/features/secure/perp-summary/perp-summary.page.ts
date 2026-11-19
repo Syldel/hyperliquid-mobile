@@ -53,6 +53,8 @@ interface PerpSummaryData {
 export interface PositionRow {
   position: HLPerpPositionDetail;
   protection: PositionProtection;
+  /** La paire est au bot ; `null` : le profil n'a pas pu être lu. Le formulaire Trail compare au stop du bot. */
+  botManaged: boolean | null;
 }
 
 @Component({
@@ -203,6 +205,7 @@ export class PerpSummaryPage extends MenuBasePage {
             orders,
             botPairs?.has(ap.position!.coin) ?? false,
           ),
+          botManaged: botPairs ? botPairs.has(ap.position!.coin) : null,
         })),
     );
   });

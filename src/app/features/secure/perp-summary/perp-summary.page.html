@@ -21,6 +21,7 @@
     <app-position-item
       [position]="row.position"
       [protection]="row.protection"
+      [botManaged]="row.botManaged"
       (clicked)="openWatchlist($event)"
       (changed)="reload()"
     />

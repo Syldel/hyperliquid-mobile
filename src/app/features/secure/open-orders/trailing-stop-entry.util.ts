@@ -1,5 +1,5 @@
 import { formatPrice, formatSize, TickAndLotError } from '@syldel/hl-shared-types';
-import { isPerpMarket, openOrdersDexOf } from '@utils/market-kind.util';
+import { isPerpMarket } from '@utils/market-kind.util';
 
 /**
  * ============================================================================
@@ -21,7 +21,9 @@ import { isPerpMarket, openOrdersDexOf } from '@utils/market-kind.util';
  * - le pourcentage a au plus quatre décimales (la précision signée, `toFixed(4)`), et reste sous
  *   100 % : 100 % a été refusé par l'exchange (« Trailing stop retracement is invalid. ») ; la borne
  *   exacte n'est pas mesurée ;
- * - seuls les perps du dex principal : le gateway refuse le spot, les outcomes et les dex HIP-3.
+ * - seuls les perps, du dex principal ou d'un dex HIP-3 : le gateway refuse le spot et les outcomes, qui
+ *   n'ont pas de trailing stop. HIP-3 est accepté depuis le 2026-11-19, mesuré le même jour sur
+ *   `xyz:BRENTOIL` (`nest-trading-bot/docs/hyperliquid/live-check.md`, S7).
  *
  * Et un avertissement que le gateway ne donne pas : **le minimum de 10 $ se compte au déclenchement**,
  * pas au marqué. Une position BTC de 10,41 $ (2026-11-17) aurait déclenché un ordre au marché sous le
@@ -85,8 +87,8 @@ export function planTrailingEntry(input: TrailingEntryInput): TrailingEntryResul
   const issues: TrailingEntryIssue[] = [];
   const refuse = (field: TrailingEntryField, message: string) => issues.push({ field, message });
 
-  if (!isPerpMarket(input.coin) || openOrdersDexOf(input.coin) !== '') {
-    refuse('position', `${input.coin}: native trailing stops are placed on main-dex perps only.`);
+  if (!isPerpMarket(input.coin)) {
+    refuse('position', `${input.coin}: native trailing stops exist on perps only.`);
     return { ok: false, issues };
   }
 
@@ -269,4 +271,109 @@ function canonical(value: string): string {
   const kept = frac.replace(/0+$/, '');
   const head = int.replace(/^0+(?=\d)/, '');
   return kept ? `${head}.${kept}` : head;
+}
+
+/**
+ * ============================================================================
+ * LE TRAILING FACE AU STOP DU BOT
+ *
+ * Sur une paire du bot, le trailing s'ajoute à son stop, sans le remplacer (décidé le 2026-11-16) : les
+ * deux cohabitent, et le premier franchi ferme la position (`nest-trading-bot/docs/known-gaps.md`). Un
+ * trailing **plus serré** que le stop du bot sort donc avant lui — avant la sortie que le backtest de la
+ * stratégie a éprouvée (`docs/roadmap.md`, étape 3). Le formulaire le dit ; il ne l'interdit pas.
+ *
+ * La comparaison se fait **au départ** du suivi : ensuite, le trailing suit le prix et peut dépasser un stop
+ * qu'il ne dépassait pas à la pose, ce que la note dit aussi.
+ *
+ * - `null` : la paire n'est pas au bot (ou on ne sait pas), rien à dire ici ;
+ * - `tighter: true` : le trailing part déjà plus près du prix que le stop du bot.
+ * ============================================================================
+ */
+export interface BotStopNotice {
+  tighter: boolean;
+  text: string;
+}
+
+export function botStopNotice(
+  plan: Pick<TrailingEntryPlan, 'isBuy' | 'stopAtStart'>,
+  /** `null` : paire hors bot ou profil illisible. Sinon, le stop du bot, ou `null` s'il n'en a pas. */
+  bot: { stopPx: string | null } | null,
+): BotStopNotice | null {
+  if (bot === null) return null;
+  const start = formatStop(plan.stopAtStart);
+  if (bot.stopPx === null) {
+    return {
+      tighter: false,
+      text: `The bot manages this pair but has no stop on it now. This trailing stop adds to the bot's, it never replaces it.`,
+    };
+  }
+  const botStop = Number(bot.stopPx);
+  // Fermer un long : vente, le stop le plus haut part le premier. Fermer un short : l'inverse.
+  const tighter = plan.isBuy ? plan.stopAtStart < botStop : plan.stopAtStart > botStop;
+  return tighter
+    ? {
+        tighter: true,
+        text: `Starts at ${start}, closer to the price than the bot's stop (${bot.stopPx}): it would exit first, before the exit the strategy's backtest tested.`,
+      }
+    : {
+        tighter: false,
+        text: `Starts at ${start}, behind the bot's stop (${bot.stopPx}). It follows the price and may pass it later.`,
+      };
+}
+
+/** Un stop calculé, à six chiffres significatifs : la précision des prix de l'exchange, sans traîne de flottant. */
+export function formatStop(stop: number): string {
+  return String(Number(stop.toPrecision(6)));
+}
+
+/**
+ * Ce que le formulaire lit d'un marché pour contrôler la saisie : la grille de taille et le marqué, dans la
+ * même réponse `metaAndAssetCtxs` du dex de la paire (poids 20), par égalité exacte du nom. Le contexte
+ * d'indice i est celui du marché d'indice i de `universe`.
+ */
+export function readTrailingMarket(
+  coin: string,
+  metaAndCtx: unknown,
+): { ok: true; szDecimals: number; markPx: string } | { ok: false; reason: string } {
+  const [meta, ctxs] = Array.isArray(metaAndCtx) ? metaAndCtx : [];
+  const universe: { name?: unknown; szDecimals?: unknown }[] = Array.isArray(meta?.universe)
+    ? meta.universe
+    : [];
+  const index = universe.findIndex((m) => m?.name === coin);
+  if (index < 0) return { ok: false, reason: `${coin} is not in the markets of its dex.` };
+  const szDecimals = universe[index].szDecimals;
+  const markPx = Array.isArray(ctxs) ? ctxs[index]?.markPx : undefined;
+  if (typeof szDecimals !== 'number') {
+    return { ok: false, reason: `The size grid of ${coin} is missing.` };
+  }
+  if (typeof markPx !== 'string' || !(Number(markPx) > 0)) {
+    return { ok: false, reason: `The mark price of ${coin} reads "${String(markPx)}".` };
+  }
+  return { ok: true, szDecimals, markPx };
+}
+
+/**
+ * ============================================================================
+ * APRÈS UN ÉCHEC D'ENVOI : RIEN N'EST POSÉ, OU ON NE SAIT PAS
+ *
+ * L'action n'a pas de `cloid` : renvoyer après une réponse perdue poserait un **second** trailing, que rien ne
+ * distinguerait du premier. Un échec se range donc en deux familles, et seule la première laisse renvoyer :
+ *
+ * - `nothing-placed` : le gateway a refusé **avant** de signer (400 : hors grille, mauvais côté du marqué ;
+ *   401 / 403 : session ; 404 : un gateway sans la route), ou l'exchange a refusé l'action
+ *   (502 `EXCHANGE_TRAILING_STOP_REFUSED`, `nest-hyperliquid-gateway/docs/trailing-stop.md`) ;
+ * - `unknown` : tout le reste — réseau coupé, 5xx, 502 `EXCHANGE_OUTCOME_UNKNOWN` ou
+ *   `EXCHANGE_UNEXPECTED_RESPONSE`. Le trailing a pu être posé : on relit les ordres ouverts, on ne renvoie pas.
+ *
+ * Un code inconnu tombe dans `unknown` : se tromper dans ce sens coûte une relecture, l'inverse un doublon.
+ * ============================================================================
+ */
+export type TrailingSendFailure = 'nothing-placed' | 'unknown';
+
+export function trailingSendFailure(status: number, body: unknown): TrailingSendFailure {
+  if (status === 400 || status === 401 || status === 403 || status === 404) return 'nothing-placed';
+  const code =
+    typeof body === 'object' && body !== null ? (body as { error?: unknown }).error : undefined;
+  if (status === 502 && code === 'EXCHANGE_TRAILING_STOP_REFUSED') return 'nothing-placed';
+  return 'unknown';
 }

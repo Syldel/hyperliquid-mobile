@@ -11,7 +11,9 @@ import {
   HLOrderStatusResponse,
   HLPlaceOrderResponse,
   HLSuccessResponse,
+  HLTrailingStopAction,
 } from '@syldel/hl-shared-types';
+import type { TrailingStopRequestBody } from '../../features/secure/open-orders/trailing-stop-entry.util';
 import { finalize, Observable } from 'rxjs';
 import { AccountActivityService, AccountWrite } from './account-activity.service';
 
@@ -88,6 +90,25 @@ export class HyperliquidGatewayService {
         cancels,
         isTestnet,
       },
+    );
+  }
+
+  /**
+   * Pose un trailing stop natif (`POST /orders/trailing-stop`). Le gateway rend l'oid et l'action **telle
+   * qu'elle a été signée**, ou refuse : 400 avant toute signature (hors grille, mauvais côté du marqué), 502
+   * quand l'exchange refuse ou que l'issue est inconnue.
+   *
+   * **Jamais relancé**, ni ici ni au gateway : l'action n'a pas de `cloid`, et un second envoi après une
+   * réponse perdue poserait un second stop suiveur que rien ne distinguerait du premier
+   * (`nest-hyperliquid-gateway/docs/trailing-stop.md`). Après un échec, on relit les ordres ouverts.
+   */
+  placeTrailingStop(
+    body: TrailingStopRequestBody,
+  ): Observable<{ oid: number; action: HLTrailingStopAction }> {
+    return this.write<{ oid: number; action: HLTrailingStopAction }>(
+      'place',
+      'orders/trailing-stop',
+      body,
     );
   }
 

@@ -1,0 +1,180 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Trail {{ coin() }}</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="dismiss()" aria-label="Close">
+        <ion-icon slot="icon-only" name="close-outline" />
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <p class="summary">
+    <strong [class]="isLong() ? 'side--buy' : 'side--sell'">
+      {{ isLong() ? 'Long' : 'Short' }}
+    </strong>
+    {{ positionSz() }} {{ coin() }}
+    @if (market(); as m) {
+      <span class="muted">· mark {{ m.markPx }}</span>
+    }
+  </p>
+  <p class="muted small">
+    A native trailing stop: a reduce-only {{ orderSide().toLowerCase() }} that follows the mark
+    price and closes after a retracement.
+  </p>
+
+  @if (marketError(); as message) {
+    <p class="notice notice--high" role="alert">{{ message }}</p>
+  }
+
+  <div class="percents" role="group" aria-label="Share of the position">
+    @for (p of percents; track p) {
+      <ion-button
+        size="small"
+        [fill]="percent() === p ? 'solid' : 'outline'"
+        color="medium"
+        [disabled]="market() === null || locked()"
+        (click)="selectPercent(p)"
+      >
+        {{ p }} %
+      </ion-button>
+    }
+  </div>
+
+  <ion-list inset class="fields">
+    <ion-item lines="full">
+      <ion-label position="stacked">Size</ion-label>
+      <ion-input
+        type="number"
+        inputmode="decimal"
+        [value]="sz()"
+        [disabled]="locked()"
+        (ionInput)="onSizeInput($event.detail.value ?? '')"
+      />
+    </ion-item>
+    @if (issue('sz'); as message) {
+      <ion-item lines="full" class="field-notice">
+        <ion-label class="ion-text-wrap notice--high" role="alert">{{ message }}</ion-label>
+      </ion-item>
+    }
+
+    <ion-item lines="full">
+      <ion-label position="stacked">
+        Retracement, {{ unit() === 'pct' ? 'in % of the best price' : 'in $ from the best price' }}
+      </ion-label>
+      <ion-input
+        type="number"
+        inputmode="decimal"
+        [placeholder]="unit() === 'pct' ? 'e.g. 10' : 'e.g. 2.5'"
+        [value]="retracement()"
+        [disabled]="locked()"
+        (ionInput)="retracement.set($event.detail.value ?? '')"
+      />
+      <div slot="end" class="units" role="group" aria-label="Retracement unit">
+        <ion-button
+          size="small"
+          [fill]="unit() === 'pct' ? 'solid' : 'outline'"
+          color="medium"
+          [disabled]="locked()"
+          (click)="unit.set('pct')"
+        >
+          %
+        </ion-button>
+        <ion-button
+          size="small"
+          [fill]="unit() === 'px' ? 'solid' : 'outline'"
+          color="medium"
+          [disabled]="locked()"
+          (click)="unit.set('px')"
+        >
+          $
+        </ion-button>
+      </div>
+    </ion-item>
+    @if (issue('retracement'); as message) {
+      <ion-item lines="full" class="field-notice">
+        <ion-label class="ion-text-wrap notice--high" role="alert">{{ message }}</ion-label>
+      </ion-item>
+    }
+
+    <ion-item lines="none">
+      <ion-label position="stacked">
+        Activation price, optional ({{ isLong() ? 'above' : 'below' }} the mark)
+      </ion-label>
+      <ion-input
+        type="number"
+        inputmode="decimal"
+        placeholder="Empty: tracks from now"
+        [value]="activation()"
+        [disabled]="locked()"
+        (ionInput)="activation.set($event.detail.value ?? '')"
+      />
+    </ion-item>
+    @if (issue('activation'); as message) {
+      <ion-item lines="none" class="field-notice">
+        <ion-label class="ion-text-wrap notice--high" role="alert">{{ message }}</ion-label>
+      </ion-item>
+    }
+  </ion-list>
+
+  @if (issue('position'); as message) {
+    <p class="notice notice--high" role="alert">{{ message }}</p>
+  }
+  @if (preview(); as text) {
+    <p class="notice">{{ text }}</p>
+  }
+  @for (warning of warnings(); track warning) {
+    <p class="notice notice--caution" role="alert">{{ warning }}</p>
+  }
+  @if (botManaged() === null) {
+    <p class="notice notice--caution">
+      The bot's profile could not be read: whether it manages this pair, and where its stop is, are
+      unknown.
+    </p>
+  }
+  @if (botNotice(); as notice) {
+    <p class="notice" [class.notice--caution]="notice.tighter" role="status">{{ notice.text }}</p>
+  }
+
+  <p class="section-label">Trailing stops on {{ coin() }}</p>
+  @if (ordersError(); as message) {
+    <p class="notice notice--high">{{ message }}</p>
+  } @else if (orders() === null) {
+    <p class="muted small">
+      <ion-spinner name="crescent" />
+      Reading the open orders…
+    </p>
+  } @else if (existing().length === 0) {
+    <p class="muted small">None yet.</p>
+  } @else {
+    <ul class="protective">
+      @for (e of existing(); track e.oid) {
+        <li>
+          <span>{{ e.text }}</span>
+          <span class="muted small">OID {{ e.oid }}</span>
+        </li>
+      }
+    </ul>
+    <p class="muted small">A new one adds to these: each keeps its own best price.</p>
+  }
+
+  @if (outcome(); as o) {
+    <p [class]="'notice notice--' + o.tone" role="status">{{ o.text }}</p>
+  }
+  @if (error(); as message) {
+    <p class="notice notice--high" role="alert">{{ message }}</p>
+  }
+
+  <div class="actions">
+    <ion-button fill="outline" color="medium" (click)="dismiss()">
+      {{ locked() ? 'Done' : 'Cancel' }}
+    </ion-button>
+    <ion-button [disabled]="!canReview()" (click)="review()">
+      @if (sending()) {
+        <ion-spinner name="crescent" slot="start" />
+      }
+      Review trailing stop
+    </ion-button>
+  </div>
+</ion-content>

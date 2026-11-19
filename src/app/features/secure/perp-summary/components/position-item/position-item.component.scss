@@ -18,6 +18,8 @@ h2 {
 }
 
 .position-actions__label {
+  /* Les deux lignes, Close et Protect, alignent leurs boutons. */
+  min-width: 48px;
   font-size: 13px;
   color: var(--ion-color-medium);
 }

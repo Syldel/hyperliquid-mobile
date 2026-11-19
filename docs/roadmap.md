@@ -476,6 +476,22 @@ Market`) prennent l'escalier de la pastille du rond (`app-order-type-badge`), en
    `nest-trading-bot/docs/known-gaps.md`), mais un trailing plus serré que le stop du bot devance la sortie que le
    backtest a éprouvée. Le formulaire devra le dire.
 
+   **Le formulaire, écrit le 2026-11-19** (`open-orders/trailing-stop-form`) : une ligne « Protect · Trail » sur la
+   carte dépliée d'une position (sur la ligne « Close », il fallait 276 px pour 232 à côté du mini-graphique, à 360 px).
+   Taille (25 à 100 %), repli en `%` ou en `$` (l'unité écrite à côté du champ), activation facultative, contrôlés à la
+   saisie par `planTrailingEntry` sur le marqué et la grille lus dans `metaAndAssetCtxs` du dex (poids 20). L'écran dit
+   le stop au départ et sa valeur au déclenchement, liste les trailings déjà posés sur la paire, et sur une paire du bot
+   dit si le trailing part plus serré que le stop du bot (`botStopNotice`). Un échec se range en « rien n'est posé »
+   (400, ou refus de l'exchange) ou « issue inconnue » (`trailingSendFailure`) : dans le second cas l'écran se
+   verrouille et relit les ordres une fois, **jamais de second envoi** (pas de `cloid`). **Vu dans le navigateur** sur
+   `xyz:BRENTOIL` à 360 px, en clair et en sombre : refus du mauvais côté à la saisie, aperçu juste (90,103 × 0,9 =
+   81,0927), confirmation ouverte puis annulée. **Premier envoi réel le même jour à 16:55**, par l'utilisateur depuis
+   l'app : une seule action signée (journal du gateway : actif 110049, vente reduce-only de 0,15, `10.0000%`, sans
+   activation), oid 610331573505 ; relu dans Open Orders : `Stop 80.6796 · best 89.644 · 10 %` (89,644 × 0,9), taille
+   0,15/0,15, reduce-only. Le chart affichait au même moment `TS 80.6562` (89,618 × 0,9) : l'état de sa lecture
+   précédente, en cache — la limite connue, le stop était monté entre-temps. ⚠️ Le cas « issue inconnue » et l'avis du
+   stop du bot ne sont vus qu'en test.
+
 4. **Le remplacement**, qui n'est pas une modification : poser le nouveau, puis annuler l'ancien. L'écran dit que le
    suivi repart du prix marqué du moment.
 
@@ -490,8 +506,8 @@ depuis l'interface officielle, se lit dans `frontendOpenOrders` du dex `xyz` sou
 (`limitPx` 183.18 ≈ stop × 1,1). **La pose y est mesurée le 2026-11-19** (`xyz:BRENTOIL`, S7 de
 `nest-trading-bot/docs/hyperliquid/live-check.md`) : le gateway l'accepte depuis `d7f8273` et lit le marqué du contrôle
 d'activation sur le dex de la paire ; l'exchange a accepté notre signature pour l'actif 110049, le trailing a suivi
-(stop = best × 0,9) et s'est annulé par la route ordinaire. ⚠️ `planTrailingEntry` refuse **encore** HIP-3 : à lever
-avec le formulaire Trail. Non mesurés sur HIP-3 : une activation atteinte, un déclenchement, un achat.
+(stop = best × 0,9) et s'est annulé par la route ordinaire. `planTrailingEntry` accepte HIP-3 depuis le même jour.
+Non mesurés sur HIP-3 : une activation atteinte, un déclenchement, un achat.
 
 ---
 

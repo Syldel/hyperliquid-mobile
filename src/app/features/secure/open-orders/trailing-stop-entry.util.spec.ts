@@ -1,4 +1,11 @@
-import { planTrailingEntry, type TrailingEntryInput } from './trailing-stop-entry.util';
+import {
+  botStopNotice,
+  formatStop,
+  planTrailingEntry,
+  readTrailingMarket,
+  trailingSendFailure,
+  type TrailingEntryInput,
+} from './trailing-stop-entry.util';
 
 /** Le long ETH des mesures du 2026-11-17 : 0,0065 ETH, quatre décimales de taille. */
 const longEth: TrailingEntryInput = {
@@ -39,6 +46,23 @@ describe('planTrailingEntry', () => {
         expect(result.plan.stopAtStart).toBeCloseTo(1647);
         expect('activationPx' in result.plan.body).toBe(false);
       }
+    });
+
+    // S7, mesuré le 2026-11-19 : la pose sur un dex HIP-3 passe, sous le nom préfixé de la paire.
+    it('places on a HIP-3 perp as on the main dex', () => {
+      const result = planTrailingEntry({
+        ...longEth,
+        coin: 'xyz:BRENTOIL',
+        positionSzi: '0.15',
+        markPx: '90.588',
+        szDecimals: 2,
+        sz: '0.15',
+      });
+      expect(result).toMatchObject({
+        ok: true,
+        plan: { body: { assetName: 'xyz:BRENTOIL', isBuy: false, sz: '0.15', reduceOnly: true } },
+      });
+      if (result.ok) expect(result.plan.stopAtStart).toBeCloseTo(81.5292);
     });
 
     it('closes a short with a buy, its stop above the mark', () => {
@@ -131,8 +155,8 @@ describe('planTrailingEntry', () => {
       ).toContain('above zero');
     });
 
-    it('a market the gateway does not place trailing stops on', () => {
-      for (const coin of ['xyz:BRENTOIL', '@107']) {
+    it('a market that has no trailing stop: spot or outcome', () => {
+      for (const coin of ['@107', 'PURR/USDC', '#10']) {
         expect(issuesOf({ ...longEth, coin })[0]?.field).toBe('position');
       }
     });
@@ -166,5 +190,98 @@ describe('planTrailingEntry', () => {
     });
     expect(result.ok).toBe(true);
     expect(result.ok && result.warnings[0]).toContain('10.38 $');
+  });
+});
+
+describe('botStopNotice', () => {
+  // Fermer un long : une vente, dont le stop le plus HAUT part le premier.
+  const sellAt = (stopAtStart: number) => ({ isBuy: false, stopAtStart });
+  // Fermer un short : un achat, dont le stop le plus BAS part le premier.
+  const buyAt = (stopAtStart: number) => ({ isBuy: true, stopAtStart });
+
+  it("says nothing off the bot's pairs", () => {
+    expect(botStopNotice(sellAt(81.5), null)).toBeNull();
+  });
+
+  it("flags a sell starting above the bot's stop: it would exit first", () => {
+    expect(botStopNotice(sellAt(81.5), { stopPx: '80' })).toMatchObject({ tighter: true });
+  });
+
+  it("keeps a sell starting below the bot's stop as behind it", () => {
+    expect(botStopNotice(sellAt(79), { stopPx: '80' })).toMatchObject({ tighter: false });
+  });
+
+  // Le miroir : sans lui, un short serait jugé à l'envers.
+  it("flags a buy starting below the bot's stop, and not one above it", () => {
+    expect(botStopNotice(buyAt(95), { stopPx: '96' })).toMatchObject({ tighter: true });
+    expect(botStopNotice(buyAt(97), { stopPx: '96' })).toMatchObject({ tighter: false });
+  });
+
+  it('says when the bot has no stop on its own pair', () => {
+    const notice = botStopNotice(sellAt(81.5), { stopPx: null });
+    expect(notice).toMatchObject({ tighter: false });
+    expect(notice?.text).toContain('no stop');
+  });
+});
+
+describe('formatStop', () => {
+  it('writes six significant digits, without float noise', () => {
+    expect(formatStop(90.588 * 0.9)).toBe('81.5292');
+    expect(formatStop(64971 * 1.003)).toBe('65165.9');
+  });
+});
+
+describe('readTrailingMarket', () => {
+  const metaAndCtx = [
+    {
+      universe: [
+        { name: 'xyz:NVDA', szDecimals: 3 },
+        { name: 'xyz:BRENTOIL', szDecimals: 2 },
+      ],
+    },
+    [{ markPx: '156.77' }, { markPx: '90.588' }],
+  ];
+
+  it('reads the grid and the mark of the pair, by its index', () => {
+    expect(readTrailingMarket('xyz:BRENTOIL', metaAndCtx)).toEqual({
+      ok: true,
+      szDecimals: 2,
+      markPx: '90.588',
+    });
+  });
+
+  // Par égalité exacte : une sous-chaîne a déjà fait lire à 38 perps la grille d'un autre.
+  it('does not take a market whose name only contains the pair', () => {
+    expect(readTrailingMarket('BRENTOIL', metaAndCtx)).toMatchObject({ ok: false });
+  });
+
+  it('refuses a missing or unreadable mark', () => {
+    const noMark = [metaAndCtx[0], [{ markPx: '156.77' }, { markPx: '' }]];
+    expect(readTrailingMarket('xyz:BRENTOIL', noMark)).toMatchObject({ ok: false });
+    expect(readTrailingMarket('xyz:BRENTOIL', null)).toMatchObject({ ok: false });
+  });
+});
+
+describe('trailingSendFailure', () => {
+  it('knows nothing was placed when the gateway refused before signing', () => {
+    for (const status of [400, 401, 403, 404]) {
+      expect(trailingSendFailure(status, { message: 'Validation failed' })).toBe('nothing-placed');
+    }
+  });
+
+  it('knows nothing was placed when the exchange refused the action', () => {
+    expect(
+      trailingSendFailure(502, { error: 'EXCHANGE_TRAILING_STOP_REFUSED', message: 'refused' }),
+    ).toBe('nothing-placed');
+  });
+
+  // Sans cloid, renvoyer après une issue inconnue poserait un second trailing.
+  it('treats every other failure as an outcome to read, never to resend', () => {
+    expect(trailingSendFailure(502, { error: 'EXCHANGE_OUTCOME_UNKNOWN' })).toBe('unknown');
+    expect(trailingSendFailure(502, { error: 'EXCHANGE_UNEXPECTED_RESPONSE' })).toBe('unknown');
+    expect(trailingSendFailure(502, { error: 'SOMETHING_NEW' })).toBe('unknown');
+    expect(trailingSendFailure(0, null)).toBe('unknown');
+    expect(trailingSendFailure(500, 'Internal')).toBe('unknown');
+    expect(trailingSendFailure(504, null)).toBe('unknown');
   });
 });
