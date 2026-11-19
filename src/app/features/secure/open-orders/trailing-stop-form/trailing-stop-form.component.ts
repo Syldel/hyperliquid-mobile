@@ -49,7 +49,12 @@ import {
   type TrailingUnit,
 } from '../trailing-stop-entry.util';
 import { isTrailingStop, trailingStopSummary, trailingStopView } from '../trailing-stop-view.util';
-import { readCancelReply, stopChange, trailingPrefill } from '../trailing-stop-replace.util';
+import {
+  readCancelReply,
+  stopChange,
+  trailingPrefill,
+  type TrailingReplaced,
+} from '../trailing-stop-replace.util';
 
 /**
  * ============================================================================
@@ -374,7 +379,10 @@ export class TrailingStopFormComponent implements OnInit {
         switch (read.kind) {
           case 'cancelled':
             this.orderToast.success(`Replaced · OID ${placed.oid} (OID ${old} cancelled)`);
-            this.modalCtrl.dismiss(null, 'confirm');
+            this.modalCtrl.dismiss(
+              { kind: 'replaced', newOid: placed.oid, oldOid: old } satisfies TrailingReplaced,
+              'confirm',
+            );
             return;
           case 'gone':
             this.outcome.set({

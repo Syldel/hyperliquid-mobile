@@ -507,8 +507,26 @@ Market`) prennent l'escalier de la pastille du rond (`app-order-type-badge`), en
    (orange 5,43:1 et 8,68:1, rouge 6,20:1 et 6,11:1), avec l'état mesuré du trailing BRENTOIL **injecté dans la page** :
    ce trailing n'était plus ouvert au moment de la vérification. Rien n'a été envoyé, et les écritures vers le gateway
    étaient bloquées. L'état « deux trailings » a été posé à la main dans le composant, pour voir sa mise en page.
-   ⚠️ **Pas encore vus en réel** : un remplacement réussi, une annulation refusée. Et le texte reconnu pour `gone`
-   (« Order was never placed, already canceled, or filled. ») vient de la doc, pas d'une mesure.
+   **Premier remplacement réel le même jour à 17:35**, par l'utilisateur depuis le détail du trailing 10 %
+   (oid 610366939959) : le 7 % posé (oid 610375977814), puis l'ancien annulé, réponse `statuses: ["success"]`. Une seule
+   pose, une seule annulation. **Mais la page de détail relisait ensuite l'ancien oid**, et `orderStatus` répondait
+   encore `open`, avec l'état de la pose, alors que `frontendOpenOrders` ne le listait déjà plus. L'écran disait
+   « Status open » et « Not in the open orders list ». Relu à 17:36:55 : `canceled`, horodaté 17:35:07. **Corrigé le
+   même jour** : le formulaire rend `{ kind: 'replaced' }`, et le détail revient à la liste (`afterTrailingForm`). La
+   réponse de l'annulation fait foi, et la liste lit `frontendOpenOrders`. **Vu en réel le même jour à 18:36**, sur un
+   second remplacement (7 % → 5 %) :
+   - l'écran annonçait `85.6244` au départ (90,131 × 0,95), contre `84.1715` pour l'ancien (90,507 × 0,93), « tighter » ;
+   - une pose (oid 610455230013), puis l'annulation de 610375977814 (`success`), et le toast « Replaced » ;
+   - le détail est revenu à la liste **sans relire l'ancien oid** (aucun `GET` après l'annulation) ;
+   - la liste ne montrait que le nouveau trailing, `Stop 85.6558 · best 90.164 · 5 %` : `frontendOpenOrders` le listait
+     dès le retour, et il avait déjà suivi un nouveau plus haut.
+
+   **Vu en réel avant ce remplacement** : passé par le bouton Trail de la carte en pensant remplacer, l'utilisateur a
+   ajouté un second trailing (8 %). Le formulaire ne propose le remplacement que depuis le détail. C'est un point
+   d'entrée à revoir : un bouton Replace sur chaque trailing listé dans le formulaire.
+
+   ⚠️ **Pas encore vu en réel** : une annulation refusée. Et le texte reconnu pour `gone` (« Order was never placed,
+   already canceled, or filled. ») vient de la doc, pas d'une mesure.
 
 ⚠️ **Mesuré le 2026-11-17, à reporter dans la pose (3)** : l'exchange **accepte** une activation du mauvais côté (une vente
 activée sous le marqué) et la suit tout de suite, sans rien dire. Le client officiel refuse cette saisie ; le gateway aussi

@@ -48,6 +48,7 @@ import { editRefusal } from '../editable-order.util';
 import { afterModify, ModifyOutcome } from '../modify-outcome.util';
 import { OrderFormComponent } from '../open-form/order-form.component';
 import { TrailingStopFormComponent } from '../trailing-stop-form/trailing-stop-form.component';
+import { afterTrailingForm, type TrailingReplaced } from '../trailing-stop-replace.util';
 import { describeStuckTriggered, isStuckTriggeredOrder } from '../stuck-triggered-order.util';
 import {
   activationLabel,
@@ -360,10 +361,15 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
           initialBreakpoint: 1,
         });
         await modal.present();
-        const { role } = await modal.onDidDismiss();
-        if (role !== 'confirm') return;
-        // Remplacé (cet oid annulé) ou issue à vérifier : la page relit, et dit ce qu'il en est.
+        const { data, role } = await modal.onDidDismiss<TrailingReplaced | null>();
+        const next = afterTrailingForm(role, data);
+        if (next === 'stay') return;
         this.availableCapitalService.invalidate();
+        // Remplacé : cet oid est annulé, la liste le montre ; le relire ici montrait un `orderStatus` en retard.
+        if (next === 'list') {
+          this.backToList();
+          return;
+        }
         this.fetchFn.set(this.buildFetchFn());
       },
       error: (error: unknown) => {

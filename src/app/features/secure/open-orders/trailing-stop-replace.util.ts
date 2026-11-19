@@ -2,6 +2,7 @@ import {
   parseTrailingStopCondition,
   TrailingStopConditionError,
   type HLFrontendOpenOrder,
+  type HLOid,
 } from '@syldel/hl-shared-types';
 import { exchangeRefusal } from '@utils/hl-error.utils';
 import type { TrailingEntryPlan, TrailingUnit } from './trailing-stop-entry.util';
@@ -113,6 +114,36 @@ export function stopChange(
     looser,
     text: `Your stop moves from ${old.stopPx} (now) to ${to} ${start}: ${looser ? 'looser, further from the price' : 'tighter, closer to the price'}. Tracking starts over from the current mark.`,
   };
+}
+
+/**
+ * Ce que le formulaire Trail rend à sa fermeture, en remplacement : `replaced` seulement quand l'annulation de
+ * l'ancien a répondu `success`. Toute autre fermeture rend `null`.
+ */
+export interface TrailingReplaced {
+  kind: 'replaced';
+  newOid: number;
+  oldOid: HLOid;
+}
+
+/**
+ * Ce que la page de détail de l'**ancien** trailing fait à la fermeture du formulaire.
+ *
+ * - `list` après un remplacement réussi : la réponse `success` de l'annulation fait foi, et la liste lit
+ *   `frontendOpenOrders`. Relire l'ancien oid montrait un faux état : mesuré le 2026-11-19 à 17:35,
+ *   `orderStatus` répondait encore `open`, avec l'état de la pose, juste après l'annulation réussie, alors
+ *   que `frontendOpenOrders` ne le listait déjà plus. La page affichait « Status open » et « Not in the open
+ *   orders list » ; `canceled` moins de deux minutes plus tard ;
+ * - `reread` après toute autre écriture (deux trailings, ancien disparu, issue inconnue) : la page relit, et
+ *   dit ce qu'elle voit ;
+ * - `stay` : rien n'a été envoyé.
+ */
+export function afterTrailingForm(
+  role: string | undefined,
+  data: TrailingReplaced | null | undefined,
+): 'list' | 'reread' | 'stay' {
+  if (role !== 'confirm') return 'stay';
+  return data?.kind === 'replaced' ? 'list' : 'reread';
 }
 
 /**

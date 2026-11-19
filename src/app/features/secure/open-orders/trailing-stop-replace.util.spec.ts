@@ -1,4 +1,9 @@
-import { readCancelReply, stopChange, trailingPrefill } from './trailing-stop-replace.util';
+import {
+  afterTrailingForm,
+  readCancelReply,
+  stopChange,
+  trailingPrefill,
+} from './trailing-stop-replace.util';
 import { trailingStopView } from './trailing-stop-view.util';
 
 /**
@@ -129,5 +134,25 @@ describe('readCancelReply', () => {
       kind: 'unknown',
     });
     expect(readCancelReply(null)).toEqual({ kind: 'unknown' });
+  });
+});
+
+describe('afterTrailingForm', () => {
+  const replaced = { kind: 'replaced', newOid: 610375977814, oldOid: 610366939959 } as const;
+
+  // Mesuré le 2026-11-19 : relu juste après une annulation réussie, `orderStatus` disait encore `open`.
+  it('goes back to the list after a replacement, instead of re-reading the cancelled order', () => {
+    expect(afterTrailingForm('confirm', replaced)).toBe('list');
+  });
+
+  it('re-reads after any other write: two trailing stops, an old one gone, an unknown outcome', () => {
+    expect(afterTrailingForm('confirm', null)).toBe('reread');
+    expect(afterTrailingForm('confirm', undefined)).toBe('reread');
+  });
+
+  it('stays when nothing was sent', () => {
+    expect(afterTrailingForm('cancel', null)).toBe('stay');
+    expect(afterTrailingForm('backdrop', undefined)).toBe('stay');
+    expect(afterTrailingForm(undefined, undefined)).toBe('stay');
   });
 });
