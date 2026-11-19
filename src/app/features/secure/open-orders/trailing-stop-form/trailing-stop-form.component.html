@@ -1,6 +1,6 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>{{ replacingOid() === null ? 'Trail' : 'Replace trail' }} {{ coin() }}</ion-title>
+    <ion-title>{{ target() === null ? 'Trail' : 'Replace trail' }} {{ coin() }}</ion-title>
     <ion-buttons slot="end">
       <ion-button (click)="dismiss()" aria-label="Close">
         <ion-icon slot="icon-only" name="close-outline" />
@@ -19,7 +19,7 @@
       <span class="muted">· mark {{ m.markPx }}</span>
     }
   </p>
-  @if (replacingOid(); as old) {
+  @if (target(); as old) {
     <p class="muted small">
       Places a new trailing stop, then cancels OID {{ old }}. The new one tracks from the current
       mark price, not from the old one's best price.
@@ -32,7 +32,7 @@
   }
   @if (replacingMissing()) {
     <p class="notice notice--high" role="alert">
-      OID {{ replacingOid() }} is no longer open: it triggered or was cancelled. Nothing to replace.
+      OID {{ target() }} is no longer open: it triggered or was cancelled. Nothing to replace.
     </p>
   }
 
@@ -49,9 +49,18 @@
         [disabled]="market() === null || locked()"
         (click)="selectPercent(p)"
       >
-        {{ p }} %
+        {{ p }}&nbsp;%
       </ion-button>
     }
+    <ion-button
+      size="small"
+      [fill]="percent() === 'rest' ? 'solid' : 'outline'"
+      color="medium"
+      [disabled]="!rest() || locked()"
+      (click)="selectRest()"
+    >
+      Rest
+    </ion-button>
   </div>
 
   <ion-list inset class="fields">
@@ -169,12 +178,42 @@
       @for (e of existing(); track e.oid) {
         <li>
           <span>{{ e.text }}</span>
-          <span class="muted small">OID {{ e.oid }}{{ e.replaced ? ' · to replace' : '' }}</span>
+          <span class="oid-row">
+            <span class="muted small">OID {{ e.oid }}{{ e.replaced ? ' · to replace' : '' }}</span>
+            @if (!e.replaced && !locked()) {
+              <ion-button
+                size="small"
+                fill="outline"
+                color="medium"
+                [disabled]="sending()"
+                (click)="replaceOne(e.oid)"
+              >
+                Replace
+              </ion-button>
+            }
+          </span>
         </li>
       }
     </ul>
-    @if (replacingOid() === null) {
-      <p class="muted small">A new one adds to these: each keeps its own best price.</p>
+    @if (coverage(); as c) {
+      <p class="notice" [class.notice--caution]="c.kind === 'unreadable' || c.over" role="status">
+        {{ c.text }}
+      </p>
+    }
+    @if (target() === null) {
+      <p class="muted small">
+        A new one adds to these, each with its own best price, or replaces one.
+      </p>
+    } @else if (!locked()) {
+      <ion-button
+        fill="clear"
+        size="small"
+        color="medium"
+        class="add-instead"
+        (click)="addInstead()"
+      >
+        Add a new one instead
+      </ion-button>
     }
   }
 
@@ -201,7 +240,7 @@
         @if (sending()) {
           <ion-spinner name="crescent" slot="start" />
         }
-        {{ replacingOid() === null ? 'Review trailing stop' : 'Review replacement' }}
+        {{ target() === null ? 'Review trailing stop' : 'Review replacement' }}
       </ion-button>
     }
   </div>

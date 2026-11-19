@@ -5,6 +5,7 @@ import {
   computed,
   inject,
   input,
+  linkedSignal,
   OnInit,
   signal,
 } from '@angular/core';
@@ -48,6 +49,7 @@ import {
   type TrailingEntryPlan,
   type TrailingUnit,
 } from '../trailing-stop-entry.util';
+import { trailingCoverage } from '../trailing-stop-coverage.util';
 import { isTrailingStop, trailingStopSummary, trailingStopView } from '../trailing-stop-view.util';
 import {
   readCancelReply,
@@ -80,6 +82,11 @@ import {
  * annule l'ancien — jamais dans l'autre ordre, et jamais l'ancien après une pose à l'issue inconnue
  * (`trailing-stop-replace.util.ts`). Une annulation qui échoue laisse deux trailings : l'écran le dit, et
  * propose de la retenter (annuler se renvoie sans risque, poser non).
+ *
+ * **Plusieurs trailings par position sont voulus** (sortie en paliers) : la couverture cumulée se dit
+ * (`trailingCoverage`), « Rest » remplit la part sans trailing, et chaque trailing listé se remplace d'ici —
+ * au premier essai réel (2026-11-19), « Trail » depuis la carte a ajouté un 8 % à côté du 10 % qu'on voulait
+ * remplacer, faute de chemin vers le remplacement depuis cet écran.
  *
  * Les champs restent ceux de l'API, unités écrites : un pourcentage n'est pas une distance en prix, et une
  * saisie prise pour l'autre a été refusée par l'exchange pendant la mesure (2026-11-17).
@@ -122,6 +129,11 @@ export class TrailingStopFormComponent implements OnInit {
   readonly botManaged = input<boolean | null | undefined>(undefined);
   /** L'oid du trailing à remplacer ; `null` : une pose simple. */
   readonly replacingOid = input<HLOid | null>(null);
+  /**
+   * Le trailing remplacé **maintenant** : l'entrée au départ, puis le choix fait dans la liste (« Replace »,
+   * « Add a new one instead »).
+   */
+  readonly target = linkedSignal(() => this.replacingOid());
 
   readonly percents = CLOSE_PERCENTS;
 
@@ -130,7 +142,7 @@ export class TrailingStopFormComponent implements OnInit {
   readonly orders = signal<HLFrontendOpenOrder[] | null>(null);
   readonly ordersError = signal<string | null>(null);
 
-  readonly percent = signal<number | null>(100);
+  readonly percent = signal<number | 'rest' | null>(100);
   readonly sz = signal('');
   readonly unit = signal<TrailingUnit>('pct');
   readonly retracement = signal('');
@@ -147,6 +159,8 @@ export class TrailingStopFormComponent implements OnInit {
   readonly oldCancelFailed = signal(false);
   readonly cancellingOld = signal(false);
   private prefilled = false;
+  /** La taille par défaut d'une pose simple a été choisie : une fois, marché et ordres lus. */
+  private sized = false;
 
   readonly coin = computed(() => this.position().coin);
   readonly isLong = computed(() => Number(this.position().szi) > 0);
@@ -208,25 +222,47 @@ export class TrailingStopFormComponent implements OnInit {
       .map((o) => ({
         oid: o.oid,
         text: trailingStopSummary(trailingStopView(o)!),
-        replaced: o.oid === this.replacingOid(),
+        replaced: o.oid === this.target(),
       })),
   );
 
   /** L'ancien, tel que la liste le donne **maintenant** : son état courant, pas celui de sa pose. */
   readonly replacing = computed(() => {
-    const oid = this.replacingOid();
+    const oid = this.target();
     return oid === null ? null : (this.orders()?.find((o) => o.oid === oid) ?? null);
   });
 
   /** L'ancien n'est plus dans la liste : déclenché ou annulé entre-temps. Rien à remplacer. */
   readonly replacingMissing = computed(
-    () => this.replacingOid() !== null && this.orders() !== null && this.replacing() === null,
+    () => this.target() !== null && this.orders() !== null && this.replacing() === null,
   );
 
   readonly change = computed(() => {
     const plan = this.plan();
     const old = this.replacing();
     return plan && old ? stopChange(trailingStopView(old), plan) : null;
+  });
+
+  /** Ce que les trailings de la paire couvrent de la position, l'ancien exclu en remplacement. */
+  readonly coverage = computed(() => {
+    const market = this.market();
+    const orders = this.orders();
+    if (!market || orders === null) return null;
+    return trailingCoverage({
+      positionSzi: this.position().szi,
+      szDecimals: market.szDecimals,
+      trailings: orders
+        .filter((o) => o.coin === this.coin() && isTrailingStop(o))
+        .map((o) => ({ oid: o.oid, sz: o.sz })),
+      excludeOid: this.target(),
+      newSz: this.sz(),
+    });
+  });
+
+  /** La part de la position sans trailing ; `''` : rien à compléter. */
+  readonly rest = computed(() => {
+    const c = this.coverage();
+    return c?.kind === 'read' ? c.rest : '';
   });
 
   readonly canReview = computed(
@@ -254,8 +290,7 @@ export class TrailingStopFormComponent implements OnInit {
           return;
         }
         this.market.set({ szDecimals: read.szDecimals, markPx: read.markPx });
-        // En remplacement, la taille vient de l'ancien (`applyPrefill`), pas de 100 % de la position.
-        if (this.replacingOid() === null) this.selectPercent(100);
+        this.applyDefaultSize();
       },
       error: (error: unknown) =>
         this.marketError.set(
@@ -282,6 +317,32 @@ export class TrailingStopFormComponent implements OnInit {
     this.sz.set(closeSize(this.position().szi, percent, market.szDecimals));
   }
 
+  /** « Rest » : la part de la position que les autres trailings laissent sans trailing. */
+  selectRest(): void {
+    const rest = this.rest();
+    if (!rest) return;
+    this.percent.set('rest');
+    this.sz.set(rest);
+  }
+
+  /** « Replace » sur un trailing listé : la feuille passe en remplacement de celui-là, pré-remplie. */
+  replaceOne(oid: HLOid): void {
+    if (this.locked() || this.sending()) return;
+    this.error.set(null);
+    this.target.set(oid);
+    this.prefilled = false;
+    this.applyPrefill();
+  }
+
+  /** Retour à une pose simple : la taille repart du défaut, le repli saisi reste. */
+  addInstead(): void {
+    if (this.locked() || this.sending()) return;
+    this.error.set(null);
+    this.target.set(null);
+    this.sized = false;
+    this.applyDefaultSize();
+  }
+
   onSizeInput(value: string): void {
     this.percent.set(null);
     this.sz.set(value);
@@ -295,7 +356,7 @@ export class TrailingStopFormComponent implements OnInit {
       'pct' in plan.body.retracement
         ? `${plan.body.retracement.pct} %`
         : `${plan.body.retracement.px} $`;
-    const replacing = this.replacingOid();
+    const replacing = this.target();
     const change = this.change();
     const alert = await this.alertCtrl.create({
       header: replacing === null ? 'Place trailing stop' : 'Replace trailing stop',
@@ -326,7 +387,7 @@ export class TrailingStopFormComponent implements OnInit {
     this.gateway.placeTrailingStop(plan.body).subscribe({
       next: ({ oid, action }) => {
         this.sending.set(false);
-        if (this.replacingOid() === null) {
+        if (this.target() === null) {
           this.orderToast.success(`Trailing stop placed · OID ${oid}`);
           this.modalCtrl.dismiss(null, 'confirm');
           return;
@@ -348,7 +409,7 @@ export class TrailingStopFormComponent implements OnInit {
         this.locked.set(true);
         this.error.set(
           `${message} It may have been placed: nothing will be sent again from here` +
-            (this.replacingOid() === null ? '.' : ', and the old trailing stop is kept.'),
+            (this.target() === null ? '.' : ', and the old trailing stop is kept.'),
         );
         this.rereadAfterUnknown();
       },
@@ -361,7 +422,7 @@ export class TrailingStopFormComponent implements OnInit {
    */
   cancelOld(): void {
     const placed = this.placed();
-    const old = this.replacingOid();
+    const old = this.target();
     if (!placed || old === null || this.cancellingOld()) return;
     this.cancellingOld.set(true);
     this.oldCancelFailed.set(false);
@@ -405,6 +466,17 @@ export class TrailingStopFormComponent implements OnInit {
     });
   }
 
+  /**
+   * Pose simple : le reste quand d'autres trailings couvrent déjà une part (le palier suivant), 100 % sinon.
+   * En remplacement, la taille vient de l'ancien (`applyPrefill`).
+   */
+  private applyDefaultSize(): void {
+    if (this.sized || this.target() !== null || !this.market() || this.orders() === null) return;
+    this.sized = true;
+    if (this.rest() && this.coverage() !== null) this.selectRest();
+    else this.selectPercent(100);
+  }
+
   /** Reprend les valeurs de l'ancien, une fois, dès qu'il est lu dans la liste. */
   private applyPrefill(): void {
     const old = this.replacing();
@@ -425,6 +497,7 @@ export class TrailingStopFormComponent implements OnInit {
       next: (orders) => {
         this.orders.set(orders);
         this.applyPrefill();
+        this.applyDefaultSize();
       },
       error: (error: unknown) =>
         this.ordersError.set(

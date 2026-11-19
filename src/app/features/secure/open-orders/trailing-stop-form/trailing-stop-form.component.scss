@@ -44,11 +44,16 @@
 
 .percents {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 6px;
 
+  // Cinq colonnes à 360 px (« Rest » s'est ajouté) : ~61 px chacune, où le rembourrage par défaut renvoyait
+  // « 100 % » sur deux lignes (mesuré le 2026-11-19).
   ion-button {
     margin: 0;
+    --padding-start: 2px;
+    --padding-end: 2px;
+    white-space: nowrap;
   }
 }
 
@@ -78,6 +83,23 @@
     padding: 6px 0;
     border-bottom: 1px solid var(--ion-background-color-step-150);
   }
+
+  .oid-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 28px;
+
+    ion-button {
+      margin: 0;
+      flex: none;
+    }
+  }
+}
+
+.add-instead {
+  margin: 4px 0 0;
 }
 
 .actions {

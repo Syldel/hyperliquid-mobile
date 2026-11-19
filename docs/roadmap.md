@@ -522,8 +522,22 @@ Market`) prennent l'escalier de la pastille du rond (`app-order-type-badge`), en
      dès le retour, et il avait déjà suivi un nouveau plus haut.
 
    **Vu en réel avant ce remplacement** : passé par le bouton Trail de la carte en pensant remplacer, l'utilisateur a
-   ajouté un second trailing (8 %). Le formulaire ne propose le remplacement que depuis le détail. C'est un point
-   d'entrée à revoir : un bouton Replace sur chaque trailing listé dans le formulaire.
+   ajouté un second trailing (8 %). Le formulaire ne proposait le remplacement que depuis le détail.
+
+   **Fait le 2026-11-19 au soir, pas encore envoyé en réel** : cumuler des trailings reste voulu (sortie en paliers,
+   comme les `strategy.exit` multiples de TradingView avec `qty_percent` ; le trailing de Freqtrade porte sur toute la
+   position). Le formulaire dit donc ce que les trailings couvrent :
+   - **la couverture** (`trailing-stop-coverage.util.ts`) : « Trailing stops cover 0.1 of 0.15 (67 %) · 0.05 left.
+     With this one: … », en orange au-delà de 100 %, sans bloquer. Les tailles s'additionnent en unités de la grille,
+     et l'ancien est exclu en remplacement ;
+   - **« Rest »** à côté de 25/50/75/100 % : la part sans trailing. C'est la taille par défaut d'une pose quand
+     d'autres trailings couvrent déjà une part ;
+   - **« Replace » sur chaque trailing listé** : le formulaire passe en remplacement de celui-là, pré-rempli.
+     « Add a new one instead » ramène à une pose simple.
+
+   Vérifié dans le navigateur, sur la position réelle `xyz:BRENTOIL` (puis un second trailing injecté), à 360 px, en
+   clair et en sombre (contrastes ≥ 6:1), sans rien envoyer. ⚠️ Ce qu'un trailing plus grand que la position
+   **restante** fait à son déclenchement n'est pas mesuré.
 
    ⚠️ **Pas encore vu en réel** : une annulation refusée. Et le texte reconnu pour `gone` (« Order was never placed,
    already canceled, or filled. ») vient de la doc, pas d'une mesure.
