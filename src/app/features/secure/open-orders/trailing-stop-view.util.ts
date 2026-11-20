@@ -264,6 +264,11 @@ export interface TrailingStart {
   time: number;
   price: string;
   waiting: boolean;
+  /**
+   * Le meilleur prix vu à la pose (le watermark de départ de `trailing-stop-staircase.util.ts`), ou
+   * `null` pour une pose en attente : elle n'en avait pas encore.
+   */
+  best: string | null;
 }
 
 export function trailingStart(
@@ -285,9 +290,9 @@ export function trailingStart(
   if (!view) return null;
   switch (view.state) {
     case 'tracking':
-      return { time: pose.statusTimestamp, price: view.stopPx, waiting: false };
+      return { time: pose.statusTimestamp, price: view.stopPx, waiting: false, best: view.best };
     case 'waiting':
-      return { time: pose.statusTimestamp, price: view.activation.px, waiting: true };
+      return { time: pose.statusTimestamp, price: view.activation.px, waiting: true, best: null };
     case 'unreadable':
       return null;
   }

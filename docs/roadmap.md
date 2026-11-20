@@ -357,7 +357,7 @@ l'app**, **en plus** du stop intelligent du bot, jamais à sa place (décidé le
 2. **L'affichage** : l'état lu dans `triggerCondition` (en attente à X, ou suit depuis W et déclenche à T), une ligne
    propre sur le chart. Le déclencheur est hors de la grille des prix, et vaut `"0.0"` en attente.
    **Écrit le 2026-11-17** : `open-orders/trailing-stop-view.util.ts`, lu par la liste, le détail et le chart (voir
-   [watchlist/chart-overlays.md](watchlist/chart-overlays.md#le-trailing-stop-natif--son-niveau-actuel-jamais-son-passé)).
+   [watchlist/chart-overlays.md](watchlist/chart-overlays.md#le-trailing-stop-natif--son-départ-son-niveau-et-lescalier-reconstitué-entre-les-deux)).
    `limitPx` ne s'affiche plus pour ce type, ni « Trigger 0.0 », ni la taille en dollars qui en découlait.
    **Vu dans le navigateur le 2026-11-17**, sur un achat reduce-only en suivi et un achat en attente sous 1 250, en clair,
    en sombre et à 360 px, le chart par capture. La vérification a trouvé et corrigé deux défaillances muettes du chart :
@@ -377,6 +377,15 @@ l'app**, **en plus** du stop intelligent du bot, jamais à sa place (décidé le
      test : il demande un déclenchement entre les deux lectures ;
    - l'exchange écrit `3.5000000000000004%` : **réglé le même jour**, le repli s'affiche arrondi à quatre décimales, la
      précision d'une action signée (`3.5 %`), et le détail montre le texte brut sous « Exchange text ».
+
+   **L'escalier sur le chart, le 2026-11-20** : de la pose au niveau actuel, une marche par bougie, reconstituée depuis
+   les bougies déjà chargées (`trailing-stop-staircase.util.ts`, aucune lecture en plus) — un pointillé où le stop n'a
+   pas bougé, une **bande** où il a bougé dans la bougie, sans étiquette (le rond de départ perd aussi son texte). Les
+   deux bouts sont exacts, le milieu approché : éprouvé contre les stops mesurés de S6 (à 1 $ près) et de BRENTOIL
+   (exact). Voir [watchlist/chart-overlays.md](watchlist/chart-overlays.md#son-escalier-bougie-par-bougie-2026-11-20).
+   Vu dans le navigateur à 360 px, en clair et en sombre, par capture et par lecture des pixels du canvas ; la capture
+   a trouvé un escalier peint sous l'axe des dates (corrigé, coupé au pane). ⚠️ Pas encore vu sur le téléphone.
+
 3. **La pose** depuis une position : reduce-only, à la taille de la position par défaut, l'unité de chaque champ écrite
    (`%` ou prix). Une saisie prise pour un pourcentage a été refusée par l'exchange pendant la mesure.
    **Écrit le 2026-11-17, sans formulaire encore** : la validation de la saisie (`open-orders/trailing-stop-entry.util.ts`),

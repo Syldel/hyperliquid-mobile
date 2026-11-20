@@ -1,4 +1,9 @@
-import type { HLTrailingRetracementState } from '@syldel/hl-shared-types';
+import {
+  parseTrailingStopCondition,
+  type HLFrontendOpenOrder,
+  type HLTrailingRetracementState,
+} from '@syldel/hl-shared-types';
+import { trailingStart, trailingStopView } from './trailing-stop-view.util';
 
 /**
  * ============================================================================
@@ -56,9 +61,13 @@ export interface StaircaseInput {
    * trailing au plus proche sur cette grille **seule**, sans la limite de cinq chiffres significatifs des
    * prix d'ordre : 64 971 × 1,003 = 65 165,913 écrit 65165.9, 64 919 × 1,003 = 65 113,757 écrit 65113.8
    * (BTC, S6, 2026-11-17 — l'arrondi au plus proche, pas la troncature) ; 1 811,5 × 0,9 = 1630.35 sur
-   * ETH. Sans cet arrondi, la fin de l'escalier tombait à côté de l'étiquette du stop.
+   * ETH. Sans cet arrondi, la fin de l'escalier tombait à côté du stop écrit par l'exchange.
+   *
+   * `null` : pas d'arrondi. C'est le cas du chart, qui n'a pas la méta du marché et ne la lit pas pour
+   * ça (20 de poids) : un pas de prix y fait moins d'un pixel — 0,1 $ sur un BTC à 65 000 dans un pane de
+   * 400 px couvrant 2 %, environ 0,03 px.
    */
-  pxDecimals: number;
+  pxDecimals: number | null;
 }
 
 /**
@@ -127,8 +136,10 @@ export function trailingStaircase(input: StaircaseInput): TrailingStaircase {
     return { kind: 'uncovered', reason: 'No candle holds the present state.' };
   }
 
-  const stop = (signedBest: number) =>
-    roundToTick(stopAt(side, input.retracement, k * signedBest), input.pxDecimals);
+  const stop = (signedBest: number) => {
+    const px = stopAt(side, input.retracement, k * signedBest);
+    return input.pxDecimals === null ? px : roundToTick(px, input.pxDecimals);
+  };
   const steps: StaircaseStep[] = [];
   let lo = startBest;
   let hi = startBest;
@@ -155,4 +166,50 @@ export function trailingStaircase(input: StaircaseInput): TrailingStaircase {
   }
 
   return { kind: 'drawn', steps, clipped, missed };
+}
+
+/**
+ * L'escalier d'un trailing stop **ouvert**, tel que le chart le dessine : sa pose dans l'historique
+ * (`trailingStart`), son état présent dans la liste, et les bougies déjà chargées.
+ *
+ * L'état présent se pose sur la **dernière bougie chargée** : la liste et les bougies sont lues ensemble,
+ * mais les bougies restent en cache un quart de leur intervalle (`hyperliquid-candle.service.ts`), et
+ * cette dernière bougie peut donc finir avant `now`. Au-delà d'**un** intervalle de retard, la série
+ * n'est plus celle du présent (une fenêtre passée, un cache inattendu) : pas d'escalier, plutôt qu'un
+ * état présent attribué à une bougie d'une autre heure.
+ */
+export function trailingStaircaseOf(
+  order: Pick<HLFrontendOpenOrder, 'oid' | 'side' | 'orderType' | 'triggerCondition' | 'triggerPx'>,
+  history: Parameters<typeof trailingStart>[1],
+  candles: readonly StaircaseCandle[],
+  intervalMs: number,
+  now: number,
+): TrailingStaircase {
+  const view = trailingStopView(order);
+  if (view?.state !== 'tracking') {
+    return { kind: 'uncovered', reason: 'Not a tracking trailing stop.' };
+  }
+  const start = trailingStart(order.oid, history);
+  if (start === null) {
+    return { kind: 'uncovered', reason: 'The placement is not in the order history.' };
+  }
+  if (start.best === null) {
+    // Posé en attente : il a commencé à suivre à un instant que rien ne donne.
+    return { kind: 'uncovered', reason: 'Placed waiting for activation: its start is not known.' };
+  }
+  const last = candles.at(-1);
+  if (last === undefined || now >= last.t + 2 * intervalMs) {
+    return { kind: 'uncovered', reason: 'The candles do not reach the present.' };
+  }
+  // Déjà lu sans erreur par `trailingStopView`, qui l'a dit en suivi.
+  const { retracement } = parseTrailingStopCondition(order.triggerCondition ?? '');
+  return trailingStaircase({
+    side: order.side,
+    retracement,
+    start: { time: start.time, best: Number(start.best) },
+    end: { time: Math.min(now, last.t + intervalMs - 1), best: Number(view.best) },
+    candles,
+    intervalMs,
+    pxDecimals: null,
+  });
 }

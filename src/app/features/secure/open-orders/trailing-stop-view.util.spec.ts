@@ -274,13 +274,19 @@ describe('trailingStart', () => {
       time: 1_795_000_027_000,
       price: '65165.9',
       waiting: false,
+      best: '64971',
     });
   });
 
   // Posé en attente, le stop de la pose vaut 0.0 : le départ est le prix d'activation.
   it('starts a trailing stop placed waiting at its activation price', () => {
     const pose = { order: { ...S2_WAITING, oid: 7 }, status: 'open', statusTimestamp: 5 };
-    expect(trailingStart(7, [pose])).toEqual({ time: 5, price: '2355', waiting: true });
+    expect(trailingStart(7, [pose])).toEqual({
+      time: 5,
+      price: '2355',
+      waiting: true,
+      best: null,
+    });
   });
 
   // Un trailing annulé garde son dernier état, lisible (T2 du 2026-11-16, `live-check.md`) : sans la pose

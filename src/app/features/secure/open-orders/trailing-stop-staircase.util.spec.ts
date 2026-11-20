@@ -5,6 +5,7 @@ import {
   type StaircaseCandle,
   type StaircaseStep,
   trailingStaircase,
+  trailingStaircaseOf,
 } from './trailing-stop-staircase.util';
 
 const MIN = 60_000;
@@ -175,5 +176,64 @@ describe('roundToTick', () => {
   it('rounds to the nearest tick, not down: 64 919 × 1.003 = 65 113.757 was written 65113.8', () => {
     expect(roundToTick(64919 * 1.003, 1)).toBe(65113.8);
     expect(roundToTick(64949 * 1.003, 1)).toBe(65143.8);
+  });
+});
+
+describe('trailingStaircaseOf', () => {
+  // 610736354584 tel que `historicalOrders` en garde la pose et que `frontendOpenOrders` le listait le
+  // 2026-11-20 au soir.
+  const OID = 610736354584;
+  const LISTED = {
+    oid: OID,
+    side: 'A' as const,
+    orderType: 'Trailing Stop Market',
+    triggerCondition: 'Activation immediate, retracement 5%, best 90.398',
+    triggerPx: '85.8781',
+  };
+  const POSE = {
+    order: {
+      ...LISTED,
+      triggerCondition: 'Activation immediate, retracement 5%, best 90.075',
+      triggerPx: '85.5713',
+    },
+    status: 'open',
+    statusTimestamp: BRENT.start.time,
+  };
+  const at = (h: number, m: number) => Date.UTC(2026, 10, 20, h, m);
+
+  it('draws from the placement to the listed stop, with the candles the chart already has', () => {
+    const r = drawn(trailingStaircaseOf(LISTED, [POSE], BRENT.candles, 5 * MIN, at(22, 31)));
+    // Sans arrondi sur la grille (le chart n'a pas la méta) : 90,075 × 0,95, que l'exchange écrit 85.5713.
+    expect(r.steps[0].from).toBeCloseTo(85.57125, 9);
+    expect(r.steps.at(-1)!.to).toBeCloseTo(85.8781, 9);
+  });
+
+  // Le cache des bougies dure un quart de leur intervalle : la dernière peut avoir fini avant `now`.
+  it('puts the present state on the last candle when it is at most one interval behind', () => {
+    const r = drawn(trailingStaircaseOf(LISTED, [POSE], BRENT.candles, 5 * MIN, at(22, 39)));
+    expect(r.steps.at(-1)!.t).toBe(at(22, 30));
+    expect(r.steps.at(-1)!.to).toBeCloseTo(85.8781, 9);
+  });
+
+  it('draws nothing when the candles stop more than one interval before the present', () => {
+    const r = trailingStaircaseOf(LISTED, [POSE], BRENT.candles, 5 * MIN, at(22, 40));
+    expect(r.kind).toBe('uncovered');
+  });
+
+  it('draws nothing without the placement, or for one placed waiting', () => {
+    expect(trailingStaircaseOf(LISTED, [], BRENT.candles, 5 * MIN, at(22, 31)).kind).toBe(
+      'uncovered',
+    );
+    const waiting = {
+      ...POSE,
+      order: {
+        ...POSE.order,
+        triggerCondition: 'Activation above 90.2, retracement 5%, best waiting',
+        triggerPx: '0.0',
+      },
+    };
+    expect(trailingStaircaseOf(LISTED, [waiting], BRENT.candles, 5 * MIN, at(22, 31)).kind).toBe(
+      'uncovered',
+    );
   });
 });

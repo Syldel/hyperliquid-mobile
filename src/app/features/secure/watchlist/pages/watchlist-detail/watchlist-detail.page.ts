@@ -70,6 +70,7 @@ import {
   IChartApi,
   IPriceLine,
   ISeriesApi,
+  Logical,
   Time,
   UTCTimestamp,
   createChart,
@@ -154,6 +155,11 @@ import {
   type TrailingChartMark,
   type TrailingStart,
 } from '../../../open-orders/trailing-stop-view.util';
+import {
+  trailingStaircaseOf,
+  type StaircaseCandle,
+  type StaircaseStep,
+} from '../../../open-orders/trailing-stop-staircase.util';
 
 /** Ce que chaque lecture du compte dessine, pour dire laquelle manque. */
 const ACCOUNT_SOURCE_LABELS: Record<HLCacheSource, string> = {
@@ -1427,10 +1433,15 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
   }
 
   /**
-   * Les trailing stops natifs ouverts : leur niveau **actuel** (voir `trailingChartMark`), un court
-   * segment au bord droit et son étiquette, et leur **départ** (`trailingStart`, lu dans l'historique
-   * déjà chargé), un rond creux à l'heure de la pose. Rien entre les deux : l'API ne garde pas
-   * l'escalier, et un trait du départ au niveau actuel raconterait un chemin que personne n'a lu. Un état
+   * Les trailing stops natifs ouverts : leur **départ** (`trailingStart`, lu dans l'historique déjà
+   * chargé), un rond creux à l'heure de la pose, puis leur **escalier** reconstitué bougie par bougie
+   * jusqu'au niveau actuel (`trailing-stop-staircase.util.ts`) — sans étiquette, à la demande de
+   * l'utilisateur (2026-11-20) : l'escalier finit sur le niveau, synchro aux bougies comme les lignes
+   * des stops ordinaires.
+   *
+   * Sans escalier (pose hors des bougies chargées ou absente de l'historique, pose en attente, bougies
+   * qui n'atteignent pas le présent), le niveau actuel garde son segment et son étiquette : rien d'autre
+   * ne le dirait. Hors de l'échelle aussi, où l'étiquette collée au bord est le seul signe. Un état
    * illisible n'a pas de prix sûr : il est dit en haut du chart au lieu d'être tu.
    */
   private drawTrailingStops(
@@ -1443,6 +1454,11 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     const xEnd = this.chart!.timeScale().timeToCoordinate(visibleRange.to);
     if (xEnd === null) return;
 
+    const intervalMs = this.getIntervalSeconds() * 1000;
+    const now = Date.now();
+    // Converties une fois par dessin, et seulement s'il y a un trailing à reconstituer.
+    let candles: StaircaseCandle[] | null = null;
+
     let unreadable = 0;
     for (const order of orders) {
       const view = trailingStopView(order);
@@ -1453,8 +1469,12 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
         continue;
       }
       const start = trailingStart(order.oid, history);
-      if (start) this.drawTrailingStart(ctx, start, start.waiting ? 'waiting' : mark.tone, xEnd);
-      this.drawTrailingMark(ctx, mark, xEnd);
+      if (start) this.drawTrailingStart(ctx, start, start.waiting ? 'waiting' : mark.tone);
+
+      candles ??= this.lastCandles.map((c) => ({ t: c.t, h: Number(c.h), l: Number(c.l) }));
+      const stairs = trailingStaircaseOf(order, history, candles, intervalMs, now);
+      if (stairs.kind === 'drawn') this.drawTrailingStaircase(ctx, stairs.steps, mark.tone);
+      this.drawTrailingMark(ctx, mark, xEnd, stairs.kind === 'drawn');
     }
 
     if (unreadable > 0) {
@@ -1466,14 +1486,14 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
 
   /**
    * Le départ d'un trailing stop : un rond **creux**, pour ne pas se lire comme un remplissage (rond
-   * plein), et `TS start`, sans prix : jugé trop long par l'utilisateur (2026-11-19). Hors des bougies
-   * chargées, il n'a pas d'abscisse : rien n'est dessiné.
+   * plein). Sans texte depuis le 2026-11-20 : « TS start » (sans prix depuis le 2026-11-19) a été retiré
+   * par l'utilisateur, l'escalier qui en part suffisant à dire ce qu'il est. Hors des bougies chargées, il
+   * n'a pas d'abscisse : rien n'est dessiné.
    */
   private drawTrailingStart(
     ctx: CanvasRenderingContext2D,
     start: TrailingStart,
     tone: TrailingChartMark['tone'],
-    xEnd: number,
   ): void {
     const intervalSec = this.getIntervalSeconds();
     const time = (Math.floor(start.time / 1000 / intervalSec) * intervalSec) as unknown as Time;
@@ -1487,25 +1507,98 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
       tone === 'waiting' ? this.COLOR_WAITING : tone === 'buy' ? this.COLOR_BUY : this.COLOR_SELL;
     ctx.lineWidth = 1.5;
     ctx.stroke();
-
-    // Le texte à la couleur du texte du thème, pas à celle du rond : le rouge des stops fait 3,8:1 sur le
-    // fond clair, sous le seuil de 4,5:1 d'un texte de 10 px (mesuré le 2026-11-19, docs/theming.md).
-    ctx.font = '10px monospace';
-    ctx.fillStyle =
-      getComputedStyle(document.documentElement).getPropertyValue('--ion-text-color').trim() ||
-      '#ccc';
-    // Au-dessus du rond : un départ proche du niveau actuel tombe sur son trait pointillé, qui barrait le
-    // texte. Et à gauche s'il entrerait sous l'étiquette du niveau actuel (48 px de segment au bord droit,
-    // `drawTrailingMark`) : une pose récente cachait son texte dessous (deux captures du 2026-11-19).
-    const text = 'TS start';
-    const tw = ctx.measureText(text).width;
-    ctx.fillText(text, x + 4 + tw > xEnd - 52 ? x - 4 - tw : x + 4, y - 7);
   }
 
+  /**
+   * L'escalier d'un trailing stop : une marche par bougie, sur toute sa largeur.
+   *
+   * - une bougie où le stop n'a pas bougé de façon sûre : un trait **pointillé**, comme le niveau d'un
+   *   stop ordinaire (`drawOrderChain`) ;
+   * - une bougie où il a bougé : une **bande** translucide entre le stop à son ouverture et le stop à sa
+   *   clôture. L'heure exacte du mouvement dans la bougie n'est pas connue, et une marche nette
+   *   l'affirmerait (voir `trailing-stop-staircase.util.ts`).
+   */
+  private drawTrailingStaircase(
+    ctx: CanvasRenderingContext2D,
+    steps: StaircaseStep[],
+    tone: TrailingChartMark['tone'],
+  ): void {
+    const ts = this.chart!.timeScale();
+    const series = this.candleSeries!;
+    // La largeur d'une bougie à l'écran, qui suit le zoom.
+    const x0 = ts.logicalToCoordinate(0 as Logical);
+    const x1 = ts.logicalToCoordinate(1 as Logical);
+    if (x0 === null || x1 === null) return;
+    const half = Math.abs(x1 - x0) / 2;
+
+    const color = tone === 'buy' ? this.COLOR_BUY : this.COLOR_SELL;
+    const bands: { x: number; y: number; w: number; h: number }[] = [];
+    ctx.save();
+    // Coupé au pane : le canvas de surcouche couvre aussi l'axe des dates, et un niveau hors de l'échelle
+    // y peignait l'escalier, sous les dates (capture du 2026-11-20, bougies 1D). Hors de l'échelle, c'est
+    // l'étiquette collée au bord qui le dit (`drawTrailingMark`).
+    const pane = this.chart!.paneSize(0);
+    ctx.beginPath();
+    ctx.rect(0, 0, pane.width, pane.height);
+    ctx.clip();
+    ctx.beginPath();
+    let last: { x: number; y: number } | null = null;
+    for (const step of steps) {
+      const x = ts.timeToCoordinate(Math.floor(step.t / 1000) as UTCTimestamp);
+      const yFrom = series.priceToCoordinate(step.from);
+      const yTo = series.priceToCoordinate(step.to);
+      if (x === null || yFrom === null || yTo === null) {
+        last = null;
+        continue;
+      }
+      if (Math.abs(yFrom - yTo) < 1) {
+        // Une marche plate qui prolonge la précédente reste dans le même tracé : le pointillé ne
+        // recommence pas à chaque bougie.
+        if (last === null || Math.abs(last.x - (x - half)) > 0.5 || Math.abs(last.y - yTo) > 0.5) {
+          ctx.moveTo(x - half, yTo);
+        }
+        ctx.lineTo(x + half, yTo);
+        last = { x: x + half, y: yTo };
+      } else {
+        bands.push({
+          x: x - half,
+          y: Math.min(yFrom, yTo),
+          w: 2 * half,
+          h: Math.abs(yFrom - yTo),
+        });
+        last = null;
+      }
+    }
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Le remplissage translucide dit « incertain » ; le contour plein porte le contraste. Seul, le
+    // remplissage à 35 % tombait à 1,60:1 sur le fond clair (#feffff) et 1,55:1 sur le sombre (#1d1d1d),
+    // sous le seuil de 3:1 d'un graphique (WCAG 1.4.11) ; le rouge plein tient 3,81:1 et 4,4:1
+    // (calculés le 2026-11-20, docs/theming.md).
+    ctx.fillStyle = color;
+    ctx.lineWidth = 1;
+    for (const b of bands) {
+      ctx.globalAlpha = 0.35;
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(b.x + 0.5, b.y + 0.5, Math.max(b.w - 1, 0), Math.max(b.h - 1, 0));
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Le niveau actuel d'un trailing stop, au bord droit. Avec un escalier dessiné, il n'est rien de plus
+   * — l'escalier finit sur ce niveau —, sauf hors de l'échelle, où l'étiquette collée au bord est le seul
+   * signe que le niveau existe.
+   */
   private drawTrailingMark(
     ctx: CanvasRenderingContext2D,
     mark: TrailingChartMark,
     xEnd: number,
+    staircase: boolean,
   ): void {
     const rawY = this.candleSeries!.priceToCoordinate(parseFloat(mark.price));
     if (rawY === null) return;
@@ -1515,6 +1608,7 @@ export class WatchlistDetailPage implements OnInit, OnDestroy {
     const padY = 4;
     // Hors de l'échelle, collé au bord franchi avec une flèche, sans segment : voir `pinToPane`.
     const { y, pinned } = pinToPane(rawY, this.chart!.paneSize(0).height, fSize / 2 + padY);
+    if (staircase && pinned === null) return;
     const label = pinned === null ? mark.label : `${mark.label} ${pinned === 'above' ? '↑' : '↓'}`;
 
     const color =

@@ -623,7 +623,7 @@ plage visible (`subscribeVisibleLogicalRangeChange`), contrairement à une séri
 librairie repositionne seule. `scheduleOverlayDraw()` passe par `requestAnimationFrame`
 pour ne pas redessiner plusieurs fois dans la même frame.
 
-## Le trailing stop natif : son niveau actuel, jamais son passé
+## Le trailing stop natif : son départ, son niveau, et l'escalier reconstitué entre les deux
 
 Un trailing stop natif d'Hyperliquid (`orderType` `"Trailing Stop Market"`) déplace son stop à chaque
 nouveau meilleur prix, sur le même oid. Le chart le dessinait comme un stop ordinaire, depuis
@@ -635,37 +635,87 @@ Depuis le 2026-11-17 (`drawTrailingStops`) :
 
 - l'historique ne dessine **aucun** trailing stop, ouvert ou terminé : il n'en garde qu'un état ;
 - un trailing **ouvert** est lu dans `frontendOpenOrders`, par `trailingStopView`
-  (`open-orders/trailing-stop-view.util.ts`, la même lecture que la liste et le détail), et dessiné
-  en **court segment au bord droit** avec son étiquette : `TS 1630.35` en suivi, `TS ≥ 2355` en
-  attente, au prix d'activation et en gris ;
+  (`open-orders/trailing-stop-view.util.ts`, la même lecture que la liste et le détail). En suivi, il
+  se dessine en **escalier** depuis sa pose (voir plus bas) ; sans escalier, en **court segment au bord
+  droit** avec son étiquette : `TS 1630.35` en suivi, `TS ≥ 2355` en attente, au prix d'activation et en
+  gris ;
 - reduce-only, il prend la couleur d'un stop ; sinon celle de son côté, comme un ordre qui peut
   ouvrir une position ;
 - un état illisible n'a pas de prix sûr : le chart l'écrit en haut à gauche
   (« N trailing stop(s) unreadable: see open orders ») au lieu de le taire.
 
-⚠️ Comme tout ordre du chart, un trailing dont le prix sort de la fenêtre n'est pas signalé. En attente,
-l'activation est souvent loin du marché : elle sera hors champ plus souvent qu'un stop.
+Hors de l'échelle, son étiquette se colle au bord franchi avec une flèche (`pinToPane`, 2026-11-17) :
+un trailing en attente à 1250 sous une échelle de 1700 à 2200 était dessiné hors du canvas, jamais vu.
+L'activation d'un trailing en attente est souvent loin du marché : c'est le cas courant, pas l'exception.
 
 ### Son départ (2026-11-19)
 
 Un **rond creux** à l'heure de la pose, au stop de la pose — ou au prix d'activation, en gris, pour un
-trailing posé en attente —, avec `TS start` au-dessus (sans le prix, jugé trop long), à la couleur du texte du thème (le rouge
-des stops ne tient que 3,8:1 sur le fond clair). Creux, pour ne pas se lire comme un remplissage.
+trailing posé en attente. Creux, pour ne pas se lire comme un remplissage. **Sans texte** depuis le
+2026-11-20 : `TS start` (déjà sans prix depuis le 19) a été retiré par l'utilisateur, l'escalier qui en
+part suffisant à dire ce qu'il est.
 
-- **aucune lecture en plus** : l'enregistrement `open` de `historicalOrders`, que le chart charge déjà,
-  fige l'état de la pose (S6, `nest-trading-bot/docs/hyperliquid/live-check.md`) — `trailingStart`. Vu
-  sur les deux trailings réels de `xyz:BRENTOIL` : 85,6454 (5 %) et 82,9187 (8 %) ;
-- **rien entre le départ et le niveau actuel** : l'API ne garde pas l'escalier, un trait raconterait un
-  chemin que personne n'a lu ;
-- le texte passe **au-dessus** du rond (un départ proche du niveau actuel tombait sur son pointillé) et
-  **à gauche** quand il entrerait sous l'étiquette du niveau actuel (une pose récente) ;
-- une pose dans les 48 derniers pixels a son rond **sous** le segment du niveau actuel : seul le texte se
-  voit. Zoomer le fait réapparaître.
+**Aucune lecture en plus** : l'enregistrement `open` de `historicalOrders`, que le chart charge déjà, fige
+l'état de la pose (S6, `nest-trading-bot/docs/hyperliquid/live-check.md`) — `trailingStart`, qui en rend
+aussi le watermark (`best`), le point de départ de l'escalier.
 
-Une première version (même jour) y ajoutait une alerte « moved since … ? » tirée des bougies : retirée,
-jugée de peu de valeur par l'utilisateur. Seul le départ est revenu, à sa demande.
+Une première version (2026-11-19) y ajoutait une alerte « moved since … ? » tirée des bougies : retirée,
+jugée de peu de valeur par l'utilisateur.
 
 ⚠️ Un départ absent ne se signale pas : une pose sortie de l'historique (il ne garde que les ordres
 récents) ou antérieure aux bougies chargées n'a simplement pas de rond. Et une capture prise juste après
 un changement de thème émulé l'a montré sans rond ni texte, revenus au premier déplacement du chart, sans
 lecture réseau entre les deux : non expliqué.
+
+### Son escalier, bougie par bougie (2026-11-20)
+
+L'API ne garde pas le chemin d'un trailing : seulement sa pose et son état présent. Entre les deux, le
+chart le **reconstitue** depuis les bougies qu'il a déjà (`open-orders/trailing-stop-staircase.util.ts`,
+`trailingStaircaseOf`) — aucune lecture en plus, et une marche par bougie, synchro aux bougies comme les
+lignes des stops ordinaires.
+
+La règle de l'exchange, lue en brut dans la FAQ officielle (`support/faq/trailing-stops.md`) : le
+watermark est le plus haut (vente) ou le plus bas (achat) du **prix mark** depuis l'activation, le stop en
+découle, et il ne bouge que sur un nouveau watermark — **sans attendre la clôture d'une bougie**.
+
+- une bougie où le stop n'a pas bougé de façon sûre : un **pointillé**, comme un stop ordinaire ;
+- une bougie où il a bougé : une **bande** entre le stop à son ouverture et le stop à sa clôture. L'heure
+  du mouvement dans la bougie n'est pas connue ; une marche nette l'affirmerait. Remplie à 35 %, avec un
+  **contour plein** : le remplissage seul tombait à 1,60:1 sur le fond clair et 1,55:1 sur le sombre, sous
+  le seuil de 3:1 d'un graphique ; le rouge plein tient 3,81:1 et 4,4:1 (calculés le 2026-11-20) ;
+- les deux bouts sont **exacts** (la pose, et le `best` listé), le milieu approché ;
+- **sans étiquette** quand l'escalier est dessiné (demande de l'utilisateur, 2026-11-20) : il finit sur le
+  niveau actuel. L'étiquette `TS …` revient quand il n'y a pas d'escalier — pose hors des bougies
+  chargées ou absente de l'historique, pose en attente, bougies en retard de plus d'un intervalle — et
+  hors de l'échelle, collée au bord avec sa flèche : sans elle, rien ne dirait que le niveau existe ;
+- coupé au **pane** : le canvas de surcouche couvre aussi l'axe des dates, et un niveau hors de l'échelle
+  y peignait l'escalier, sous les dates (vu sur capture en bougies 1D, corrigé le même jour).
+
+Éprouvé sur des états **mesurés** (spec, bougies réelles recopiées dans
+`trailing-stop-staircase.fixtures.ts`) :
+
+| Contrôle                               | Mesuré par l'exchange       | Reconstitué                               |
+| -------------------------------------- | --------------------------- | ----------------------------------------- |
+| S6 (BTC, achat 0,3 %), stop de la pose | 65165.9                     | 65165.9                                   |
+| S6, 14:07:43 / 14:13:46 / 14:26:38     | 65143.8 / 65113.8 / 65087.7 | dans la bande / à 1 $ / à 1 $ de la bande |
+| S6, stop appliqué au déclenchement     | 64983.4                     | 64983.4                                   |
+| `xyz:BRENTOIL` (vente 5 %), stop listé | 85.8781                     | 85.8781                                   |
+
+Ce que la validation a appris, et que le code porte :
+
+- les bougies sont des prix d'**échange**, pas du mark (aucune bougie de mark dans la doc de l'endpoint
+  info) : une mèche de S6 a dépassé le mark de 21,8 $ (0,034 %), une de BRENTOIL de 0,002. Le watermark
+  reconstitué est donc **borné par le watermark présent** ; un écart en milieu de course n'est pas
+  corrigé, c'est l'approximation de ce dessin ;
+- la bougie de la pose contient des prix **d'avant** la pose (BRENTOIL : 90,126 dans la bougie de 23:05Z,
+  pose à 90,075 à 23:09:14) : son extrême n'est qu'une borne haute, d'où une bande qui dure jusqu'à ce
+  qu'une bougie suivante la dépasse — trois heures et demie sur cet exemple en 5m ;
+- l'exchange arrondit le stop d'un trailing au plus proche sur la grille de **décimales seule**
+  (`6 − szDecimals`, sans les cinq chiffres significatifs des ordres), une égalité **vers le haut**
+  (85,57125 écrit 85.5713). Le chart, lui, n'arrondit pas : il n'a pas la méta du marché, et un pas de
+  prix y fait moins d'un pixel ;
+- une bougie en **1D** donne une bande par jour : honnête, mais grossière. La finesse vient de l'intervalle
+  affiché, pas d'une lecture de plus.
+
+⚠️ Non vérifié : l'arrondi d'une égalité sur un trailing d'**achat** (une seule égalité mesurée, sur une
+vente) ; et le rendu sur le **téléphone** — vérifié dans le navigateur, à 360 px, dans les deux thèmes.
