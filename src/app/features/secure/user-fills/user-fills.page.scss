@@ -73,7 +73,12 @@ ion-item {
   /* Le marché et le badge se partagent une demi-largeur (159 px à 360). Sans
      retour à la ligne, `xyz:BRENTOIL` (113 px) **chevauchait** le badge de 12 px
      (mesuré le 2026-11-18). L'en-tête passe donc à la ligne : le marché garde sa
-     puce HIP-3 sur sa ligne, et le badge descend, aligné à droite. */
+     puce HIP-3 sur sa ligne, et le badge descend, aligné à droite (choisi le
+     2026-11-20, plutôt que de faire descendre la puce avec lui).
+
+     La marge est sur `.fill-side` et non sur `app-side-badge` : l'hôte du badge est
+     en `display: contents`, sans boîte, et sa marge ne s'appliquait pas — le badge
+     descendu se collait à gauche (vu le 2026-11-20). */
   .fill-header {
     display: flex;
     flex-wrap: wrap;
@@ -82,7 +87,8 @@ ion-item {
     gap: 2px 6px;
     margin-bottom: 2px;
 
-    app-side-badge {
+    .fill-side {
+      display: inline-flex;
       margin-left: auto;
     }
   }

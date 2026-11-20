@@ -110,7 +110,8 @@
               <ion-badge color="medium" class="fill-dex">HIP-3</ion-badge>
               }
             </span>
-            <app-side-badge [badge]="sideBadge(fill)" />
+            <!-- Dans un span : l'hôte du badge est en `display: contents`, une marge n'y prend pas. -->
+            <span class="fill-side"><app-side-badge [badge]="sideBadge(fill)" /></span>
           </div>
           <div class="fill-row">
             <span>{{ fill.px }} · {{ fill.sz }}</span>
