@@ -384,14 +384,39 @@ l'encre. L'écart entre l'espace du haut et celui du bas doit tomber sous 0,1 px
 1, 2 et 3 chiffres). Le **repli se mesure aussi**, en forçant `text-box: normal`
 et son padding sur un badge.
 
-⚠️ **Roboto n'est pas installé sur le PC de développement** : la page y est
-rendue en Arial, la police de repli. La première mesure du repli, notée « sur
+**Roboto est installé sur le PC de développement depuis le 2026-11-20** (les TTF
+statiques de Google Fonts, pour tous les utilisateurs), et le navigateur de l'app le
+rend : un texte témoin mesure 789,77 px en `Roboto, monospace` comme en
+`Roboto, serif` (le repli n'est plus pris), contre 822,13 px en Arial. Piège : fermer
+la fenêtre de l'app ne la quitte pas, et un navigateur ne voit que les polices
+installées avant son démarrage. Le vérifier ainsi avant une mesure fine, sur une autre
+machine aussi (le MacBook).
+
+**Mesuré sur le téléphone le 2026-11-20** (Xperia 1 III, Android 13, l'APK Capacitor :
+**WebView** Android 157, `wv` dans la signature, pas Chrome ; densité 2,625), par
+`chrome://inspect` en USB :
+
+- la WebView **ne trouve pas « Roboto » par son nom** : `Roboto, monospace` mesure
+  844,94 px comme `monospace` seul, `Roboto, serif` 850,75. La pile de l'app
+  (`Roboto, "Helvetica Neue", sans-serif`) y descend donc jusqu'à **`sans-serif`** ;
+- `sans-serif` y est **Roboto** : DevTools, « Rendered Fonts » sur un badge SHORT,
+  `Roboto-Regular`, fichier local ;
+- **mêmes proportions que le Roboto du PC** : 789,77 px en `sans-serif` (789,77 sur le
+  PC), 795,92 en graisse 500 (795,93 sur le PC). La pile entière de l'app : 789,77.
+
+Le texte se mesure donc sur le PC avec les métriques du téléphone. Restent la densité
+(environ 1 contre 2,625) et le rendu des glyphes, d'où la capture du téléphone pour un
+alignement au pixel. ⚠️ Le test `Roboto, monospace` contre `Roboto, serif` ne vaut que
+sur le PC : sur le téléphone, il dirait « pas de Roboto » alors que Roboto est dessiné.
+
+Avant cette date, la page y était rendue en Arial, la police de repli. La première mesure du repli, notée « sur
 Roboto », avait été faite sur Arial : sur Roboto, ce repli laissait le texte
 0,69 px trop bas (0,29 sur la puce HIP-3). Pour mesurer sur Roboto, le charger dans la page
 (une feuille Google Fonts injectée, le temps de la mesure) et poser
-`font-family: Roboto` sur les badges : `document.fonts.check` répond `true`
-même pour une police absente, il ne prouve rien ; comparer une largeur
-`measureText` contre `monospace` le dit. Chiffres du 2026-11-18, repli livré :
+`font-family: Roboto` sur les badges — inutile depuis l'installation, sauf sur une
+machine qui ne l'a pas. `document.fonts.check` répond `true` même pour une police
+absente, il ne prouve rien ; comparer la largeur d'un texte en `Roboto, monospace` et
+en `Roboto, serif` le dit (égales : Roboto est pris). Chiffres du 2026-11-18, repli livré :
 0,09 px à 11,2 px, 0,18 px sur HIP-3 (9,9 px) ; le reste vient de l'arrondi de
 la ligne de base aux pixels de l'écran.
 
@@ -403,8 +428,10 @@ système peut différer.
 
 L'app se lit sur un **téléphone Android** — aujourd'hui un Xperia 1 III (Android 13,
 Chrome 157, écran à forte densité), la police du système étant **Roboto**. Le
-navigateur de développement n'en est qu'une approximation : autre police (Arial sur le
-PC, faute de Roboto), autre densité de pixels, autre arrondi des positions. Un écart
+navigateur de développement n'en est qu'une approximation : la police est la même
+depuis le 2026-11-20 (Roboto installé sur le PC, proportions identiques à celles du
+téléphone, mesurées ; Arial avant cette date), mais la densité de pixels et l'arrondi
+des positions diffèrent. Un écart
 d'un pixel y est invisible et devient visible sur l'appareil — vu le 2026-11-18, un
 badge centré à 0,00 px dans le navigateur, trop bas de 1 à 2 px sur le téléphone.
 

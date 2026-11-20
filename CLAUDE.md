@@ -177,9 +177,13 @@ un nom court. Ce qui se mesure, les largeurs de référence et ce qu'elles valen
 [docs/conventions.md](docs/conventions.md#la-largeur-se-vérifie-et-sur-des-largeurs-réelles).
 
 **Le navigateur n'est pas le téléphone.** L'écran final est un vrai téléphone Android
-(Chrome, police **Roboto**), et le PC de développement rend en Arial, faute de Roboto. Un
+(l'APK, donc la **WebView** Android, police **Roboto**). Le PC de développement a Roboto
+installé depuis le 2026-11-20 (Google Fonts), aux **mêmes proportions** que celui du
+téléphone (789,77 px des deux côtés sur un texte témoin, mesuré par `chrome://inspect`) —
+avant, il rendait en Arial ; le vérifier plutôt que le supposer, voir
+[docs/conventions.md](docs/conventions.md#un-badge-monoligne-se-centre-sur-ses-capitales-et-se-mesure). Un
 alignement au pixel (texte dans un badge, glyphe à côté d'un texte) se règle par une
-construction qui ne dépend pas des métriques de la police, se mesure sur Roboto chargé, et
+construction qui ne dépend pas des métriques de la police, se mesure sur Roboto, et
 ne se déclare juste qu'après une capture du téléphone : le 2026-11-18, un badge centré à
 0,00 px dans le navigateur avait son texte 1 à 2 px trop bas sur l'appareil. Voir
 [docs/conventions.md](docs/conventions.md#lécran-de-référence-est-un-vrai-téléphone-pas-le-navigateur-de-développement).
