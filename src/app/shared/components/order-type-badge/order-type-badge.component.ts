@@ -13,7 +13,7 @@ import { HL_ORDER_TYPE } from '@syldel/hl-shared-types';
  * Le libellé reste libre (`Trailing` dans la liste ouverte, faute de place ; le type complet dans
  * l'historique) : c'est le **type** qui décide du glyphe, jamais le texte affiché.
  *
- * Même construction que `app-side-badge` : un `ion-badge` ordinaire, l'hôte effacé, et le glyphe hors
+ * Un `ion-badge` ordinaire, l'hôte effacé (comme `app-side-badge`), et le glyphe hors
  * du flux du texte (`.badge-glyph`, `badge--glyph`, styles.scss), pour garder la hauteur et le
  * centrage de tous les badges.
  * ============================================================================
@@ -36,7 +36,7 @@ import { HL_ORDER_TYPE } from '@syldel/hl-shared-types';
         >
           <!-- Trois marches, pas les quatre de la pastille du rond (11 px) : à 7 px, des marches de
                1,4 px se lisaient comme un trait oblique (vu à ×3 le 2026-11-18). Encre de y = 1,3 à
-               5,7 avec le trait : centrée sur 3,5, le milieu du badge, comme ▲, ▼ et ■. -->
+               5,7 avec le trait : centrée sur 3,5, le milieu du badge. -->
           <path d="M0.55 5.25 H2.3 V3.5 H4.05 V1.75 H6.45" />
         </svg>
       }
@@ -48,7 +48,7 @@ import { HL_ORDER_TYPE } from '@syldel/hl-shared-types';
       display: contents;
     }
 
-    /* 9 px, pas les 7 de ▲, ▼ et ■ : un trait fin pèse moins qu'un aplat, et à 7 px l'escalier se lisait
+    /* 9 px, pas les 7 des anciens ▲, ▼ et ■ (retirés le 2026-11-20) : un trait fin pèse moins qu'un aplat, et à 7 px l'escalier se lisait
        petit à côté du texte (demandé le 2026-11-19). Il dépasse les capitales (8 px) d'un pixel, centré. */
     ion-badge.badge--glyph {
       --badge-glyph-size: 9px;

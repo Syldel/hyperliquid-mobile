@@ -48,7 +48,7 @@ export class HistoryPage extends MenuBasePage {
 
   /** Le côté, avec la règle du reste de l'app : l'historique écrivait « Buy » même sur un perp. */
   readonly sideBadge = (order: HLOrderStatusDetails) =>
-    orderSideBadge(order.coin, order.side === 'B', order.reduceOnly);
+    orderSideBadge(order.coin, order.side === 'B');
   readonly tifLabel = tifLabel;
   coinFilter = signal<string>('');
   coinsResolved = signal(false);

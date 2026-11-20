@@ -110,8 +110,8 @@ export class UserFillsPage extends MenuBasePage {
   );
 
   /**
-   * Le sens du remplissage en capitales (`CLOSE SHORT`), lu dans `dir`. La pastille disait `BUY` et
-   * la ligne du dessous répétait `dir` : une seule information, dite une fois.
+   * Le côté de l'exécution, LONG / SHORT (BUY / SELL sur un spot) : `Close Short` est un achat, donc
+   * LONG (2026-11-20, `fillSideBadge`). Un `dir` que l'on ne classe pas s'écrit tel quel.
    */
   readonly sideBadge = fillSideBadge;
 

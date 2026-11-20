@@ -472,6 +472,12 @@ Market`) prennent l'escalier de la pastille du rond (`app-order-type-badge`), en
    lightweight-charts 5.2 le dessine à 0,7 fois la flèche (9 px contre 13), et son option `size` est bornée par
    un minimum de 12 px. Une reprise devra d'abord répondre à cette densité.
 
+   **Revenu en arrière le 2026-11-20** : plus de glyphe, plus d'action. Le badge dit **le côté que l'API écrit**
+   (`side`) : B → LONG vert, A → SHORT rouge, BUY / SELL sur un spot, reduce-only compris. Un stop qui ferme un long
+   est une vente, donc SHORT, et « Reduce only » dit qu'il ferme ; un remplissage `Close Short` est un achat, donc
+   LONG. Ni `CLOSE`, ni le mot de la position fermée : l'utilisateur veut le vrai sens de l'ordre, au plus près de
+   l'API. L'incohérence avec les marqueurs de stratégie disparaît avec les glyphes.
+
    **Sur une paire du bot, le bouton « Trail »** : la cohabitation est mesurée (2026-11-16,
    `nest-trading-bot/docs/known-gaps.md`), mais un trailing plus serré que le stop du bot devance la sortie que le
    backtest a éprouvée. Le formulaire devra le dire.

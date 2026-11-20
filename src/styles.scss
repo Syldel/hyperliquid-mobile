@@ -84,7 +84,8 @@ ion-badge {
   }
 }
 
-/* Le glyphe d'un badge (▲ / ▼ ouvre, ■ ferme, l'escalier du trailing) : **hors du flux du
+/* Le glyphe d'un badge (aujourd'hui l'escalier du trailing ; ▲ / ▼ / ■ des badges de côté
+   jusqu'au 2026-11-20) : **hors du flux du
    texte**. Le badge porte la classe `badge--glyph`, qui élargit seulement son padding
    gauche ; le glyphe y est posé en absolu et centré sur la boîte du badge, que
    `text-box` centre déjà sur les capitales.
@@ -97,7 +98,7 @@ ion-badge {
    était juste sur le téléphone —, et le centrage du glyphe ne dépend d'aucune métrique
    de police. */
 ion-badge.badge--glyph {
-  /* 7 px par défaut (▲, ▼, ■) ; un glyphe à trait fin peut demander plus (l'escalier). */
+  /* 7 px par défaut (la taille de ▲, ▼, ■, retirés le 2026-11-20) ; l'escalier en demande 9. */
   --badge-glyph-size: 7px;
 
   position: relative;

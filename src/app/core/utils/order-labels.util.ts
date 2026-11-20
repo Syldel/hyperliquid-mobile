@@ -15,89 +15,64 @@ import { isPerpMarket } from './market-kind.util';
  *   ordinaire (type d'ordre, `carried in`, `delisted`). Le statut garde l'écriture de l'API
  *   (`open`, `reduceOnlyCanceled`), par décision ;
  * - **le côté suit le genre du marché** : LONG / SHORT sur un perp, BUY / SELL sur un spot ;
- * - **un ordre reduce-only se dit par ce qu'il ferme** : un achat reduce-only sur un perp ferme un
- *   short. L'afficher `LONG` (un trailing stop ETH du 2026-11-17) faisait croire à une ouverture.
+ * - **le côté est celui de l'API**, reduce-only compris (voir `SideBadge`, 2026-11-20).
  * ============================================================================
  */
 
 /**
- * Un badge de côté : le mot, l'action, et la couleur.
+ * Un badge de côté : le mot et sa couleur, rien d'autre.
  *
- * Depuis le 2026-11-18 l'action ne s'écrit plus : `OPEN SHORT` était coupé à droite dans Trade History
- * sur un téléphone, et `CLOSE SHORT` encombrait Open Orders. Un glyphe plein la porte — ▲ ouvre un long, ▼ ouvre un short, ■ ferme
- * (`app-side-badge`). La **couleur suit le mot**, pas le sens de l'ordre : `■ SHORT` (un achat qui
- * ferme un short) est rouge comme le short qu'il ferme ; l'ancien `CLOSE SHORT` était vert, couleur
- * de l'achat, et se lisait comme une ouverture longue.
+ * **Le badge dit le côté que l'API écrit** (`side`, `B` / `A`), décidé le 2026-11-20 : B → LONG vert,
+ * A → SHORT rouge sur un perp, BUY / SELL sur un spot. Un stop qui ferme un long est une vente : il
+ * s'affiche **SHORT**, et c'est le tag « Reduce only » qui dit qu'il ferme. Ce qu'on a essayé avant, et
+ * pourquoi on en est revenu :
+ *
+ * - `CLOSE LONG` / `CLOSE SHORT` (2026-11-17) : coupé à 360 px dans Trade History, encombrant dans Open
+ *   Orders ;
+ * - un glyphe pour l'action, ▲ / ▼ ouvre, ■ ferme, et le mot de la **position** fermée (2026-11-18 et
+ *   2026-11-19) : un stop de long s'affichait LONG, l'inverse de son côté réel. L'utilisateur veut le vrai
+ *   sens de l'ordre, au plus près de l'API, sans glyphe ni `CLOSE`.
  */
 export interface SideBadge {
   text: string;
-  /** `null` : pas d'action à dire (une position, un spot, un sens que l'on ne classe pas). */
-  action: 'open' | 'close' | null;
   tone: 'success' | 'danger';
 }
 
-/**
- * Le glyphe d'un badge de côté. ▲ ouvre un LONG — un achat —, ▼ ouvre un SHORT — une vente —, ■ ferme.
- * La convention ▲ achat / ▼ vente est celle des marqueurs de TradingView et des exécutions sur le chart
- * de la watchlist (2026-11-19, au lieu de ▶ pour toute ouverture).
- *
- * ■ ne dit pas de direction : fermer un short est un achat, mais le badge parle de la position. Un
- * badge qui ouvre sans dire LONG ni SHORT n'a pas de glyphe : une direction ne se devine pas.
- */
-export type SideBadgeGlyph = 'buy' | 'sell' | 'close';
-
-export function sideBadgeGlyph(badge: SideBadge): SideBadgeGlyph | null {
-  if (badge.action === 'close') return 'close';
-  if (badge.action !== 'open') return null;
-  if (badge.text === 'LONG') return 'buy';
-  if (badge.text === 'SHORT') return 'sell';
-  return null;
-}
-
-const toneOf = (text: string, isBuy: boolean): SideBadge['tone'] =>
-  text === 'LONG' ? 'success' : text === 'SHORT' ? 'danger' : isBuy ? 'success' : 'danger';
+const sideOf = (coin: string, isBuy: boolean): SideBadge => {
+  const perp = isPerpMarket(coin);
+  return {
+    text: isBuy ? (perp ? 'LONG' : 'BUY') : perp ? 'SHORT' : 'SELL',
+    tone: isBuy ? 'success' : 'danger',
+  };
+};
 
 /**
- * Le badge d'un **ordre** : ▲ LONG / ▼ SHORT pour un perp qui ouvre, ■ SHORT / ■ LONG pour un
- * reduce-only (il se dit par ce qu'il ferme : un achat reduce-only ferme un short), BUY / SELL sans
- * glyphe sur un spot.
+ * Le badge d'un **ordre** : son côté, reduce-only ou non. LONG / SHORT sur un perp (dex principal ou
+ * HIP-3), BUY / SELL sur un spot.
  */
-export function orderSideBadge(coin: string, isBuy: boolean, reduceOnly = false): SideBadge {
-  if (!isPerpMarket(coin)) {
-    const text = isBuy ? 'BUY' : 'SELL';
-    return { text, action: null, tone: toneOf(text, isBuy) };
-  }
-  if (reduceOnly) {
-    const text = isBuy ? 'SHORT' : 'LONG';
-    return { text, action: 'close', tone: toneOf(text, isBuy) };
-  }
-  const text = isBuy ? 'LONG' : 'SHORT';
-  return { text, action: 'open', tone: toneOf(text, isBuy) };
+export function orderSideBadge(coin: string, isBuy: boolean): SideBadge {
+  return sideOf(coin, isBuy);
 }
 
-/** Le badge d'une **position** : son côté seul, elle est ouverte par définition. */
+/** Le badge d'une **position** : son côté. */
 export function positionSideBadge(coin: string, isLong: boolean): SideBadge {
-  return { ...orderSideBadge(coin, isLong), action: null };
+  return sideOf(coin, isLong);
 }
 
-const FILL_DIR = /^(Open|Close) (Long|Short)$/;
+const FILL_DIR = /^(?:Open|Close) (?:Long|Short)$/;
 
 /**
- * Le badge d'un **remplissage**, lu dans le `dir` de l'exchange. `Open Long` → ▲ LONG,
- * `Close Short` → ■ SHORT. Tout autre sens (`Buy`, `Long > Short`, une liquidation) s'écrit tel
- * quel en capitales, sans glyphe : un sens que l'on ne classe pas ne se devine pas. Un `dir` vide
- * retombe sur BUY / SELL plutôt que sur une pastille vide.
+ * Le badge d'un **remplissage** : le côté de l'exécution (`side`), comme pour un ordre. `Close Short`
+ * est un achat : LONG vert (décidé le 2026-11-20). Le `dir` de l'exchange ne sert qu'à reconnaître un
+ * perp ; tout autre sens (`Buy`, `Long > Short`, une liquidation) s'écrit tel quel en capitales : un
+ * sens que l'on ne classe pas ne se devine pas. Un `dir` vide retombe sur BUY / SELL.
  */
 export function fillSideBadge(fill: { dir?: string | null; side: 'A' | 'B' }): SideBadge {
   const isBuy = fill.side === 'B';
+  const tone: SideBadge['tone'] = isBuy ? 'success' : 'danger';
   const dir = fill.dir?.trim() ?? '';
-  const match = FILL_DIR.exec(dir);
-  if (match) {
-    const text = match[2].toUpperCase();
-    return { text, action: match[1] === 'Open' ? 'open' : 'close', tone: toneOf(text, isBuy) };
-  }
-  const text = dir ? dir.toUpperCase() : isBuy ? 'BUY' : 'SELL';
-  return { text, action: null, tone: toneOf(text, isBuy) };
+  if (FILL_DIR.test(dir)) return { text: isBuy ? 'LONG' : 'SHORT', tone };
+  return { text: dir ? dir.toUpperCase() : isBuy ? 'BUY' : 'SELL', tone };
 }
 
 /**

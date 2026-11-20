@@ -117,7 +117,7 @@ export class OpenOrdersPage extends MenuBasePage implements OnInit {
       (o) => ({
         ...o,
         // ▲ / ▼ / ■ LONG / SHORT sur un perp, BUY / SELL ailleurs (`order-labels.util.ts`).
-        sideBadge: orderSideBadge(o.coin, o.side === 'B', o.reduceOnly),
+        sideBadge: orderSideBadge(o.coin, o.side === 'B'),
       }),
     );
   });

@@ -237,7 +237,7 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
   /** Le côté, et ce qu'un reduce-only ferme (voir `order-labels.util.ts`). */
   readonly sideBadge = computed(() => {
     const order = this.order();
-    return order ? orderSideBadge(this.coin(), order.side === 'B', order.reduceOnly) : null;
+    return order ? orderSideBadge(this.coin(), order.side === 'B') : null;
   });
 
   readonly tifDescription = tifDescription;

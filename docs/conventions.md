@@ -366,7 +366,8 @@ La règle, pour tout élément à **une seule ligne** de texte dans une boîte �
   de ligne non rognée (`5px - 0.1145em` / `5px - 0.1745em`, réglé sur Roboto).
   C'est une approximation **par police** : sur Arial il laisse le texte ~0,7 px
   trop haut, et seul `text-box` garantit l'alignement.
-- **Un glyphe dans un badge** (▲, ▼, ■, l'escalier du trailing) se pose **hors du
+- **Un glyphe dans un badge** (l'escalier du trailing ; ▲, ▼, ■ des badges de côté jusqu'au
+  2026-11-20) se pose **hors du
   flux du texte** : la classe `badge--glyph` sur le badge élargit son padding
   gauche, `.badge-glyph` y place un SVG de 7 px (9 pour l'escalier, `--badge-glyph-size`) en absolu, centré sur la boîte
   (`styles.scss`). La ligne du badge ne contient ainsi que son texte, et le texte
