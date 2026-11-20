@@ -477,7 +477,11 @@ export class TrailingStopFormComponent implements OnInit {
         const read = readCancelReply(reply);
         switch (read.kind) {
           case 'cancelled':
-            this.orderToast.success(`Replaced · OID ${placed.oid} (OID ${old} cancelled)`);
+            // Deux résultats, deux lignes du même toast (`OrderToastService`) : en une seule phrase,
+            // « Replaced · OID … (OID … cancelled) » se coupait n'importe où sur le téléphone (2026-11-20).
+            // Chaque ligne tient à 360 px (mesuré : une ligne de 20 px chacune).
+            this.orderToast.success(`Replaced · new OID ${placed.oid}`);
+            this.orderToast.success(`Cancelled · old OID ${old}`);
             this.modalCtrl.dismiss(
               { kind: 'replaced', newOid: placed.oid, oldOid: old } satisfies TrailingReplaced,
               'confirm',
