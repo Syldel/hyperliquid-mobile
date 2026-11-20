@@ -1,4 +1,4 @@
-import { afterModify, readModifyOutcome } from './modify-outcome.util';
+import { modifyMessage, unknownOrderText, readModifyOutcome } from './modify-outcome.util';
 
 /**
  * Les réponses sont celles **mesurées** sur le mainnet, par les routes du gateway que l'app appelle
@@ -88,27 +88,35 @@ describe('readModifyOutcome', () => {
   });
 });
 
-describe('afterModify', () => {
-  // Le défaut d'origine : la page relisait l'ancien oid et affichait « canceled » après un succès.
-  it('shows the order that replaced the modified one', () => {
-    const after = afterModify({ kind: 'resting', oid: 599951351972 });
-
-    expect(after.show).toBe(599951351972);
-    expect(after.message).toContain('599951351972');
+describe('modifyMessage', () => {
+  it('names the order that replaced the modified one', () => {
+    expect(modifyMessage({ kind: 'resting', oid: 599951351972 })).toBe(
+      'Order updated · new OID 599951351972',
+    );
+    expect(modifyMessage({ kind: 'filled', oid: 77 })).toContain('OID 77');
   });
 
-  it('shows an order that filled at once, when its oid is known', () => {
-    expect(afterModify({ kind: 'filled', oid: 77 }).show).toBe(77);
+  // Sans oid, aucune recherche par ressemblance : le dire.
+  it('says when the reply does not give the new order', () => {
+    expect(modifyMessage({ kind: 'unknown' })).toContain('no new OID given');
+    expect(modifyMessage({ kind: 'filled', oid: null })).toContain('filled · no new OID given');
+  });
+});
+
+describe('unknownOrderText', () => {
+  it('says nothing when the exchange returns the order', () => {
+    expect(unknownOrderText({ status: 'order', order: { status: 'open' } }, 1)).toBeNull();
   });
 
-  // Sans oid, aucune recherche par ressemblance : la liste, et le dire.
-  it('sends to the open orders when the reply does not say where the order went', () => {
-    const unknown = afterModify({ kind: 'unknown' });
-    const filled = afterModify({ kind: 'filled', oid: null });
+  // Le défaut du 2026-11-20 : une réponse sans ordre était ignorée, et la page restait muette.
+  it('says the exchange does not know the oid, with what it answered', () => {
+    const text = unknownOrderText({ status: 'unknownOid' }, 610736354584);
+    expect(text).toContain('does not know OID 610736354584 yet');
+    expect(text).toContain('"unknownOid"');
+  });
 
-    expect(unknown.show).toBeNull();
-    expect(unknown.message).toContain('no new OID given');
-    expect(filled.show).toBeNull();
-    expect(filled.message).toContain('filled · no new OID given');
+  it('says it too for an empty or malformed reply, never nothing', () => {
+    expect(unknownOrderText(null, 5)).toContain('does not know OID 5');
+    expect(unknownOrderText({ status: 'order' }, 5)).toContain('"order"');
   });
 });

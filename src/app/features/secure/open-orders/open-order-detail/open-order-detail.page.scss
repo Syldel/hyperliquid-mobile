@@ -31,7 +31,8 @@ ion-note {
 
 /* Voir `open-orders.page.scss` : le rouge du thème, sur plusieurs lignes. */
 .stuck-triggered ion-label,
-.trailing-unreadable ion-label {
+.trailing-unreadable ion-label,
+.order-not-found ion-label {
   color: var(--ion-color-danger);
   font-weight: 600;
 }

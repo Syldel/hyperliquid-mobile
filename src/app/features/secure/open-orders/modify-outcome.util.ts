@@ -47,34 +47,40 @@ export function readModifyOutcome(reply: unknown): ModifyOutcome {
 }
 
 /**
- * Ce que montre la page de détail après une modification acceptée, et ce qu'elle en dit.
+ * Ce que la page de détail dit d'une modification acceptée, avant de **revenir à la liste**.
  *
- * La règle : après une écriture, l'écran montre l'ordre qui **en résulte**, jamais celui qui n'existe
- * plus. `show` est l'oid à afficher ; `null` renvoie à la liste des ordres ouverts — quand la réponse
- * ne dit pas où est passé l'ordre, on ne le cherche pas en comparant prix et taille : deux ordres
- * identiques rendraient le choix arbitraire.
+ * Depuis le 2026-11-20, la page ne passe plus au nouvel oid : elle le relisait par `orderStatus`, qui ne le
+ * connaît pas toujours juste après l'écriture — l'utilisateur voyait un statut vide, sous les champs de
+ * l'ancien ordre, jusqu'à plusieurs rafraîchissements. Même retard qu'après une annulation (S8,
+ * `nest-trading-bot/docs/hyperliquid/live-check.md`). La liste lit `frontendOpenOrders`, qui suit
+ * l'écriture (point 18 de `docs/roadmap.md`) : on y revient, comme après une annulation ou le
+ * remplacement d'un trailing. Le message donne le nouvel oid quand la réponse le dit ; sans lui, on ne
+ * le cherche pas en comparant prix et taille, deux ordres identiques rendraient le choix arbitraire.
  */
-export function afterModify(outcome: Exclude<ModifyOutcome, { kind: 'refused' }>): {
-  show: number | null;
-  message: string;
-} {
+export function modifyMessage(outcome: Exclude<ModifyOutcome, { kind: 'refused' }>): string {
   switch (outcome.kind) {
     case 'resting':
-      return {
-        show: outcome.oid,
-        message: `Order updated · OID ${outcome.oid}`,
-      };
+      return `Order updated · new OID ${outcome.oid}`;
     case 'filled':
       return outcome.oid === null
-        ? {
-            show: null,
-            message: 'Order updated and filled · no new OID given',
-          }
-        : { show: outcome.oid, message: 'Order updated and filled at once' };
+        ? 'Order updated and filled · no new OID given'
+        : `Order updated and filled at once · OID ${outcome.oid}`;
     case 'unknown':
-      return {
-        show: null,
-        message: 'Order updated · no new OID given',
-      };
+      return 'Order updated · no new OID given';
   }
+}
+
+/**
+ * Ce que la page de détail dit quand `orderStatus` ne rend pas d'ordre (`unknownOid`, ou une réponse sans
+ * `order`), ou `null` s'il y en a un. Avant, la page ignorait la réponse en silence : statut vide, et les
+ * champs de l'ordre précédent restaient affichés (2026-11-20). Un oid inconnu peut être un ordre tout juste
+ * posé ou modifié, que `orderStatus` n'a pas encore : on le dit, sans relire de soi-même.
+ */
+export function unknownOrderText(
+  response: { status?: string; order?: unknown } | null | undefined,
+  oid: number,
+): string | null {
+  if (response?.status === 'order' && response.order) return null;
+  const said = response?.status ? ` (it answered "${response.status}")` : '';
+  return `The exchange does not know OID ${oid} yet${said}. If it was just placed or modified, refresh in a moment; otherwise check Open Orders.`;
 }

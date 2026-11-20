@@ -1415,6 +1415,16 @@ Profit Limit"`, `triggerCondition: "Price above 81959"`.
     (`?coin=BTC`), sans oid périmé. ⚠️ Jamais mesuré : une modification qui **s'exécute aussitôt**
     (`filled`) ; elle est traitée comme un ordre `order` exécuté, forme supposée identique.
 
+    **Revu le 2026-11-20 : après une modification, retour à la liste.** Sur le téléphone, la page passée
+    au nouvel oid affichait souvent un **statut vide**, « open » n'apparaissant qu'après un ou plusieurs
+    rafraîchissements : `orderStatus` ne connaissait pas encore le nouvel oid, et la page ignorait cette
+    réponse **en silence**, sous les champs de l'ancien ordre. Même retard qu'après une annulation (S8).
+    Désormais la page dit « Order updated · new OID … » et revient à la liste, qui lit `frontendOpenOrders`
+    (point 18), comme après une annulation ou le remplacement d'un trailing ; et un oid que `orderStatus`
+    ne connaît pas se dit sur la page (`unknownOrderText`), sans champs ni statut. Pas de relecture
+    automatique, par décision : la durée du retard n'est pas connue, et la liste a déjà la bonne réponse.
+    Vu le même jour sur une vraie réponse `unknownOid` (oid 1, gateway local, connecté) à 360 px, en clair (6,20:1) et en sombre (6,11:1) ; le cas normal (trailing 610736354584) affiche `open` sans message. Le retour à la liste et son toast, déclenchés à la main, sans modification réelle.
+
 18. **Un ordre posé depuis le mobile est listé dès la relecture qui suit l'écriture** (mesuré une
     fois, le 2026-11-16). La relecture du compte part à l'instant où `/exchange` répond, une seule
     fois ; si le listing suivait avec retard — le bot en a déjà vu un, cause non établie

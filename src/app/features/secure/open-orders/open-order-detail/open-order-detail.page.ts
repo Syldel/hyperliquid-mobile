@@ -1,4 +1,4 @@
-import { DatePipe, DecimalPipe, Location } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { OrderToastService } from '@services/order-toast.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
@@ -45,7 +45,7 @@ import { addIcons } from 'ionicons';
 import { closeOutline, createOutline, trashOutline } from 'ionicons/icons';
 import { catchError, map, Observable, of, switchMap } from 'rxjs';
 import { editRefusal } from '../editable-order.util';
-import { afterModify, ModifyOutcome } from '../modify-outcome.util';
+import { ModifyOutcome, modifyMessage, unknownOrderText } from '../modify-outcome.util';
 import { OrderFormComponent } from '../open-form/order-form.component';
 import { TrailingStopFormComponent } from '../trailing-stop-form/trailing-stop-form.component';
 import { afterTrailingForm, type TrailingReplaced } from '../trailing-stop-replace.util';
@@ -107,7 +107,6 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
   private readonly modalCtrl = inject(ModalController);
   private readonly availableCapitalService = inject(AvailableCapitalService);
   private readonly activity = inject(AccountActivityService);
-  private readonly location = inject(Location);
   private readonly navCtrl = inject(NavController);
   private readonly outlet = inject(IonRouterOutlet, { optional: true });
 
@@ -120,6 +119,8 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
   coinTitle = signal<string>('—');
   /** Pourquoi l'état courant d'un trailing ouvert n'a pas pu être lu (voir `liveTrailingState`). */
   trailingMissing = signal<string | null>(null);
+  /** `orderStatus` n'a pas rendu d'ordre : ce qu'on en dit (`unknownOrderText`). */
+  notFound = signal<string | null>(null);
   /** La position est en cours de lecture, avant d'ouvrir le remplacement. */
   readonly replacing = signal(false);
 
@@ -285,7 +286,17 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
   }
 
   onDataLoaded(data: OrderDetailData | null): void {
-    const status = data?.response?.order;
+    if (!data) return;
+    const unknown = unknownOrderText(data.response, this.oid() ?? 0);
+    this.notFound.set(unknown);
+    if (unknown) {
+      // Ni statut ni champs : ceux affichés seraient ceux d'un autre instant, ou d'un autre ordre.
+      this.order.set(null);
+      this.orderStatus.set(null);
+      this.trailingMissing.set(null);
+      return;
+    }
+    const status = data.response?.order;
     if (!status) return;
     const live = liveTrailingState(status.order, status.status, data.listed ?? null);
     this.order.set(live.kind === 'live' ? live.order : status.order);
@@ -387,21 +398,10 @@ export class OpenOrderDetailPage extends MenuBasePage implements OnInit {
    * et affichait « canceled » après un succès. Elle passe désormais au nouvel ordre — l'URL remplacée,
    * pour qu'un retour arrière ne ramène pas l'ancien — ou, si la réponse ne dit pas lequel, à la liste.
    */
+  /** Une modification acceptée : on le dit, et on revient à la liste (voir `modifyMessage`). */
   private followModify(outcome: Exclude<ModifyOutcome, { kind: 'refused' }>): void {
-    const { show, message } = afterModify(outcome);
-    this.showToast(message, 'success');
-    if (show === null) {
-      this.backToList();
-      return;
-    }
-    this.oid.set(show);
-    this.orderStatus.set(null);
-    this.statusTimestamp.set(null);
-    this.location.replaceState(
-      '/secure/open-orders/detail',
-      new URLSearchParams({ oid: String(show), coin: this.coin() }).toString(),
-    );
-    this.fetchFn.set(this.buildFetchFn());
+    this.showToast(modifyMessage(outcome), 'success');
+    this.backToList();
   }
 
   /**

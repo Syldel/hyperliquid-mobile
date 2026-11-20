@@ -30,7 +30,11 @@
 
   <app-agent-expiry-notice />
 
-  @if (order(); as o) { @if (editNote(); as refusal) {
+  @if (notFound(); as text) {
+  <ion-item lines="full" class="order-not-found">
+    <ion-label class="ion-text-wrap" role="alert">{{ text }}</ion-label>
+  </ion-item>
+  } @if (order(); as o) { @if (editNote(); as refusal) {
   <ion-item lines="full" class="edit-refusal">
     <ion-label class="ion-text-wrap">{{ refusal }}</ion-label>
   </ion-item>
